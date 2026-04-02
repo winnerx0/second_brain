@@ -1,0 +1,30 @@
+{
+  "name": "second-brain",
+  "module": "src/index.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "bun --watch src/index.ts",
+    "start": "bun src/index.ts",
+    "db:generate": "bunx drizzle-kit generate",
+    "db:migrate": "bunx drizzle-kit migrate",
+    "db:studio": "bunx drizzle-kit studio"
+  },
+  "dependencies": {
+    "@langchain/openai": "latest",
+    "@types/pg": "^8.20.0",
+    "dotenv": "^17.4.0",
+    "drizzle-orm": "latest",
+    "googleapis": "latest",
+    "hono": "latest",
+    "js-tiktoken": "^1.0.21",
+    "langchain": "latest",
+    "pg": "^8.20.0",
+    "zod": "latest"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "drizzle-kit": "latest",
+    "typescript": "latest"
+  }
+}
