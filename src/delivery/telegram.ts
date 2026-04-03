@@ -4,7 +4,7 @@ const TELEGRAM_API = `https://api.telegram.org/bot${config.TELEGRAM_BOT_TOKEN}`;
 const MAX_LENGTH = 4096;
 
 async function sendMessage(text: string): Promise<void> {
-  const res = await fetch(`${TELEGRAM_API}/sendMessage`, {
+  let res = await fetch(`${TELEGRAM_API}/sendMessage`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -13,6 +13,18 @@ async function sendMessage(text: string): Promise<void> {
       parse_mode: "Markdown",
     }),
   });
+
+  // Telegram v1 Markdown is strict — retry as plain text on parse errors
+  if (res.status === 400) {
+    res = await fetch(`${TELEGRAM_API}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: config.TELEGRAM_CHAT_ID,
+        text,
+      }),
+    });
+  }
 
   if (!res.ok) {
     const body = await res.text();
