@@ -9,6 +9,7 @@ import { storeMemory, recallMemories } from "./tools/memory.ts";
 import { db } from "./db/client.ts";
 import { agentRuns } from "./db/schema.ts";
 import { sendTelegramMessage } from "./delivery/telegram.ts";
+import { env } from "bun";
 
 const enc = getEncoding("cl100k_base");
 function countTokens(text: string) {
@@ -70,7 +71,7 @@ export async function runBriefing(): Promise<string> {
 }
 
 const CHAT_SYSTEM = new SystemMessage(
-  `You are a highly capable personal assistant. You serve one principal and operate with precision, discretion, and a formal tone at all times.
+  `You are a highly capable personal assistant for ${env.MASTER}. You serve one principal and operate with precision, discretion, and a formal tone at all times.
 
 Conduct:
 - Address the user respectfully. Be direct, concise, and professional — never casual or verbose.
@@ -94,7 +95,7 @@ export async function handleMessage(text: string): Promise<string> {
 
   const response = await agent.invoke(
     { messages: [CHAT_SYSTEM, new HumanMessage(text)] },
-    { recursionLimit: 25, configurable: { thread_id: THREAD_ID }, context: { master: "Winner" } },
+    { recursionLimit: 25, configurable: { thread_id: THREAD_ID } },
   );
 
   console.log("[chat] actual tokens used:", totalTokensUsed(response.messages as never[]));
