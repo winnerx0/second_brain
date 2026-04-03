@@ -92,6 +92,8 @@ const THREAD_ID = "default";
 
 export async function handleMessage(text: string): Promise<string> {
   console.log("[chat] estimated input tokens:", countTokens(CHAT_SYSTEM.content + text));
+  
+  console.log("[chat] input:", text)
 
   const response = await agent.invoke(
     { messages: [CHAT_SYSTEM, new HumanMessage(text)] },

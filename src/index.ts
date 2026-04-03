@@ -17,11 +17,11 @@ const cron = new CronJob("0 0 * * *", async () => {
   }
 });
 
-cron.start()
+cron.start();
 
 app.post("/chat", async (c) => {
-  const { message } = await c.req.json<{ message: string }>();
-  const content = await handleMessage(message);
+  const { message } = await c.req.json<{ message: { text: string } }>();
+  const content = await handleMessage(message.text);
   await sendTelegramMessage(content).catch((err) =>
     console.error("[telegram]", err),
   );

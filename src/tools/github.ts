@@ -19,7 +19,13 @@ interface EventItem {
   type: string;
   repo: { name: string };
   created_at: string;
-  payload: { commits?: Array<{ message: string }> };
+  payload: {
+    commits?: Array<{ message: string }>;
+    size?: number;
+    head?: string;
+    before?: string;
+    ref?: string;
+  };
 }
 
 export const getOpenPRs = tool(
@@ -90,16 +96,36 @@ export const getRecentPushes = tool(
       const events = (await res.json()) as EventItem[];
       const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-      const pushes = events
-        .filter(
-          (e) => e.type === "PushEvent" && new Date(e.created_at) > oneDayAgo,
-        )
-        .map((e) => ({
-          repo: e.repo.name,
-          pushedAt: e.created_at,
-          commitCount: e.payload.commits?.length ?? 0,
-        }));
-      console.log("pushed", events)
+      const pushEvents = events.filter(
+        (e) => e.type === "PushEvent" && new Date(e.created_at) > oneDayAgo,
+      );
+
+      const pushes = await Promise.all(
+        pushEvents.map(async (e) => {
+          let commits: string[] = e.payload.commits?.map((c) => c.message) ?? [];
+
+          if (commits.length === 0 && e.payload.head && e.payload.before) {
+            try {
+              const compareRes = await fetch(
+                `https://api.github.com/repos/${e.repo.name}/compare/${e.payload.before}...${e.payload.head}`,
+                { headers },
+              );
+              const compareData = await compareRes.json() as { commits?: Array<{ commit: { message: string } }> };
+              commits = compareData.commits?.map((c) => c.commit.message) ?? [];
+            } catch {
+              // keep empty
+            }
+          }
+
+          return {
+            repo: e.repo.name,
+            pushedAt: e.created_at,
+            commitCount: e.payload.size ?? commits.length,
+            commits,
+          };
+        }),
+      );
+
       return JSON.stringify(pushes);
     } catch (error) {
       console.error("[github]", error);
@@ -109,7 +135,7 @@ export const getRecentPushes = tool(
   {
     name: "get_recent_pushes",
     description:
-      "Get repos the user pushed to in the last 24 hours, with commit counts.",
+      "Get repos the user pushed to in the last 24 hours, with commit counts and commit messages.",
     schema: z.object({}),
   },
 );
