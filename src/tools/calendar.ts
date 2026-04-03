@@ -4,7 +4,7 @@ import { google } from "googleapis";
 import { config } from "../config.ts";
 
 function loadServiceAccount(): Record<string, string> {
-  return JSON.parse(config.GOOGLE_SERVICE_ACCOUNT_JSON);
+  return JSON.parse(config.GOOGLE_CREDENTIALS);
 }
 
 function getCalendarClient() {

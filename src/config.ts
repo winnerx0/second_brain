@@ -6,7 +6,7 @@ const envSchema = z.object({
   GITHUB_TOKEN: z.string().min(1),
   GITHUB_USERNAME: z.string().min(1),
   GOOGLE_CALENDAR_ID: z.string().min(1),
-  GOOGLE_SERVICE_ACCOUNT_JSON: z.string().min(1),
+  GOOGLE_CREDENTIALS: z.string().min(1),
   TELEGRAM_BOT_TOKEN: z.string().min(1),
   TELEGRAM_CHAT_ID: z.string().min(1),
   DATABASE_URL: z.string().min(1),
