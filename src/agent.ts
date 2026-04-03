@@ -1,5 +1,5 @@
 import { createAgent, HumanMessage, SystemMessage } from "langchain";
-import { MemorySaver } from "@langchain/langgraph";
+import { PostgresSaver } from "@langchain/langgraph-checkpoint-postgres";
 import { ChatOpenAI } from "@langchain/openai";
 import { getEncoding } from "js-tiktoken";
 import { config } from "./config.ts";
@@ -27,9 +27,11 @@ const model = new ChatOpenAI({
 });
 
 const tools = [getOpenPRs, getAssignedIssues, getRecentPushes, createIssue, getCalendarEvents, createCalendarEvent, createAllDayCalendarEvent, editCalendarEvent, deleteCalendarEvent, storeMemory, recallMemories];
-const memory = new MemorySaver();
 
-export const agent = createAgent({ model, tools, checkpointer: memory });
+const checkpointer = PostgresSaver.fromConnString(config.DATABASE_URL);
+await checkpointer.setup();
+
+export const agent = createAgent({ model, tools, checkpointer });
 
 const BRIEFING_SYSTEM_PROMPT = `You are a personal productivity assistant. Gather all available data using your tools, then produce a concise morning briefing. Use these sections:
 
