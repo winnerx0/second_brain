@@ -4,7 +4,7 @@ import { ChatOpenAI } from "@langchain/openai";
 import { getEncoding } from "js-tiktoken";
 import { config } from "./config.ts";
 import { getOpenPRs, getAssignedIssues, getRecentPushes, createIssue } from "./tools/github.ts";
-import { getTodaysEvents } from "./tools/calendar.ts";
+import { getCalendarEvents, createCalendarEvent, createAllDayCalendarEvent, editCalendarEvent, deleteCalendarEvent } from "./tools/calendar.ts";
 import { storeMemory, recallMemories } from "./tools/memory.ts";
 import { db } from "./db/client.ts";
 import { agentRuns } from "./db/schema.ts";
@@ -25,7 +25,7 @@ const model = new ChatOpenAI({
   maxRetries: 3,
 });
 
-const tools = [getOpenPRs, getAssignedIssues, getRecentPushes, createIssue, getTodaysEvents, storeMemory, recallMemories];
+const tools = [getOpenPRs, getAssignedIssues, getRecentPushes, createIssue, getCalendarEvents, createCalendarEvent, createAllDayCalendarEvent, editCalendarEvent, deleteCalendarEvent, storeMemory, recallMemories];
 const memory = new MemorySaver();
 
 export const agent = createAgent({ model, tools, checkpointer: memory });
@@ -70,7 +70,21 @@ export async function runBriefing(): Promise<string> {
 }
 
 const CHAT_SYSTEM = new SystemMessage(
-  "You are a personal productivity assistant. Use your tools to answer the user's question accurately and concisely. Format for Telegram markdown.",
+  `You are a highly capable personal assistant. You serve one principal and operate with precision, discretion, and a formal tone at all times.
+
+Conduct:
+- Address the user respectfully. Be direct, concise, and professional — never casual or verbose.
+- Anticipate needs where possible. If a request is ambiguous, make a reasonable assumption and state it briefly rather than asking unnecessary clarifying questions.
+- Never volunteer unsolicited opinions or commentary beyond what is relevant to the task.
+
+Tool use:
+- Always use your available tools to fulfil requests; do not speculate about information you can retrieve.
+- When creating or editing calendar events, always use UTC datetimes (ISO 8601 with Z suffix, e.g. "2026-04-03T14:00:00Z"). Never ask the user for a timezone.
+- For all-day events, use the dedicated all-day event tool with YYYY-MM-DD dates.
+
+Formatting:
+- Format all responses for Telegram markdown.
+- Keep responses brief. Use bullet points or short paragraphs — never long prose.`,
 );
 
 const THREAD_ID = "default";
@@ -80,7 +94,7 @@ export async function handleMessage(text: string): Promise<string> {
 
   const response = await agent.invoke(
     { messages: [CHAT_SYSTEM, new HumanMessage(text)] },
-    { recursionLimit: 25, configurable: { thread_id: THREAD_ID } },
+    { recursionLimit: 25, configurable: { thread_id: THREAD_ID }, context: { master: "Winner" } },
   );
 
   console.log("[chat] actual tokens used:", totalTokensUsed(response.messages as never[]));
