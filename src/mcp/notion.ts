@@ -41,7 +41,7 @@ export class NotionMcpClient {
           },
           {
             name: t.name,
-            description: t.description ?? t.name,
+            description: `${t.description ?? t.name}\n\nInput schema: ${JSON.stringify(t.inputSchema)}`,
             schema: z.object({
               input: z.record(z.any(), z.any()),
             }),
