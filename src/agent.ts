@@ -3,7 +3,7 @@ import { PostgresSaver } from "@langchain/langgraph-checkpoint-postgres";
 import { ChatOpenAI } from "@langchain/openai";
 import { getEncoding } from "js-tiktoken";
 import { config } from "./config.ts";
-import { getOpenPRs, getAssignedIssues, getRecentPushes, createIssue } from "./tools/github.ts";
+import { getOpenPRs, getAssignedIssues, getRecentPushes, createIssue, closeIssue, deleteIssue } from "./tools/github.ts";
 import { getCalendarEvents, createCalendarEvent, createAllDayCalendarEvent, editCalendarEvent, deleteCalendarEvent } from "./tools/calendar.ts";
 import { storeMemory, recallMemories } from "./tools/memory.ts";
 import { db } from "./db/client.ts";
@@ -23,11 +23,11 @@ function totalTokensUsed(messages: { usage_metadata?: { total_tokens?: number } 
 const model = new ChatOpenAI({
   apiKey: config.OPENAI_API_KEY,
   model: "gpt-5-nano",
-  temperature: 0,
+  temperature: 1,
   maxRetries: 3,
 });
 
-const tools = [getOpenPRs, getAssignedIssues, getRecentPushes, createIssue, getCalendarEvents, createCalendarEvent, createAllDayCalendarEvent, editCalendarEvent, deleteCalendarEvent, storeMemory, recallMemories];
+const tools = [getOpenPRs, getAssignedIssues, getRecentPushes, createIssue, closeIssue, deleteIssue, getCalendarEvents, createCalendarEvent, createAllDayCalendarEvent, editCalendarEvent, deleteCalendarEvent, storeMemory, recallMemories];
 
 const checkpointer = PostgresSaver.fromConnString(config.DATABASE_URL);
 await checkpointer.setup();

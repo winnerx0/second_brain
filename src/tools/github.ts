@@ -63,10 +63,12 @@ export const getAssignedIssues = tool(
   async () => {
     try {
       const res = await fetch(
-        `https://api.github.com/search/issues?q=assignee:${config.GITHUB_USERNAME}+state:open`,
+        `https://api.github.com/search/issues?q=is:issue+assignee:${config.GITHUB_USERNAME}+state:open`,
         { headers },
       );
       const data = (await res.json()) as { items?: SearchItem[] };
+      
+      logger.info(`[github] fetched ${data.items?.length ?? 0} assigned issues`);
       const items = data.items ?? [];
       return JSON.stringify(
         items.map((item) => ({
@@ -158,6 +160,7 @@ export const createIssue = tool(
             title,
             ...(body ? { body } : {}),
             ...(labels?.length ? { labels } : {}),
+            "assignees": [config.GITHUB_USERNAME]
           }),
         },
       );
@@ -193,6 +196,103 @@ export const createIssue = tool(
         .string()
         .optional()
         .describe("Repo owner — omit to use your own username"),
+    }),
+  },
+);
+
+export const closeIssue = tool(
+  async ({ repo, issue_number, owner }) => {
+    try {
+      const repoOwner = owner ?? config.GITHUB_USERNAME;
+      const res = await fetch(
+        `https://api.github.com/repos/${repoOwner}/${repo}/issues/${issue_number}`,
+        {
+          method: "PATCH",
+          headers: { ...headers, "Content-Type": "application/json" },
+          body: JSON.stringify({ state: "closed" }),
+        },
+      );
+
+      if (!res.ok) {
+        const err = await res.text();
+        return `Failed to close issue (${res.status}): ${err}`;
+      }
+
+      return `Issue #${issue_number} in ${repoOwner}/${repo} closed.`;
+    } catch (error) {
+      logger.error("[github]", error);
+      return `Error closing issue: ${error instanceof Error ? error.message : String(error)}`;
+    }
+  },
+  {
+    name: "close_issue",
+    description: "Close an open GitHub issue by number.",
+    schema: z.object({
+      repo: z.string().describe('Repository name (e.g. "second-brain")'),
+      issue_number: z.number().describe("Issue number to close"),
+      owner: z.string().optional().describe("Repo owner — omit to use your own username"),
+    }),
+  },
+);
+
+export const deleteIssue = tool(
+  async ({ repo, issue_number, owner }) => {
+    try {
+      const repoOwner = owner ?? config.GITHUB_USERNAME;
+      const res = await fetch("https://api.github.com/graphql", {
+        method: "POST",
+        headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          query: `
+            mutation {
+              deleteIssue(input: { issueId: "${issue_number}", clientMutationId: "delete" }) {
+                repository { name }
+              }
+            }
+          `,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.text();
+        return `Failed to delete issue (${res.status}): ${err}`;
+      }
+
+      // First resolve the node ID, then delete
+      const idRes = await fetch(
+        `https://api.github.com/repos/${repoOwner}/${repo}/issues/${issue_number}`,
+        { headers },
+      );
+
+      if (!idRes.ok) return `Issue #${issue_number} not found.`;
+
+      const issueData = await idRes.json() as { node_id: string };
+      const nodeId = issueData.node_id;
+
+      const delRes = await fetch("https://api.github.com/graphql", {
+        method: "POST",
+        headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          query: `mutation { deleteIssue(input: { issueId: "${nodeId}" }) { repository { name } } }`,
+        }),
+      });
+
+      const delData = await delRes.json() as { errors?: Array<{ message: string }> };
+      if (delData.errors?.length) return `GraphQL error: ${delData.errors[0]!.message}`;
+
+      return `Issue #${issue_number} in ${repoOwner}/${repo} deleted.`;
+    } catch (error) {
+      logger.error("[github]", error);
+      return `Error deleting issue: ${error instanceof Error ? error.message : String(error)}`;
+    }
+  },
+  {
+    name: "delete_issue",
+    description: "Permanently delete a GitHub issue by number. Requires admin access on the repository.",
+    schema: z.object({
+      repo: z.string().describe('Repository name (e.g. "second-brain")'),
+      issue_number: z.number().describe("Issue number to delete"),
+      owner: z.string().optional().describe("Repo owner — omit to use your own username"),
     }),
   },
 );
