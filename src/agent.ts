@@ -1,4 +1,4 @@
-import { createAgent, HumanMessage, SystemMessage } from "langchain";
+import { createAgent, HumanMessage, SystemMessage, trimMessages } from "langchain";
 import { PostgresSaver } from "@langchain/langgraph-checkpoint-postgres";
 import { ChatOpenAI } from "@langchain/openai";
 import { getEncoding } from "js-tiktoken";
@@ -11,7 +11,7 @@ import { agentRuns } from "./db/schema.ts";
 import { sendTelegramMessage } from "./delivery/telegram.ts";
 import { env } from "bun";
 import { logger } from "./logger.ts";
-import { client } from "./mcp/notion.ts";
+import { searchNotion, getNotionPage, createNotionPage, updateNotionPage, createNotionDatabase } from "./tools/notion.ts";
 
 const enc = getEncoding("cl100k_base");
 function countTokens(text: string) {
@@ -24,18 +24,26 @@ function totalTokensUsed(messages: { usage_metadata?: { total_tokens?: number } 
 const model = new ChatOpenAI({
   apiKey: config.OPENAI_API_KEY,
   model: "gpt-5-nano",
-  temperature: 0,
+  temperature: 1,
   maxRetries: 3,
 });
 
-const notionTools = await client.getTools()
-
-const tools = [getOpenPRs, getAssignedIssues, getRecentPushes, createIssue, closeIssue, deleteIssue, getCalendarEvents, createCalendarEvent, createAllDayCalendarEvent, editCalendarEvent, deleteCalendarEvent, storeMemory, recallMemories, ...notionTools];
+const tools = [getOpenPRs, getAssignedIssues, getRecentPushes, createIssue, closeIssue, deleteIssue, getCalendarEvents, createCalendarEvent, createAllDayCalendarEvent, editCalendarEvent, deleteCalendarEvent, storeMemory, recallMemories, searchNotion, getNotionPage, createNotionPage, updateNotionPage, createNotionDatabase];
 
 const checkpointer = PostgresSaver.fromConnString(config.DATABASE_URL);
 await checkpointer.setup();
 
-export const agent = createAgent({ model, tools, checkpointer });
+export const agent = createAgent({
+  model,
+  tools,
+  checkpointer,
+  messageModifier: (messages) =>
+    trimMessages(messages, {
+      maxTokens: 10,
+      strategy: "last",
+      tokenCounter: (msgs) => msgs.length,
+    }),
+});
 
 const BRIEFING_SYSTEM_PROMPT = `You are a personal productivity assistant. Gather all available data using your tools, then produce a concise morning briefing. Use these sections:
 
@@ -98,7 +106,7 @@ Tool use:
 - For all-day events, use the dedicated all-day event tool with YYYY-MM-DD dates.
 - When displaying times or durations to the user, always use natural language — e.g. "Thursday at 4pm", "tomorrow morning", "in about an hour" — never raw ISO strings.
 - Before closing or deleting a GitHub issue, you MUST first retrieve the issue number from the chat history or it is not found then call get_assigned_issues to retrieve the issue number. Never assume or guess an issue number.
-- For Notion: use API-post-page to create a page, API-post-search to find pages, API-retrieve-a-page to read a page, API-update-a-data-source to update existing content. "Put under", "add to", or "create under" always means create a new page with the parent set — never move.
+- For Notion: use search_notion to find pages, get_notion_page to read one, create_notion_page to create under a parent, update_notion_page to rename, create_notion_database for databases. "Put under", "add to", or "create under" always means create a new page — never move.
 
 Formatting:
 - Format all responses for Telegram markdown.
