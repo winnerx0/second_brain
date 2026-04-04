@@ -1,5 +1,4 @@
-import { createAgent, HumanMessage, SystemMessage, trimMessages } from "langchain";
-import { PostgresSaver } from "@langchain/langgraph-checkpoint-postgres";
+import { createAgent, HumanMessage, SystemMessage } from "langchain";
 import { ChatOpenAI } from "@langchain/openai";
 import { getEncoding } from "js-tiktoken";
 import { config } from "./config.ts";
@@ -30,20 +29,7 @@ const model = new ChatOpenAI({
 
 const tools = [getOpenPRs, getAssignedIssues, getRecentPushes, createIssue, closeIssue, deleteIssue, getCalendarEvents, createCalendarEvent, createAllDayCalendarEvent, editCalendarEvent, deleteCalendarEvent, storeMemory, recallMemories, searchNotion, getNotionPage, createNotionPage, updateNotionPage, createNotionDatabase];
 
-const checkpointer = PostgresSaver.fromConnString(config.DATABASE_URL);
-await checkpointer.setup();
-
-export const agent = createAgent({
-  model,
-  tools,
-  checkpointer,
-  messageModifier: (messages) =>
-    trimMessages(messages, {
-      maxTokens: 10,
-      strategy: "last",
-      tokenCounter: (msgs) => msgs.length,
-    }),
-});
+export const agent = createAgent({ model, tools });
 
 const BRIEFING_SYSTEM_PROMPT = `You are a personal productivity assistant. Gather all available data using your tools, then produce a concise morning briefing. Use these sections:
 
@@ -55,8 +41,6 @@ ONE THING
 
 Keep under 400 words. Format for Telegram markdown.`;
 
-const BRIEFING_THREAD_ID = "briefing";
-const CHAT_THREAD_ID = "chat";
 
 export async function runBriefing(): Promise<string> {
   const input = BRIEFING_SYSTEM_PROMPT + "Generate my daily briefing now.";
@@ -69,7 +53,7 @@ export async function runBriefing(): Promise<string> {
         new HumanMessage("Generate my daily briefing now."),
       ],
     },
-    { recursionLimit: 25, configurable: { thread_id: BRIEFING_THREAD_ID } },
+    { recursionLimit: 25 },
   );
 
   logger.info(`[briefing] actual tokens used: ${totalTokensUsed(response.messages as never[])}`);
@@ -120,7 +104,7 @@ export async function handleMessage(text: string): Promise<string> {
 
   const response = await agent.invoke(
     { messages: [CHAT_SYSTEM, new HumanMessage(text)] },
-    { recursionLimit: 25, configurable: { thread_id: CHAT_THREAD_ID } },
+    { recursionLimit: 25 },
   );
 
   logger.info(`[chat] actual tokens used: ${totalTokensUsed(response.messages as never[])}`);
