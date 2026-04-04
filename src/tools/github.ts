@@ -67,8 +67,10 @@ export const getAssignedIssues = tool(
         { headers },
       );
       const data = (await res.json()) as { items?: SearchItem[] };
-      
-      logger.info(`[github] fetched ${data.items?.length ?? 0} assigned issues`);
+
+      logger.info(
+        `[github] fetched ${data.items?.length ?? 0} assigned issues`,
+      );
       const items = data.items ?? [];
       return JSON.stringify(
         items.map((item) => ({
@@ -85,7 +87,7 @@ export const getAssignedIssues = tool(
   },
   {
     name: "get_assigned_issues",
-    description: "Get all open issues assigned to the user.",
+    description: "Get all open issues assigned to the user. Call this tool before closing or deleting an issue.",
     schema: z.object({}),
   },
 );
@@ -160,7 +162,7 @@ export const createIssue = tool(
             title,
             ...(body ? { body } : {}),
             ...(labels?.length ? { labels } : {}),
-            "assignees": [config.GITHUB_USERNAME]
+            assignees: [config.GITHUB_USERNAME],
           }),
         },
       );
@@ -201,6 +203,7 @@ export const createIssue = tool(
 );
 
 export const closeIssue = tool(
+  
   async ({ repo, issue_number, owner }) => {
     try {
       const repoOwner = owner ?? config.GITHUB_USERNAME;
@@ -226,11 +229,14 @@ export const closeIssue = tool(
   },
   {
     name: "close_issue",
-    description: "Close an open GitHub issue by number.",
+    description: "Close an open GitHub issue by number. If you do not already have the issue number, call get_assigned_issues first to retrieve it.",
     schema: z.object({
       repo: z.string().describe('Repository name (e.g. "second-brain")'),
       issue_number: z.number().describe("Issue number to close"),
-      owner: z.string().optional().describe("Repo owner — omit to use your own username"),
+      owner: z
+        .string()
+        .optional()
+        .describe("Repo owner — omit to use your own username"),
     }),
   },
 );
@@ -266,7 +272,7 @@ export const deleteIssue = tool(
 
       if (!idRes.ok) return `Issue #${issue_number} not found.`;
 
-      const issueData = await idRes.json() as { node_id: string };
+      const issueData = (await idRes.json()) as { node_id: string };
       const nodeId = issueData.node_id;
 
       const delRes = await fetch("https://api.github.com/graphql", {
@@ -277,8 +283,11 @@ export const deleteIssue = tool(
         }),
       });
 
-      const delData = await delRes.json() as { errors?: Array<{ message: string }> };
-      if (delData.errors?.length) return `GraphQL error: ${delData.errors[0]!.message}`;
+      const delData = (await delRes.json()) as {
+        errors?: Array<{ message: string }>;
+      };
+      if (delData.errors?.length)
+        return `GraphQL error: ${delData.errors[0]!.message}`;
 
       return `Issue #${issue_number} in ${repoOwner}/${repo} deleted.`;
     } catch (error) {
@@ -288,11 +297,15 @@ export const deleteIssue = tool(
   },
   {
     name: "delete_issue",
-    description: "Permanently delete a GitHub issue by number. Requires admin access on the repository.",
+    description:
+      "Permanently delete a GitHub issue by number. Requires admin access on the repository. If you do not already have the issue number, call get_assigned_issues first to retrieve it.",
     schema: z.object({
       repo: z.string().describe('Repository name (e.g. "second-brain")'),
       issue_number: z.number().describe("Issue number to delete"),
-      owner: z.string().optional().describe("Repo owner — omit to use your own username"),
+      owner: z
+        .string()
+        .optional()
+        .describe("Repo owner — omit to use your own username"),
     }),
   },
 );
