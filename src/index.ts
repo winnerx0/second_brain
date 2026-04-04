@@ -8,7 +8,7 @@ const app = new Hono();
 
 export const logger = createLogger({
   level: "info",
-  format: format.combine(format.timestamp(), format.json()),
+  format: format.combine(format.simple()),
   transports: [new transports.Console()],
 });
 
