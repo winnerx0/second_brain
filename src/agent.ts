@@ -1,4 +1,4 @@
-import { createAgent, HumanMessage, SystemMessage, trimMessages } from "langchain";
+import { createAgent, HumanMessage, SystemMessage } from "langchain";
 import { PostgresSaver } from "@langchain/langgraph-checkpoint-postgres";
 import { ChatOpenAI } from "@langchain/openai";
 import { getEncoding } from "js-tiktoken";
@@ -33,17 +33,7 @@ const tools = [getOpenPRs, getAssignedIssues, getRecentPushes, createIssue, clos
 const checkpointer = PostgresSaver.fromConnString(config.DATABASE_URL);
 await checkpointer.setup();
 
-export const agent = createAgent({
-  model,
-  tools,
-  checkpointer,
-  messageModifier: (messages) =>
-    trimMessages(messages, {
-      maxTokens: 10,
-      strategy: "last",
-      tokenCounter: (msgs) => msgs.length,
-    }),
-});
+export const agent = createAgent({ model, tools, checkpointer });
 
 const BRIEFING_SYSTEM_PROMPT = `You are a personal productivity assistant. Gather all available data using your tools, then produce a concise morning briefing. Use these sections:
 
@@ -113,14 +103,22 @@ Formatting:
 - Keep responses brief. Use bullet points or short paragraphs — never long prose.`,
 );
 
+const CHAT_CONFIG = { recursionLimit: 25, configurable: { thread_id: CHAT_THREAD_ID } };
+
 export async function handleMessage(text: string): Promise<string> {
   logger.info(`[chat] estimated input tokens: ${countTokens(CHAT_SYSTEM.content + text)}`);
-  
   logger.info(`[chat] input: ${text}`);
+
+  // Trim thread to last 10 messages before invoking
+  const state = await agent.getState(CHAT_CONFIG);
+  const history: unknown[] = state.values?.messages ?? [];
+  if (history.length > 10) {
+    await agent.updateState(CHAT_CONFIG, { messages: history.slice(-10) });
+  }
 
   const response = await agent.invoke(
     { messages: [CHAT_SYSTEM, new HumanMessage(text)] },
-    { recursionLimit: 25, configurable: { thread_id: CHAT_THREAD_ID } },
+    CHAT_CONFIG,
   );
 
   logger.info(`[chat] actual tokens used: ${totalTokensUsed(response.messages as never[])}`);
