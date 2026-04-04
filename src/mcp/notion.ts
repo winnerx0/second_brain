@@ -1,52 +1,22 @@
-import { Client, StdioClientTransport } from "@modelcontextprotocol/client";
-import { z } from "zod";
+import { MultiServerMCPClient } from "@langchain/mcp-adapters";
 import { config } from "../config";
-import { tool } from "langchain";
 
-export class NotionMcpClient {
-  client: Client;
+export const client = new MultiServerMCPClient({
+  throwOnLoadError: true,
 
-  transport: StdioClientTransport;
+  useStandardContentBlocks: true,
 
-  constructor() {
-    this.transport = new StdioClientTransport({
+  mcpServers: {
+    notion: {
+      transport: "stdio",
       command: "npx",
       args: ["-y", "@notionhq/notion-mcp-server"],
       env: { ...process.env, NOTION_TOKEN: config.NOTION_TOKEN },
-    });
-    this.client = new Client({ name: "notion", version: "1.0.0" });
-  }
-
-  async connect() {
-    await this.client.connect(this.transport);
-  }
-
-  async load() {
-    const { tools } = await this.client.listTools();
-    return tools;
-  }
-
-  async getTools(names: string[]) {
-    const { tools: mcpTools } = await this.client.listTools();
-    return mcpTools
-      .filter((t) => names.includes(t.name))
-      .map((t) =>
-        tool(
-          async ({ input }: { input: Record<string, unknown> }) => {
-            const result = await this.client.callTool({
-              name: t.name,
-              arguments: input,
-            });
-            return JSON.stringify(result.content);
-          },
-          {
-            name: t.name,
-            description: `${t.description ?? t.name}\n\nInput schema: ${JSON.stringify(t.inputSchema)}`,
-            schema: z.object({
-              input: z.record(z.any(), z.any()),
-            }),
-          },
-        ),
-      );
-  }
-}
+      restart: {
+        enabled: true,
+        maxAttempts: 3,
+        delayMs: 1000,
+      },
+    },
+  },
+});
