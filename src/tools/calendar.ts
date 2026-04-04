@@ -2,7 +2,7 @@ import { tool } from "langchain";
 import { z } from "zod";
 import { google } from "googleapis";
 import { config } from "../config.ts";
-import { logger } from "../index.ts";
+import { logger } from "../logger.ts";
 
 function loadServiceAccount(): Record<string, string> {
   return JSON.parse(config.GOOGLE_CREDENTIALS);

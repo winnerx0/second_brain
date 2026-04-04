@@ -1,7 +1,7 @@
 import { Client, StdioClientTransport } from "@modelcontextprotocol/client";
-import { tool } from "langchain/tools";
 import { z } from "zod";
 import { config } from "../config";
+import { tool } from "langchain";
 
 export class NotionMcpClient {
   client: Client;
@@ -39,7 +39,7 @@ export class NotionMcpClient {
           {
             name: t.name,
             description: t.description ?? t.name,
-            schema: z.record(z.any()),
+            schema: z.record(z.any(), z.any()),
           },
         ),
       );

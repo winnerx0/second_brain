@@ -1,7 +1,7 @@
 import { tool } from "langchain";
 import { z } from "zod";
 import { config } from "../config.ts";
-import { logger } from "../index.ts";
+import { logger } from "../logger.ts";
 
 const headers = {
   Authorization: `Bearer ${config.GITHUB_TOKEN}`,
@@ -87,7 +87,7 @@ export const getAssignedIssues = tool(
   },
   {
     name: "get_assigned_issues",
-    description: "Get all open issues assigned to the user. Call this tool before closing or deleting an issue.",
+    description: "Get all open issues assigned to the user.",
     schema: z.object({}),
   },
 );

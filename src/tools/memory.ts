@@ -3,7 +3,7 @@ import { z } from "zod";
 import { db } from "../db/client.ts";
 import { memories } from "../db/schema.ts";
 import { sql } from "drizzle-orm";
-import { logger } from "../index.ts";
+import { logger } from "../logger.ts";
 
 export const storeMemory = tool(
   async ({ content, category }) => {
