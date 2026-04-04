@@ -1,5 +1,5 @@
 import { Client, StdioClientTransport } from "@modelcontextprotocol/client";
-import { env } from "bun";
+import { config } from "../config";
 
 export class NotionMcpClient {
   client: Client;
@@ -10,7 +10,7 @@ export class NotionMcpClient {
     this.transport = new StdioClientTransport({
       command: "npx",
       args: ["-y", "@notionhq/notion-mcp-server"],
-      env: { ...process.env, NOTION_TOKEN: env.NOTION_TOKEN },
+      env: { ...process.env, NOTION_TOKEN: config.NOTION_TOKEN },
     });
     this.client = new Client({ name: "notion", version: "1.0.0" });
   }
@@ -20,6 +20,7 @@ export class NotionMcpClient {
   }
 
   async load() {
-    return await this.client.listTools();
+    const { tools } = await this.client.listTools();
+    return tools;
   }
 }
