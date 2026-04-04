@@ -1,4 +1,4 @@
-import { createAgent, HumanMessage, SystemMessage } from "langchain";
+import { createAgent, HumanMessage, SystemMessage, AIMessage } from "langchain";
 import { ChatOpenAI } from "@langchain/openai";
 import { getEncoding } from "js-tiktoken";
 import { config } from "./config.ts";
@@ -6,7 +6,8 @@ import { getOpenPRs, getAssignedIssues, getRecentPushes, createIssue, closeIssue
 import { getCalendarEvents, createCalendarEvent, createAllDayCalendarEvent, editCalendarEvent, deleteCalendarEvent } from "./tools/calendar.ts";
 import { storeMemory, recallMemories } from "./tools/memory.ts";
 import { db } from "./db/client.ts";
-import { agentRuns } from "./db/schema.ts";
+import { agentRuns, chatHistory } from "./db/schema.ts";
+import { desc } from "drizzle-orm";
 import { sendTelegramMessage } from "./delivery/telegram.ts";
 import { env } from "bun";
 import { logger } from "./logger.ts";
@@ -98,16 +99,33 @@ Formatting:
 );
 
 export async function handleMessage(text: string): Promise<string> {
-  logger.info(`[chat] estimated input tokens: ${countTokens(CHAT_SYSTEM.content + text)}`);
-  
   logger.info(`[chat] input: ${text}`);
 
+  const rows = await db
+    .select()
+    .from(chatHistory)
+    .orderBy(desc(chatHistory.createdAt))
+    .limit(10);
+
+  const history = rows.reverse().map((r) =>
+    r.role === "user" ? new HumanMessage(r.content) : new AIMessage(r.content),
+  );
+
+  logger.info(`[chat] estimated input tokens: ${countTokens(CHAT_SYSTEM.content + text)}`);
+
   const response = await agent.invoke(
-    { messages: [CHAT_SYSTEM, new HumanMessage(text)] },
+    { messages: [CHAT_SYSTEM, ...history, new HumanMessage(text)] },
     { recursionLimit: 25 },
   );
 
+  const reply = String(response.messages[response.messages.length - 1]?.content ?? "");
+
+  await db.insert(chatHistory).values([
+    { role: "user", content: text },
+    { role: "assistant", content: reply },
+  ]);
+
   logger.info(`[chat] actual tokens used: ${totalTokensUsed(response.messages as never[])}`);
 
-  return String(response.messages[response.messages.length - 1]?.content ?? "");
+  return reply;
 }

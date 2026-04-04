@@ -31,3 +31,10 @@ export const memories = pgTable("memories", {
   category: text("category").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
+
+export const chatHistory = pgTable("chat_history", {
+  id: serial("id").primaryKey(),
+  role: text("role").notNull(), // "user" | "assistant"
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});

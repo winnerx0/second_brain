@@ -8,6 +8,13 @@
       "when": 1775146880310,
       "tag": "0000_wandering_sumo",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1775311164912,
+      "tag": "0001_fixed_goblin_queen",
+      "breakpoints": true
     }
   ]
 }
