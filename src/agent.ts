@@ -23,7 +23,7 @@ function totalTokensUsed(messages: { usage_metadata?: { total_tokens?: number } 
 const model = new ChatOpenAI({
   apiKey: config.OPENAI_API_KEY,
   model: "gpt-5-nano",
-  temperature: 1,
+  temperature: 0,
   maxRetries: 3,
 });
 
@@ -44,7 +44,8 @@ ONE THING
 
 Keep under 400 words. Format for Telegram markdown.`;
 
-const THREAD_ID = "1";
+const BRIEFING_THREAD_ID = "briefing";
+const CHAT_THREAD_ID = "chat";
 
 export async function runBriefing(): Promise<string> {
   const input = BRIEFING_SYSTEM_PROMPT + "Generate my daily briefing now.";
@@ -57,7 +58,7 @@ export async function runBriefing(): Promise<string> {
         new HumanMessage("Generate my daily briefing now."),
       ],
     },
-    { recursionLimit: 25, configurable: { thread_id: THREAD_ID } },
+    { recursionLimit: 25, configurable: { thread_id: BRIEFING_THREAD_ID } },
   );
 
   logger.info(`[briefing] actual tokens used: ${totalTokensUsed(response.messages as never[])}`);
@@ -105,7 +106,7 @@ export async function handleMessage(text: string): Promise<string> {
 
   const response = await agent.invoke(
     { messages: [CHAT_SYSTEM, new HumanMessage(text)] },
-    { recursionLimit: 25, configurable: { thread_id: THREAD_ID } },
+    { recursionLimit: 25, configurable: { thread_id: CHAT_THREAD_ID } },
   );
 
   logger.info(`[chat] actual tokens used: ${totalTokensUsed(response.messages as never[])}`);
