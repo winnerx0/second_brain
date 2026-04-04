@@ -60,7 +60,7 @@ export async function runBriefing(): Promise<string> {
     { recursionLimit: 25, configurable: { thread_id: THREAD_ID } },
   );
 
-  logger.info("[briefing] actual tokens used:", totalTokensUsed(response.messages as never[]));
+  logger.info(`[briefing] actual tokens used: ${totalTokensUsed(response.messages as never[])}`);
 
   const briefing = String(response.messages[response.messages.length - 1]?.content ?? "");
 
@@ -108,7 +108,7 @@ export async function handleMessage(text: string): Promise<string> {
     { recursionLimit: 25, configurable: { thread_id: THREAD_ID } },
   );
 
-  logger.info("[chat] actual tokens used:", totalTokensUsed(response.messages as never[]));
+  logger.info(`[chat] actual tokens used: ${totalTokensUsed(response.messages as never[])}`);
 
   return String(response.messages[response.messages.length - 1]?.content ?? "");
 }
