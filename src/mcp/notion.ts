@@ -11,7 +11,7 @@ export const client = new MultiServerMCPClient({
       transport: "stdio",
       command: "npx",
       args: ["-y", "@notionhq/notion-mcp-server"],
-      env: { ...process.env, OPENAPI_MCP_HEADERS: `{"Authorization": "Bearer ${config.NOTION_TOKEN}"}` },
+      env: { ...process.env, OPENAPI_MCP_HEADERS: `{"Authorization":"Bearer ${config.NOTION_TOKEN}","Notion-Version":"2022-06-28"}` },
       restart: {
         enabled: true,
         maxAttempts: 3,

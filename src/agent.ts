@@ -24,7 +24,7 @@ function totalTokensUsed(messages: { usage_metadata?: { total_tokens?: number } 
 const model = new ChatOpenAI({
   apiKey: config.OPENAI_API_KEY,
   model: "gpt-5-nano",
-  temperature: 1,
+  temperature: 0,
   maxRetries: 3,
 });
 
