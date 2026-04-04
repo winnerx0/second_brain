@@ -1,6 +1,7 @@
 import { tool } from "langchain";
 import { z } from "zod";
 import { config } from "../config.ts";
+import { logger } from "../index.ts";
 
 const headers = {
   Authorization: `Bearer ${config.GITHUB_TOKEN}`,
@@ -35,7 +36,7 @@ export const getOpenPRs = tool(
         `https://api.github.com/search/issues?q=author:${config.GITHUB_USERNAME}+type:pr+state:open`,
         { headers },
       );
-      const data = await res.json() as { items?: SearchItem[] };
+      const data = (await res.json()) as { items?: SearchItem[] };
       const items = data.items ?? [];
       return JSON.stringify(
         items.map((item) => ({
@@ -46,13 +47,14 @@ export const getOpenPRs = tool(
         })),
       );
     } catch (error) {
-      console.error("[github]", error);
+      logger.error("[github]", error);
       return `Error fetching open PRs: ${error instanceof Error ? error.message : String(error)}`;
     }
   },
   {
     name: "get_open_prs",
-    description: "Get all open pull requests authored by the user across all repos.",
+    description:
+      "Get all open pull requests authored by the user across all repos.",
     schema: z.object({}),
   },
 );
@@ -64,7 +66,7 @@ export const getAssignedIssues = tool(
         `https://api.github.com/search/issues?q=assignee:${config.GITHUB_USERNAME}+state:open`,
         { headers },
       );
-      const data = await res.json() as { items?: SearchItem[] };
+      const data = (await res.json()) as { items?: SearchItem[] };
       const items = data.items ?? [];
       return JSON.stringify(
         items.map((item) => ({
@@ -75,7 +77,7 @@ export const getAssignedIssues = tool(
         })),
       );
     } catch (error) {
-      console.error("[github]", error);
+      logger.error("[github]", error);
       return `Error fetching assigned issues: ${error instanceof Error ? error.message : String(error)}`;
     }
   },
@@ -102,7 +104,8 @@ export const getRecentPushes = tool(
 
       const pushes = await Promise.all(
         pushEvents.map(async (e) => {
-          let commits: string[] = e.payload.commits?.map((c) => c.message) ?? [];
+          let commits: string[] =
+            e.payload.commits?.map((c) => c.message) ?? [];
 
           if (commits.length === 0 && e.payload.head && e.payload.before) {
             try {
@@ -110,7 +113,9 @@ export const getRecentPushes = tool(
                 `https://api.github.com/repos/${e.repo.name}/compare/${e.payload.before}...${e.payload.head}`,
                 { headers },
               );
-              const compareData = await compareRes.json() as { commits?: Array<{ commit: { message: string } }> };
+              const compareData = (await compareRes.json()) as {
+                commits?: Array<{ commit: { message: string } }>;
+              };
               commits = compareData.commits?.map((c) => c.commit.message) ?? [];
             } catch {
               // keep empty
@@ -128,7 +133,7 @@ export const getRecentPushes = tool(
 
       return JSON.stringify(pushes);
     } catch (error) {
-      console.error("[github]", error);
+      logger.error("[github]", error);
       return `Error fetching recent pushes: ${error instanceof Error ? error.message : String(error)}`;
     }
   },
@@ -162,10 +167,10 @@ export const createIssue = tool(
         return `Failed to create issue (${res.status}): ${err}`;
       }
 
-      const data = await res.json() as { html_url: string; number: number };
+      const data = (await res.json()) as { html_url: string; number: number };
       return `Issue #${data.number} created: ${data.html_url}`;
     } catch (error) {
-      console.error("[github]", error);
+      logger.error("[github]", error);
       return `Error creating issue: ${error instanceof Error ? error.message : String(error)}`;
     }
   },
@@ -174,12 +179,20 @@ export const createIssue = tool(
     description:
       "Open a new GitHub issue on a specified repository. Owner defaults to the authenticated user.",
     schema: z.object({
-      repo: z.string().describe("Repository name (e.g. \"second-brain\")"),
+      repo: z.string().describe('Repository name (e.g. "second-brain")'),
       title: z.string().describe("Issue title"),
-      body: z.string().optional().describe("Issue body / description (markdown)"),
-      labels: z.array(z.string()).optional().describe("Labels to apply (e.g. [\"bug\", \"enhancement\"])"),
-      owner: z.string().optional().describe("Repo owner — omit to use your own username"),
+      body: z
+        .string()
+        .optional()
+        .describe("Issue body / description (markdown)"),
+      labels: z
+        .array(z.string())
+        .optional()
+        .describe('Labels to apply (e.g. ["bug", "enhancement"])'),
+      owner: z
+        .string()
+        .optional()
+        .describe("Repo owner — omit to use your own username"),
     }),
   },
 );
-

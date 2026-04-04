@@ -10,6 +10,7 @@ import { db } from "./db/client.ts";
 import { agentRuns } from "./db/schema.ts";
 import { sendTelegramMessage } from "./delivery/telegram.ts";
 import { env } from "bun";
+import { logger } from "./index.ts";
 
 const enc = getEncoding("cl100k_base");
 function countTokens(text: string) {
@@ -43,6 +44,8 @@ ONE THING
 
 Keep under 400 words. Format for Telegram markdown.`;
 
+const THREAD_ID = "1";
+
 export async function runBriefing(): Promise<string> {
   const input = BRIEFING_SYSTEM_PROMPT + "Generate my daily briefing now.";
   console.log("[briefing] estimated input tokens:", countTokens(input));
@@ -54,10 +57,10 @@ export async function runBriefing(): Promise<string> {
         new HumanMessage("Generate my daily briefing now."),
       ],
     },
-    { recursionLimit: 25 },
+    { recursionLimit: 25, configurable: { thread_id: THREAD_ID } },
   );
 
-  console.log("[briefing] actual tokens used:", totalTokensUsed(response.messages as never[]));
+  logger.info("[briefing] actual tokens used:", totalTokensUsed(response.messages as never[]));
 
   const briefing = String(response.messages[response.messages.length - 1]?.content ?? "");
 
@@ -90,19 +93,17 @@ Formatting:
 - Keep responses brief. Use bullet points or short paragraphs — never long prose.`,
 );
 
-const THREAD_ID = "default";
-
 export async function handleMessage(text: string): Promise<string> {
   console.log("[chat] estimated input tokens:", countTokens(CHAT_SYSTEM.content + text));
   
-  console.log("[chat] input:", text)
+  logger.info("[chat] input:", text)
 
   const response = await agent.invoke(
     { messages: [CHAT_SYSTEM, new HumanMessage(text)] },
     { recursionLimit: 25, configurable: { thread_id: THREAD_ID } },
   );
 
-  console.log("[chat] actual tokens used:", totalTokensUsed(response.messages as never[]));
+  logger.info("[chat] actual tokens used:", totalTokensUsed(response.messages as never[]));
 
   return String(response.messages[response.messages.length - 1]?.content ?? "");
 }

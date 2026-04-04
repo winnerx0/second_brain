@@ -22,6 +22,7 @@
     "js-tiktoken": "^1.0.21",
     "langchain": "latest",
     "pg": "^8.20.0",
+    "winston": "^3.19.0",
     "zod": "latest"
   },
   "devDependencies": {

@@ -2,6 +2,7 @@ import { tool } from "langchain";
 import { z } from "zod";
 import { google } from "googleapis";
 import { config } from "../config.ts";
+import { logger } from "../index.ts";
 
 function loadServiceAccount(): Record<string, string> {
   return JSON.parse(config.GOOGLE_CREDENTIALS);
@@ -53,7 +54,7 @@ export const getCalendarEvents = tool(
 
       return JSON.stringify(events);
     } catch (error) {
-      console.error("[calendar]", error);
+      logger.error("[calendar]", error);
       return `Error fetching calendar events: ${error instanceof Error ? error.message : String(error)}`;
     }
   },
@@ -89,7 +90,7 @@ export const createCalendarEvent = tool(
       const event = response.data;
       return `Event created: "${event.summary}" on ${event.start?.dateTime ?? event.start?.date} — ${event.htmlLink}`;
     } catch (error) {
-      console.error("[calendar]", error);
+      logger.error("[calendar]", error);
       return `Error creating calendar event: ${error instanceof Error ? error.message : String(error)}`;
     }
   },
@@ -127,7 +128,7 @@ export const createAllDayCalendarEvent = tool(
       const event = response.data;
       return `All-day event created: "${event.summary}" on ${event.start?.date} — ${event.htmlLink}`;
     } catch (error) {
-      console.error("[calendar]", error);
+      logger.error("[calendar]", error);
       return `Error creating all-day event: ${error instanceof Error ? error.message : String(error)}`;
     }
   },
@@ -201,7 +202,7 @@ export const editCalendarEvent = tool(
       const event = response.data;
       return `Event edited: "${event.summary}" on ${event.start?.dateTime ?? event.start?.date} — ${event.htmlLink}`;
     } catch (error) {
-      console.error("[calendar]", error);
+      logger.error("[calendar]", error);
       return `Error editing calendar event: ${error instanceof Error ? error.message : String(error)}`;
     }
   },
@@ -234,7 +235,7 @@ export const deleteCalendarEvent = tool(
 
       return `Event "${found.summary}" deleted successfully`;
     } catch (error) {
-      console.error("[calendar]", error);
+      logger.error("[calendar]", error);
       return `Error deleting calendar event: ${error instanceof Error ? error.message : String(error)}`;
     }
   },

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { db } from "../db/client.ts";
 import { memories } from "../db/schema.ts";
 import { sql } from "drizzle-orm";
+import { logger } from "../index.ts";
 
 export const storeMemory = tool(
   async ({ content, category }) => {
@@ -10,7 +11,7 @@ export const storeMemory = tool(
       await db.insert(memories).values({ content, category });
       return `Memory stored: "${content}" [${category}]`;
     } catch (error) {
-      console.error("[memory]", error);
+      logger.error("[memory]", error);
       return `Error storing memory: ${error instanceof Error ? error.message : String(error)}`;
     }
   },
@@ -51,7 +52,7 @@ export const recallMemories = tool(
         })),
       );
     } catch (error) {
-      console.error("[memory]", error);
+      logger.error("[memory]", error);
       return `Error recalling memories: ${error instanceof Error ? error.message : String(error)}`;
     }
   },
