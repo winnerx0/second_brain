@@ -10,7 +10,8 @@ import { db } from "./db/client.ts";
 import { agentRuns } from "./db/schema.ts";
 import { sendTelegramMessage } from "./delivery/telegram.ts";
 import { env } from "bun";
-import { logger } from "./index.ts";
+import { logger } from "./logger.ts";
+import { NotionMcpClient } from "./mcp/notion.ts";
 
 const enc = getEncoding("cl100k_base");
 function countTokens(text: string) {
@@ -27,7 +28,18 @@ const model = new ChatOpenAI({
   maxRetries: 3,
 });
 
-const tools = [getOpenPRs, getAssignedIssues, getRecentPushes, createIssue, closeIssue, deleteIssue, getCalendarEvents, createCalendarEvent, createAllDayCalendarEvent, editCalendarEvent, deleteCalendarEvent, storeMemory, recallMemories];
+const notionClient = new NotionMcpClient();
+await notionClient.connect();
+const notionTools = await notionClient.getTools([
+  "API-post-search",
+  "API-retrieve-a-page",
+  "API-post-page",
+  "API-update-a-data-source",
+  "API-create-a-data-source",
+]);
+logger.info(`[notion] loaded ${notionTools.length} tools`);
+
+const tools = [getOpenPRs, getAssignedIssues, getRecentPushes, createIssue, closeIssue, deleteIssue, getCalendarEvents, createCalendarEvent, createAllDayCalendarEvent, editCalendarEvent, deleteCalendarEvent, storeMemory, recallMemories, ...notionTools];
 
 const checkpointer = PostgresSaver.fromConnString(config.DATABASE_URL);
 await checkpointer.setup();

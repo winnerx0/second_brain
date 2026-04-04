@@ -2,24 +2,9 @@ import { Hono } from "hono";
 import { runBriefing, handleMessage } from "./agent.ts";
 import { sendTelegramMessage } from "./delivery/telegram.ts";
 import { CronJob } from "cron";
-import { createLogger, format, transports } from "winston";
+import { logger } from "./logger.ts";
 
 const app = new Hono();
-
-export const logger = createLogger({
-  level: "info",
-  format: format.combine(
-    format.errors({ stack: true }),
-    format.timestamp({ format: "YYYY-MM-DD HH:mm:ss" }),
-    format.colorize(),
-    format.printf(({ level, message, timestamp, stack }) =>
-      stack
-        ? `${timestamp} ${level}: ${message}\n${stack}`
-        : `${timestamp} ${level}: ${message}`,
-    ),
-  ),
-  transports: [new transports.Console()],
-});
 
 app.get("/health", (c) => {
   return c.json({ status: "ok", timestamp: Date.now() });
