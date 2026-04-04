@@ -48,7 +48,7 @@ const THREAD_ID = "1";
 
 export async function runBriefing(): Promise<string> {
   const input = BRIEFING_SYSTEM_PROMPT + "Generate my daily briefing now.";
-  console.log("[briefing] estimated input tokens:", countTokens(input));
+  logger.info(`[briefing] estimated input tokens: ${countTokens(input)}`);
 
   const response = await agent.invoke(
     {
@@ -99,7 +99,7 @@ Formatting:
 );
 
 export async function handleMessage(text: string): Promise<string> {
-  console.log("[chat] estimated input tokens:", countTokens(CHAT_SYSTEM.content + text));
+  logger.info(`[chat] estimated input tokens: ${countTokens(CHAT_SYSTEM.content + text)}`);
   
   logger.info("[chat] input:", text)
 
