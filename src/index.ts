@@ -24,11 +24,13 @@ cron.start();
 app.post("/chat", async (c) => {
   const { message } = await c.req.json<{ message: { text: string } }>();
   logger.info(`[chat] received: ${message.text}`);
-  const content = await handleMessage(message.text);
-  await sendTelegramMessage(content).catch((err) =>
-    logger.error("[telegram]", err),
-  );
-  return c.json({ content });
+
+  // Respond immediately so Telegram doesn't retry the webhook
+  handleMessage(message.text)
+    .then((content) => sendTelegramMessage(content))
+    .catch((err) => logger.error("[chat]", err));
+
+  return c.json({ ok: true });
 });
 
 export default app;
