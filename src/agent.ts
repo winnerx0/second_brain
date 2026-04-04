@@ -101,7 +101,7 @@ Formatting:
 export async function handleMessage(text: string): Promise<string> {
   logger.info(`[chat] estimated input tokens: ${countTokens(CHAT_SYSTEM.content + text)}`);
   
-  logger.info("[chat] input:", text)
+  logger.info(`[chat] input: ${text}`);
 
   const response = await agent.invoke(
     { messages: [CHAT_SYSTEM, new HumanMessage(text)] },

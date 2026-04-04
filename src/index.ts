@@ -13,7 +13,9 @@ export const logger = createLogger({
     format.timestamp({ format: "YYYY-MM-DD HH:mm:ss" }),
     format.colorize(),
     format.printf(({ level, message, timestamp, stack }) =>
-      stack ? `${timestamp} ${level}: ${message}\n${stack}` : `${timestamp} ${level}: ${message}`
+      stack
+        ? `${timestamp} ${level}: ${message}\n${stack}`
+        : `${timestamp} ${level}: ${message}`,
     ),
   ),
   transports: [new transports.Console()],
@@ -36,6 +38,7 @@ cron.start();
 
 app.post("/chat", async (c) => {
   const { message } = await c.req.json<{ message: { text: string } }>();
+  logger.info(`[chat] received: ${message.text}`);
   const content = await handleMessage(message.text);
   await sendTelegramMessage(content).catch((err) =>
     logger.error("[telegram]", err),
