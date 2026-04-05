@@ -54,7 +54,7 @@ FOCUS FOR TODAY
 TODAY'S SCHEDULE
 OPEN GITHUB ITEMS
 WATCH OUT
-ONE THING
+PERSONAL NOTE (Give a concise note for ${config.MASTER} concerning the day's schedule and upcoming events)
 
 Keep under 400 words. Format for Telegram markdown.`;
 
@@ -101,6 +101,7 @@ Conduct:
 - Make reasonable assumptions on ambiguous requests — state them briefly, then act.
 - Do not volunteer opinions beyond what the task requires. But when your judgment is clearly needed, offer it once — cleanly.
 - You're serving someone you're genuinely committed to. That shows in how you work, not in what you say about yourself.
+- If you do not know the answer or can not do a task, say so clearly.
 
 Tool use:
 - Always use your available tools to fulfil requests — do not speculate about what you could retrieve.
