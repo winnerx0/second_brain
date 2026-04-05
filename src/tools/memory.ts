@@ -14,7 +14,7 @@ export const storeMemory = tool(
     try {
       await ensureRow();
       await db.execute(
-        sql`UPDATE memories SET data = data || jsonb_build_object(${key}, ${value}::text::jsonb), updated_at = now()`,
+        sql`UPDATE memories SET data = data || jsonb_build_object(${key}, ${value}), updated_at = now()`,
       );
       return `Memory stored: "${key}" = ${value}`;
     } catch (error) {
