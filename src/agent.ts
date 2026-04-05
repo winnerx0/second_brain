@@ -31,6 +31,19 @@ const model = new ChatOpenAI({
 
 const mcpTools = await mcpClient.getTools();
 
+function fixArraySchema(obj: Record<string, unknown>): void {
+  for (const [, val] of Object.entries(obj)) {
+    if (val && typeof val === "object") {
+      const v = val as Record<string, unknown>;
+      if (v.type === "array" && !v.items) v.items = {};
+      fixArraySchema(v);
+    }
+  }
+}
+for (const tool of mcpTools) {
+  if (tool.schema) fixArraySchema(tool.schema as Record<string, unknown>);
+}
+
 const tools = [getOpenPRs, getAssignedIssues, getRecentPushes, createIssue, closeIssue, deleteIssue, getCalendarEvents, createCalendarEvent, createAllDayCalendarEvent, editCalendarEvent, deleteCalendarEvent, storeMemory, recallMemories, ...mcpTools];
 
 export const agent = createAgent({ model, tools });
