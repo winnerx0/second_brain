@@ -113,31 +113,31 @@ const appendNotionContent = tool(
   },
 );
 
-const deleteNotionPage = tool(
+const trashNotionPage = tool(
   async ({ pageId }) => {
     try {
       const res = await fetch(`${NOTION_API}/pages/${pageId}`, {
         method: "PATCH",
         headers,
-        body: JSON.stringify({ archived: true }),
+        body: JSON.stringify({ in_trash: true }),
       });
 
       if (!res.ok) {
         const err = await res.text();
-        return `Failed to archive page (${res.status}): ${err}`;
+        return `Failed to trash page (${res.status}): ${err}`;
       }
 
-      return `Page ${pageId} archived successfully`;
+      return `Page ${pageId} moved to trash`;
     } catch (error) {
       logger.error("[notion]", error);
-      return `Error archiving page: ${error instanceof Error ? error.message : String(error)}`;
+      return `Error trashing page: ${error instanceof Error ? error.message : String(error)}`;
     }
   },
   {
-    name: "delete_notion_page",
-    description: "Archive (soft-delete) a Notion page.",
+    name: "trash_notion_page",
+    description: "Move a Notion page to trash.",
     schema: z.object({
-      pageId: z.string().describe("The Notion page ID to archive (UUID)"),
+      pageId: z.string().describe("The Notion page ID to trash (UUID)"),
     }),
   },
 );
@@ -487,7 +487,7 @@ const updateNotionPageProperties = tool(
 export const notionTools = [
   createNotionPage,
   appendNotionContent,
-  deleteNotionPage,
+  trashNotionPage,
   searchNotion,
   getNotionPage,
   updateNotionPageTitle,
