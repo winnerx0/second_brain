@@ -9,6 +9,9 @@ import {
   jsonb,
 } from "drizzle-orm/pg-core";
 
+// Single-row table — all memories stored as one JSON document { key: value }
+
+
 export const agentRuns = pgTable("agent_runs", {
   id: serial("id").primaryKey(),
   ranAt: timestamp("ran_at").notNull().defaultNow(),
@@ -26,12 +29,10 @@ export const taskHistory = pgTable("task_history", {
   completedAt: date("completed_at"),
 });
 
+// Single row, single JSON document — all memories as { key: value }
 export const memories = pgTable("memories", {
   id: serial("id").primaryKey(),
-  key: text("key").notNull().unique(),
-  value: jsonb("value").notNull(),
-  category: text("category").notNull(),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
+  data: jsonb("data").$type<Record<string, string>>().notNull(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 

@@ -2,20 +2,21 @@ import { tool } from "langchain";
 import { z } from "zod";
 import { db } from "../db/client.ts";
 import { memories } from "../db/schema.ts";
-import { eq, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { logger } from "../logger.ts";
 
+async function ensureRow() {
+  await db.execute(sql`INSERT INTO memories (data, updated_at) VALUES ('{}', now()) ON CONFLICT DO NOTHING`);
+}
+
 export const storeMemory = tool(
-  async ({ key, value, category }) => {
+  async ({ key, value }) => {
     try {
-      await db
-        .insert(memories)
-        .values({ key, value, category })
-        .onConflictDoUpdate({
-          target: memories.key,
-          set: { value, category, updatedAt: new Date() },
-        });
-      return `Memory stored: "${key}" = ${JSON.stringify(value)} [${category}]`;
+      await ensureRow();
+      await db.execute(
+        sql`UPDATE memories SET data = data || jsonb_build_object(${key}, ${value}::text::jsonb), updated_at = now()`,
+      );
+      return `Memory stored: "${key}" = ${value}`;
     } catch (error) {
       logger.error("[memory]", error);
       return `Error storing memory: ${error instanceof Error ? error.message : String(error)}`;
@@ -24,11 +25,10 @@ export const storeMemory = tool(
   {
     name: "store_memory",
     description:
-      "Store or update a memory by key. If the key already exists it will be overwritten. Use for preferences, facts, or anything worth remembering.",
+      "Store or update a memory by key. If the key already exists it will be overwritten. Use for preferences, facts, or anything worth remembering about the user.",
     schema: z.object({
-      key: z.string().describe("Unique identifier for this memory (e.g. 'preferred_language', 'github_username')"),
-      value: z.record(z.unknown()).describe("The data to store as key-value pairs"),
-      category: z.string().describe('Category: "preference", "pattern", "fact", or a custom label'),
+      key: z.string().describe("Unique key for this memory (e.g. 'full_name', 'preferred_language')"),
+      value: z.string().describe("The value to store"),
     }),
   },
 );
@@ -36,18 +36,19 @@ export const storeMemory = tool(
 export const recallMemories = tool(
   async ({ query }) => {
     try {
-      const results = await db
-        .select()
-        .from(memories)
-        .where(sql`${memories.key} ILIKE ${"%" + query + "%"} OR ${memories.value}::text ILIKE ${"%" + query + "%"}`)
-        .orderBy(sql`${memories.updatedAt} DESC`)
-        .limit(10);
+      await ensureRow();
+      const result = await db.execute(sql`SELECT data FROM memories LIMIT 1`);
+      const data = (result.rows[0] as { data: Record<string, string> })?.data ?? {};
 
-      if (results.length === 0) return "No memories found matching that query.";
+      if (!query) return JSON.stringify(data);
 
-      return JSON.stringify(
-        results.map((m) => ({ key: m.key, value: m.value, category: m.category, updatedAt: m.updatedAt })),
+      const q = query.toLowerCase();
+      const filtered = Object.fromEntries(
+        Object.entries(data).filter(
+          ([k, v]) => k.toLowerCase().includes(q) || String(v).toLowerCase().includes(q),
+        ),
       );
+      return Object.keys(filtered).length ? JSON.stringify(filtered) : "No memories found matching that query.";
     } catch (error) {
       logger.error("[memory]", error);
       return `Error recalling memories: ${error instanceof Error ? error.message : String(error)}`;
@@ -55,9 +56,10 @@ export const recallMemories = tool(
   },
   {
     name: "recall_memories",
-    description: "Search stored memories by key or value keyword.",
+    description:
+      "Retrieve stored memories. Call with no query to get all memories, or pass a keyword to filter by key or value.",
     schema: z.object({
-      query: z.string().describe("Keyword to search for in memory keys or values"),
+      query: z.string().describe("Keyword to filter memories, or empty string to retrieve all"),
     }),
   },
 );
@@ -65,8 +67,9 @@ export const recallMemories = tool(
 export const deleteMemory = tool(
   async ({ key }) => {
     try {
-      const result = await db.delete(memories).where(eq(memories.key, key));
-      return result.rowCount ? `Deleted memory: "${key}"` : `No memory found with key "${key}"`;
+      await ensureRow();
+      await db.execute(sql`UPDATE memories SET data = data - ${key}, updated_at = now()`);
+      return `Deleted memory: "${key}"`;
     } catch (error) {
       logger.error("[memory]", error);
       return `Error deleting memory: ${error instanceof Error ? error.message : String(error)}`;
@@ -74,9 +77,9 @@ export const deleteMemory = tool(
   },
   {
     name: "delete_memory",
-    description: "Delete a stored memory by its key.",
+    description: "Remove a key from stored memories.",
     schema: z.object({
-      key: z.string().describe("The key of the memory to delete"),
+      key: z.string().describe("The key to remove"),
     }),
   },
 );
