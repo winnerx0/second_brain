@@ -6,6 +6,7 @@ import {
   boolean,
   integer,
   date,
+  jsonb,
 } from "drizzle-orm/pg-core";
 
 export const agentRuns = pgTable("agent_runs", {
@@ -27,9 +28,11 @@ export const taskHistory = pgTable("task_history", {
 
 export const memories = pgTable("memories", {
   id: serial("id").primaryKey(),
-  content: text("content").notNull(),
+  key: text("key").notNull().unique(),
+  value: jsonb("value").notNull(),
   category: text("category").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
 export const chatHistory = pgTable("chat_history", {

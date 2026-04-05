@@ -4,7 +4,7 @@ import { getEncoding } from "js-tiktoken";
 import { config } from "./config.ts";
 import { getOpenPRs, getAssignedIssues, getRecentPushes, createIssue, closeIssue, deleteIssue } from "./tools/github.ts";
 import { getCalendarEvents, createCalendarEvent, createAllDayCalendarEvent, editCalendarEvent, deleteCalendarEvent } from "./tools/calendar.ts";
-import { storeMemory, recallMemories } from "./tools/memory.ts";
+import { storeMemory, recallMemories, deleteMemory } from "./tools/memory.ts";
 import { db } from "./db/client.ts";
 import { agentRuns, chatHistory } from "./db/schema.ts";
 import { desc } from "drizzle-orm";
@@ -44,7 +44,7 @@ for (const tool of mcpTools) {
   if (tool.schema) fixArraySchema(tool.schema as Record<string, unknown>);
 }
 
-const tools = [getOpenPRs, getAssignedIssues, getRecentPushes, createIssue, closeIssue, deleteIssue, getCalendarEvents, createCalendarEvent, createAllDayCalendarEvent, editCalendarEvent, deleteCalendarEvent, storeMemory, recallMemories, ...mcpTools];
+const tools = [getOpenPRs, getAssignedIssues, getRecentPushes, createIssue, closeIssue, deleteIssue, getCalendarEvents, createCalendarEvent, createAllDayCalendarEvent, editCalendarEvent, deleteCalendarEvent, storeMemory, recallMemories, deleteMemory, ...mcpTools];
 
 export const agent = createAgent({ model, tools });
 
