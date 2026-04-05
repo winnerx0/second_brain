@@ -8,7 +8,7 @@ RUN apt-get update && apt-get install -y curl \
 
 FROM base AS install
 COPY package.json bun.lock ./
-RUN bun install --frozen-lockfile --production
+RUN bun install --frozen-lockfile
 
 FROM base
 WORKDIR /app
