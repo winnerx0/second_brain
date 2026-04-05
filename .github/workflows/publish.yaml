@@ -10,7 +10,10 @@ jobs:
       steps:
          - name: Checkout to main
            uses: actions/checkout@v3
-        
+         - name: Create Google Docs MCP Token
+           run: |
+               mkdir -p .config/google-docs-mcp
+               echo "${{ secrets.GOOGLE_DOCS_MCP_TOKEN }}" > .config/google-docs-mcp/token    
          - name: Login to Docker Hub
            uses: docker/login-action@v4
            with:
