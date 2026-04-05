@@ -19,7 +19,7 @@ COPY src ./src
 COPY drizzle ./drizzle
 COPY drizzle.config.ts ./
 
-RUN mkdir -p /root/.config
+COPY .config/google-docs-mcp /root/.config/google-docs-mcp
 
 EXPOSE 3000
 
