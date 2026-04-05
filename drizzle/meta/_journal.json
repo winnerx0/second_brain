@@ -15,6 +15,13 @@
       "when": 1775311164912,
       "tag": "0001_fixed_goblin_queen",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1775408903801,
+      "tag": "0002_happy_hydra",
+      "breakpoints": true
     }
   ]
 }
