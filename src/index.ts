@@ -6,6 +6,14 @@ import { logger } from "./logger.ts";
 
 const app = new Hono();
 
+app.use((c, next) => {
+  const start = Date.now();
+  return next().then(() => {
+    const end = Date.now();
+    logger.info(`[latency] ${end - start}ms`);
+  });
+});
+
 app.get("/health", (c) => {
   return c.json({ status: "ok", timestamp: Date.now() });
 });
