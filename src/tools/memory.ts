@@ -6,7 +6,7 @@ import { sql } from "drizzle-orm";
 import { logger } from "../logger.ts";
 
 async function ensureRow() {
-  await db.execute(sql`INSERT INTO memories (data, updated_at) VALUES ('{}', now()) ON CONFLICT DO NOTHING`);
+  await db.execute(sql`INSERT INTO memories (id, data, updated_at) VALUES (1, '{}', now()) ON CONFLICT (id) DO NOTHING`);
 }
 
 export const storeMemory = tool(
@@ -14,7 +14,7 @@ export const storeMemory = tool(
     try {
       await ensureRow();
       await db.execute(
-        sql`UPDATE memories SET data = jsonb_set(data, ${`{${key}}`}::text[], to_jsonb(${value}::text)), updated_at = now()`,
+        sql`UPDATE memories SET data = jsonb_set(data, ${`{${key}}`}::text[], to_jsonb(${value}::text)), updated_at = now() WHERE id = 1`,
       );
       return `Memory stored: "${key}" = ${value}`;
     } catch (error) {
@@ -39,12 +39,12 @@ export const recallMemories = tool(
       await ensureRow();
       if (query) {
         // Retrieve a specific key
-        const result = await db.execute(sql`SELECT data->>${query} AS value FROM memories LIMIT 1`);
+        const result = await db.execute(sql`SELECT data->>${query} AS value FROM memories WHERE id = 1`);
         const value = (result.rows[0] as { value: string | null })?.value;
         return value !== null ? `${query}: ${value}` : `No memory found for key "${query}".`;
       }
       // Return all memories
-      const result = await db.execute(sql`SELECT data FROM memories LIMIT 1`);
+      const result = await db.execute(sql`SELECT data FROM memories WHERE id = 1`);
       const data = (result.rows[0] as { data: Record<string, string> })?.data ?? {};
       return Object.keys(data).length ? JSON.stringify(data) : "No memories stored.";
     } catch (error) {
@@ -66,7 +66,7 @@ export const deleteMemory = tool(
   async ({ key }) => {
     try {
       await ensureRow();
-      await db.execute(sql`UPDATE memories SET data = data - ${key}, updated_at = now()`);
+      await db.execute(sql`UPDATE memories SET data = data - ${key}, updated_at = now() WHERE id = 1`);
       return `Deleted memory: "${key}"`;
     } catch (error) {
       logger.error("[memory]", error);
