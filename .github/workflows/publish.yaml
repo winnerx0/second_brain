@@ -6,6 +6,8 @@ on:
          - main
 jobs:
    build:
+      env:
+        RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
       runs-on: ubuntu-latest
       steps:
          - name: Checkout to main
@@ -29,3 +31,9 @@ jobs:
            run: |
                docker build -t ${{ vars.DOCKERHUB_USERNAME }}/second_brain:latest .
                docker push ${{ vars.DOCKERHUB_USERNAME }}/second_brain:latest
+         - name: Deploy to Railway
+           run: |
+            curl -X POST https://backboard.railway.com/graphql/v2 \
+              -H "Authorization: Bearer $RAILWAY_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d '{"query":"mutation deploymentRedeploy($id: String!) {\ndeploymentRedeploy(id: $id) {\n  id\n  status\n}\n}","variables":{"id": "${{ secrets.RAILWAY_DEPLOYMENT_ID }}"}}'
