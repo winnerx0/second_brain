@@ -13,9 +13,8 @@ export const storeMemory = tool(
   async ({ key, value }) => {
     try {
       await ensureRow();
-      const patch = JSON.stringify({ [key]: value });
       await db.execute(
-        sql`UPDATE memories SET data = data || ${patch}::jsonb, updated_at = now()`,
+        sql`UPDATE memories SET data = jsonb_set(data, ${`{${key}}`}::text[], to_jsonb(${value}::text)), updated_at = now()`,
       );
       return `Memory stored: "${key}" = ${value}`;
     } catch (error) {
@@ -38,18 +37,16 @@ export const recallMemories = tool(
   async ({ query }) => {
     try {
       await ensureRow();
+      if (query) {
+        // Retrieve a specific key
+        const result = await db.execute(sql`SELECT data->>${query} AS value FROM memories LIMIT 1`);
+        const value = (result.rows[0] as { value: string | null })?.value;
+        return value !== null ? `${query}: ${value}` : `No memory found for key "${query}".`;
+      }
+      // Return all memories
       const result = await db.execute(sql`SELECT data FROM memories LIMIT 1`);
       const data = (result.rows[0] as { data: Record<string, string> })?.data ?? {};
-
-      if (!query) return JSON.stringify(data);
-
-      const q = query.toLowerCase();
-      const filtered = Object.fromEntries(
-        Object.entries(data).filter(
-          ([k, v]) => k.toLowerCase().includes(q) || String(v).toLowerCase().includes(q),
-        ),
-      );
-      return Object.keys(filtered).length ? JSON.stringify(filtered) : "No memories found matching that query.";
+      return Object.keys(data).length ? JSON.stringify(data) : "No memories stored.";
     } catch (error) {
       logger.error("[memory]", error);
       return `Error recalling memories: ${error instanceof Error ? error.message : String(error)}`;
