@@ -18,6 +18,7 @@ COPY package.json bun.lock tsconfig.json ./
 COPY src ./src
 COPY drizzle ./drizzle
 COPY drizzle.config.ts ./
+COPY .config/google-docs-mcp /root/.config/google-docs-mcp
 
 EXPOSE 3000
 
