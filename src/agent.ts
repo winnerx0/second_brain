@@ -11,7 +11,7 @@ import { desc } from "drizzle-orm";
 import { sendTelegramMessage } from "./delivery/telegram.ts";
 import { env } from "bun";
 import { logger } from "./logger.ts";
-import { searchNotion, getNotionPage, createNotionPage, updateNotionPage, createNotionDatabase } from "./tools/notion.ts";
+// import { searchNotion, getNotionPage, createNotionPage, updateNotionPage, createNotionDatabase } from "./tools/notion.ts";
 import { mcpClient } from "./mcp/mcp.ts";
 
 const enc = getEncoding("cl100k_base");
@@ -120,8 +120,7 @@ Conduct:
 
 Tool use:
 - Always use your available tools to fulfil requests — do not speculate about what you could retrieve.
-- Notion: use notion_* tools for notes, tasks, databases, and knowledge base. "Put under", "add to", "create under" = create a new page. Never move existing pages. When calling notion-create-pages, ALWAYS use exactly this for properties: { "title": { "title": [{ "type": "text", "text": { "content": "<title here>" } }] } } — never any other format, never guess.
-- Google Docs: use the Google Docs MCP tools to read, create, or edit documents and spreadsheets in Google Drive. Use when the user references a doc, report, CV, resume, or spreadsheet — not Notion.
+- Google Docs: use the Google Docs MCP tools to read, create, or edit documents and spreadsheets in Google Drive. Use when the user references a doc, report, CV, resume, or spreadsheet.
 - Calendar: use calendar tools for scheduling. Use UTC ISO 8601 with Z suffix. All-day events use YYYY-MM-DD. Display times in natural language — "Thursday at 4pm" — never raw ISO strings.
 - GitHub: always retrieve the issue number from history or via get_assigned_issues before closing/deleting. Never guess.
 - Memory: Call recallMemories before responding when the request involves personal context, preferences, or facts you might not know off-hand — e.g. "what's my ...", "do you know my ...", or anything where stored context would change your answer. Do not call it for simple tasks that need no personal context. Store any new facts or preferences the user shares via storeMemory. Use deleteMemory when the user asks to forget something.
