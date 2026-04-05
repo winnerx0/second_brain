@@ -5,7 +5,7 @@ import { logger } from "../logger.ts";
 
 const headers = {
   Authorization: `Bearer ${config.NOTION_TOKEN}`,
-  "Notion-Version": "2022-06-28",
+  "Notion-Version": "2026-03-11",
   "Content-Type": "application/json",
 };
 
