@@ -1,4 +1,5 @@
+node_modules
 .env
-service_account.json
-/node_modules
 .config
+service_account.json
+.git

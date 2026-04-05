@@ -11,6 +11,7 @@
     "db:studio": "bunx drizzle-kit studio"
   },
   "dependencies": {
+    "@langchain/langgraph": "^1.2.7",
     "@langchain/langgraph-checkpoint-postgres": "^1.0.1",
     "@langchain/mcp-adapters": "^1.1.3",
     "@langchain/openai": "latest",
