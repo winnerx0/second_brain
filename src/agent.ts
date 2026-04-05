@@ -44,13 +44,13 @@ for (const tool of mcpTools) {
   if (tool.schema) fixArraySchema(tool.schema as Record<string, unknown>);
 }
 
-console.dir(mcpTools.map((t) => {
-  return {
-    name: t.name,
-    description: t.description,
-    schema: t.schema,
-  };
-}), {depth: null})
+// console.dir(mcpTools.map((t) => {
+//   return {
+//     name: t.name,
+//     description: t.description,
+//     schema: t.schema,
+//   };
+// }), {depth: null})
 
 const tools = [getOpenPRs, getAssignedIssues, getRecentPushes, createIssue, closeIssue, deleteIssue, getCalendarEvents, createCalendarEvent, createAllDayCalendarEvent, editCalendarEvent, deleteCalendarEvent, storeMemory, recallMemories, deleteMemory, ...notionTools, ...mcpTools];
 
