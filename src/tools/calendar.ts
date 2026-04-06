@@ -222,11 +222,33 @@ export const editCalendarEvent = tool(
 );
 
 export const deleteCalendarEvent = tool(
-  async ({ startDateTime }) => {
+  async ({ startDateTime, title }) => {
     try {
       const calendar = getCalendarClient();
-      const found = await findEventByStart(startDateTime);
-      if (!found) return `No event found starting at ${startDateTime}`;
+
+      // Try finding by start time first
+      let found = await findEventByStart(startDateTime);
+
+      // Fallback: search by title if not found by time
+      if (!found && title) {
+        const target = new Date(startDateTime);
+        const dayStart = new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth(), target.getUTCDate()));
+        const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
+
+        const response = await calendar.events.list({
+          calendarId: config.GOOGLE_CALENDAR_ID,
+          timeMin: dayStart.toISOString(),
+          timeMax: dayEnd.toISOString(),
+          singleEvents: true,
+        });
+
+        const match = (response.data.items ?? []).find(
+          (e) => e.summary?.toLowerCase().includes(title.toLowerCase()),
+        );
+        if (match?.id) found = { id: match.id, summary: match.summary ?? title };
+      }
+
+      if (!found) return `No event found matching "${title ?? startDateTime}"`;
 
       await calendar.events.delete({
         calendarId: config.GOOGLE_CALENDAR_ID,
@@ -242,9 +264,10 @@ export const deleteCalendarEvent = tool(
   {
     name: "delete_calendar_event",
     description:
-      "Delete a Google Calendar event found by its start datetime.",
+      "Delete a Google Calendar event. Provide startDateTime and the event title — both are used to find the correct event.",
     schema: z.object({
       startDateTime: z.string().describe("Start datetime of the event to delete (ISO 8601 UTC, e.g. \"2026-04-03T14:00:00Z\")"),
+      title: z.string().optional().describe("Event title to help find the correct event if the time lookup fails"),
     }),
   },
 );
