@@ -13,6 +13,17 @@ import { env } from "bun";
 import { logger } from "./logger.ts";
 import { notionTools } from "./tools/notion.ts";
 import { mcpClient } from "./mcp/mcp.ts";
+import { tool } from "langchain";
+import { z } from "zod";
+
+const getCurrentDateTime = tool(
+  async () => new Date().toISOString(),
+  {
+    name: "get_current_datetime",
+    description: "Returns the current date and time in ISO 8601 format. Call this whenever you need to know the current time, date, day of the week, or relative time.",
+    schema: z.object({}),
+  },
+);
 
 const enc = getEncoding("cl100k_base");
 function countTokens(text: string) {
@@ -52,7 +63,7 @@ for (const tool of mcpTools) {
 //   };
 // }), {depth: null})
 
-const tools = [getOpenPRs, getAssignedIssues, getRecentPushes, createIssue, closeIssue, deleteIssue, getCalendarEvents, createCalendarEvent, createAllDayCalendarEvent, editCalendarEvent, deleteCalendarEvent, storeMemory, recallMemories, deleteMemory, ...notionTools, ...mcpTools];
+const tools = [getCurrentDateTime, getOpenPRs, getAssignedIssues, getRecentPushes, createIssue, closeIssue, deleteIssue, getCalendarEvents, createCalendarEvent, createAllDayCalendarEvent, editCalendarEvent, deleteCalendarEvent, storeMemory, recallMemories, deleteMemory, ...notionTools, ...mcpTools];
 
 export const agent = createAgent({ model, tools });
 
