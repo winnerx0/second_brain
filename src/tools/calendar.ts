@@ -44,7 +44,6 @@ export const getCalendarEvents = tool(
       });
 
       const events = (response.data.items ?? []).map((event) => ({
-        id: event.id ?? "",
         summary: event.summary ?? "Untitled",
         start: event.start?.dateTime ?? event.start?.date ?? "",
         end: event.end?.dateTime ?? event.end?.date ?? "",
@@ -223,27 +222,18 @@ export const editCalendarEvent = tool(
 );
 
 export const deleteCalendarEvent = tool(
-  async ({ eventId, startDateTime }) => {
+  async ({ startDateTime }) => {
     try {
       const calendar = getCalendarClient();
-
-      let id = eventId;
-      let summary = "Event";
-
-      if (!id) {
-        if (!startDateTime) return "Provide either eventId or startDateTime";
-        const found = await findEventByStart(startDateTime);
-        if (!found) return `No event found starting at ${startDateTime}`;
-        id = found.id;
-        summary = found.summary;
-      }
+      const found = await findEventByStart(startDateTime);
+      if (!found) return `No event found starting at ${startDateTime}`;
 
       await calendar.events.delete({
         calendarId: config.GOOGLE_CALENDAR_ID,
-        eventId: id,
+        eventId: found.id,
       });
 
-      return `Event "${summary}" deleted successfully`;
+      return `Event "${found.summary}" deleted successfully`;
     } catch (error) {
       logger.error("[calendar]", error);
       return `Error deleting calendar event: ${error instanceof Error ? error.message : String(error)}`;
@@ -252,10 +242,9 @@ export const deleteCalendarEvent = tool(
   {
     name: "delete_calendar_event",
     description:
-      "Delete a Google Calendar event. Prefer using eventId (from get_calendar_events). Falls back to finding by startDateTime if eventId is not available.",
+      "Delete a Google Calendar event found by its start datetime.",
     schema: z.object({
-      eventId: z.string().optional().describe("Event ID from get_calendar_events — use this when available"),
-      startDateTime: z.string().optional().describe("Start datetime of the event (ISO 8601 UTC). Used only if eventId is not provided."),
+      startDateTime: z.string().describe("Start datetime of the event to delete (ISO 8601 UTC, e.g. \"2026-04-03T14:00:00Z\")"),
     }),
   },
 );
