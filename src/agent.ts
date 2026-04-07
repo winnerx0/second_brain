@@ -32,15 +32,7 @@ import { env } from "bun";
 import { logger } from "./logger.ts";
 import { notionTools } from "./tools/notion.ts";
 import { mcpClient } from "./mcp/mcp.ts";
-import { tool } from "langchain";
-import { z } from "zod";
-
-const getCurrentDateTime = tool(async () => new Date().toISOString(), {
-  name: "get_current_datetime",
-  description:
-    "Returns the current date and time in ISO 8601 format. Call this whenever you need to know the current time, date, day of the week, or relative time.",
-  schema: z.object({}),
-});
+import { getCurrentDateTime } from "./tools/miscellaneous.ts";
 
 const enc = getEncoding("cl100k_base");
 function countTokens(text: string) {
@@ -194,22 +186,20 @@ export async function handleMessage(text: string): Promise<string> {
     .orderBy(desc(chatHistory.createdAt))
     .limit(10);
 
-  const history = rows
-    .reverse()
-    .map((r) => {
-      const data = JSON.parse(r.content);
-      if (r.role === "human") return new HumanMessage(data.content);
-      if (r.role === "tool")
-        return new ToolMessage({
-          tool_call_id: data.tool_call_id,
-          name: data.name,
-          content: data.content,
-        });
-      return new AIMessage({
+  const history = rows.reverse().map((r) => {
+    const data = JSON.parse(r.content);
+    if (r.role === "human") return new HumanMessage(data.content);
+    if (r.role === "tool")
+      return new ToolMessage({
+        tool_call_id: data.tool_call_id,
+        name: data.name,
         content: data.content,
-        tool_calls: data.tool_calls ?? [],
       });
+    return new AIMessage({
+      content: data.content,
+      tool_calls: data.tool_calls ?? [],
     });
+  });
 
   logger.info(
     `[chat] estimated input tokens: ${countTokens(CHAT_SYSTEM.content + text)}`,
@@ -243,6 +233,9 @@ export async function handleMessage(text: string): Promise<string> {
         };
       }
       if (message instanceof AIMessage) {
+        const hasContent = message.content && message.content.length > 0;
+        const hasToolCalls = message.tool_calls && message.tool_calls.length > 0;
+        if (!hasContent && !hasToolCalls) return null;
         return {
           role: "ai",
           content: JSON.stringify({
@@ -255,7 +248,8 @@ export async function handleMessage(text: string): Promise<string> {
         role: "human",
         content: JSON.stringify({ content: message.content }),
       };
-    });
+    })
+    .filter(Boolean) as (typeof chatHistory.$inferInsert)[];
 
   await db.insert(chatHistory).values(messages);
 
