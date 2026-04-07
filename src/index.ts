@@ -3,15 +3,17 @@ import { runBriefing, handleMessage } from "./agent.ts";
 import { sendTelegramMessage } from "./delivery/telegram.ts";
 import { CronJob } from "cron";
 import { logger } from "./logger.ts";
-
+import { KiviaClient } from "@kivia/sdk"
+import { env } from "bun";
 const app = new Hono();
 
-app.use((c, next) => {
-  const start = Date.now();
-  return next().then(() => {
-    const end = Date.now();
-    logger.info(`[latency] ${end - start}ms`);
-  });
+const kivia = new KiviaClient({
+  apiKey: env.KIVIA_API_KEY!,
+});
+app.use(async (c, next) => {
+  const log = kivia.logMiddleware()
+
+  log(c, c.res, next)
 });
 
 app.get("/health", (c) => {
@@ -34,11 +36,11 @@ app.post("/chat", async (c) => {
   logger.info(`[chat] received: ${message.text}`);
 
   // Respond immediately so Telegram doesn't retry the webhook
-  handleMessage(message.text)
-    .then((content) => sendTelegramMessage(content))
-    .catch((err) => logger.error("[chat]", err));
+  const reply = await handleMessage(message.text)
 
-  return c.json({ ok: true });
+  await sendTelegramMessage(reply)
+
+  return c.json({ success: true });
 });
 
 export default app;
