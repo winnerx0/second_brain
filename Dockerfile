@@ -17,7 +17,7 @@ COPY src ./src
 COPY drizzle ./drizzle
 COPY drizzle.config.ts ./
 COPY .config/google-docs-mcp /root/.config/google-docs-mcp
-RUN bun build ./src/**/*.ts --outdir ./dist --target bun --minify --external "*"
+RUN bun build --target=bun --production --outfile=dist/index.js --minify ./src/index.ts  
 
 FROM base AS final
 WORKDIR /app
