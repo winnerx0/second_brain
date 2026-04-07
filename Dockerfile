@@ -28,7 +28,6 @@ COPY package.json bun.lock tsconfig.json ./
 COPY drizzle ./drizzle
 COPY drizzle.config.ts ./
 COPY .config/google-docs-mcp /root/.config/google-docs-mcp
-RUN bun db:migrate
 
 EXPOSE 8080
 
