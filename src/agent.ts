@@ -201,12 +201,17 @@ export async function handleMessage(text: string): Promise<string> {
     });
   });
 
+  // Trim history to start from the first HumanMessage so we never
+  // send an orphaned ToolMessage without its preceding tool_calls AIMessage
+  const firstHumanIdx = history.findIndex((m) => m instanceof HumanMessage);
+  const trimmedHistory = firstHumanIdx >= 0 ? history.slice(firstHumanIdx) : [];
+
   logger.info(
     `[chat] estimated input tokens: ${countTokens(CHAT_SYSTEM.content + text)}`,
   );
 
   const response = await agent.invoke(
-    { messages: [CHAT_SYSTEM, ...history, new HumanMessage(text)] },
+    { messages: [CHAT_SYSTEM, ...trimmedHistory, new HumanMessage(text)] },
     { recursionLimit: 25 },
   );
 
