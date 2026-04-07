@@ -37,16 +37,21 @@ export const recallMemories = tool(
   async ({ query }) => {
     try {
       await ensureRow();
-      if (query) {
-        // Retrieve a specific key
-        const result = await db.execute(sql`SELECT data->>${query} AS value FROM memories WHERE id = 1`);
-        const value = (result.rows[0] as { value: string | null })?.value;
-        return value !== null ? `${query}: ${value}` : `No memory found for key "${query}".`;
-      }
-      // Return all memories
       const result = await db.execute(sql`SELECT data FROM memories WHERE id = 1`);
-      const data = (result.rows[0] as { data: Record<string, string> })?.data ?? {};
-      return Object.keys(data).length ? JSON.stringify(data) : "No memories stored.";
+      const data = (result.rows?.[0] as { data: Record<string, string> } | undefined)?.data ?? {};
+
+      if (!query) {
+        return Object.keys(data).length ? JSON.stringify(data) : "No memories stored.";
+      }
+
+      const q = query.toLowerCase();
+      const filtered = Object.fromEntries(
+        Object.entries(data).filter(
+          ([k, v]) => k.toLowerCase().includes(q) || String(v).toLowerCase().includes(q),
+        ),
+      );
+
+      return Object.keys(filtered).length ? JSON.stringify(filtered) : `No memories found matching "${query}".`;
     } catch (error) {
       logger.error("[memory]", error);
       return `Error recalling memories: ${error instanceof Error ? error.message : String(error)}`;
@@ -55,9 +60,9 @@ export const recallMemories = tool(
   {
     name: "recall_memories",
     description:
-      "Retrieve stored memories. Call with no query to get all memories, or pass a keyword to filter by key or value.",
+      "Retrieve stored memories. Pass a keyword to fuzzy-search across keys and values, or empty string to retrieve all.",
     schema: z.object({
-      query: z.string().describe("Keyword to filter memories, or empty string to retrieve all"),
+      query: z.string().describe("Keyword to search across memory keys and values, or empty string to retrieve all"),
     }),
   },
 );
