@@ -5,7 +5,7 @@
   "private": true,
   "scripts": {
     "dev": "bun run --hot src/index.ts",
-    "start": "bun run dist/index.js",
+    "start": "bun run dist/src/index.js",
     "db:generate": "bunx drizzle-kit generate",
     "db:migrate": "bunx drizzle-kit migrate",
     "db:studio": "bunx drizzle-kit studio"
@@ -23,6 +23,7 @@
     "hono": "latest",
     "js-tiktoken": "^1.0.21",
     "langchain": "latest",
+    "openai": "^6.33.0",
     "pg": "^8.20.0",
     "winston": "^3.19.0",
     "zod": "latest"
