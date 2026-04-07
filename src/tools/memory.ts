@@ -37,21 +37,30 @@ export const recallMemories = tool(
   async ({ query }) => {
     try {
       await ensureRow();
-      const result = await db.execute(sql`SELECT data FROM memories WHERE id = 1`);
-      const data = (result.rows?.[0] as { data: Record<string, string> } | undefined)?.data ?? {};
 
       if (!query) {
+        const result = await db.execute(sql`SELECT data FROM memories WHERE id = 1`);
+        const data = (result as { data: Record<string, string> }[])?.[0]?.data ?? {};
         return Object.keys(data).length ? JSON.stringify(data) : "No memories stored.";
       }
 
-      const q = query.toLowerCase();
-      const filtered = Object.fromEntries(
-        Object.entries(data).filter(
-          ([k, v]) => k.toLowerCase().includes(q) || String(v).toLowerCase().includes(q),
-        ),
-      );
+      // Use ILIKE on JSONB keys and values for case-insensitive matching
+      // Split query into words and match any part of key or value
+      const searchPattern = `%${query}%`;
+      const result = await db.execute(sql`
+        SELECT key, value
+        FROM memories,
+        LATERAL jsonb_each_text(data)
+        WHERE id = 1
+          AND (key ILIKE ${searchPattern} OR value ILIKE ${searchPattern})
+      `);
 
-      return Object.keys(filtered).length ? JSON.stringify(filtered) : `No memories found matching "${query}".`;
+      const entries = result as { key: string; value: string }[];
+      const filtered = Object.fromEntries(entries.map((row) => [row.key, row.value]));
+
+      return Object.keys(filtered).length
+        ? JSON.stringify(filtered)
+        : `No memories found matching "${query}".`;
     } catch (error) {
       logger.error("[memory]", error);
       return `Error recalling memories: ${error instanceof Error ? error.message : String(error)}`;

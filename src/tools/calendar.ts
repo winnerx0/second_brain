@@ -73,6 +73,8 @@ export const createCalendarEvent = tool(
   async ({ summary, start, end, description, attendees }) => {
     try {
       const calendar = getCalendarClient();
+      
+      logger.info(`[calendar] createCalendarEvent summary=${summary} start=${start} end=${end} description=${description} attendees=${attendees}`);
 
       const response = await calendar.events.insert({
         calendarId: config.GOOGLE_CALENDAR_ID,
@@ -225,7 +227,9 @@ export const deleteCalendarEvent = tool(
   async ({ startDateTime }) => {
     try {
       const calendar = getCalendarClient();
+      logger.info(`[calendar] deleteCalendarEvent startDateTime=${startDateTime}`);
       const found = await findEventByStart(startDateTime);
+      
       if (!found) return `No event found starting at ${startDateTime}`;
 
       await calendar.events.delete({

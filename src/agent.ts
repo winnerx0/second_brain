@@ -186,7 +186,7 @@ export async function handleMessage(text: string): Promise<string> {
     .orderBy(desc(chatHistory.createdAt))
     .limit(10);
 
-  const history = rows.reverse().map((r) => {
+  const history = rows.map((r) => {
     const data = JSON.parse(r.content);
     if (r.role === "human") return new HumanMessage(data.content);
     if (r.role === "tool")
@@ -200,11 +200,15 @@ export async function handleMessage(text: string): Promise<string> {
       tool_calls: data.tool_calls ?? [],
     });
   });
+  
+  // console.dir(history, {depth: null})
 
   // Trim history to start from the first HumanMessage so we never
   // send an orphaned ToolMessage without its preceding tool_calls AIMessage
   const firstHumanIdx = history.findIndex((m) => m instanceof HumanMessage);
   const trimmedHistory = firstHumanIdx >= 0 ? history.slice(firstHumanIdx) : [];
+  
+  console.dir(trimmedHistory, {depth: null})
 
   logger.info(
     `[chat] estimated input tokens: ${countTokens(CHAT_SYSTEM.content + text)}`,
