@@ -32,10 +32,7 @@ export const storeMemory = tool(
         input: value
       });
 
-      await db.insert(memories).values({
-        content: value,
-        vector: embeddings.data[0]!.embedding
-      })
+      await db.execute(sql`INSERT INTO memories (content, vector) VALUES (${value}, ${JSON.stringify(embeddings.data[0]!.embedding)})::vector`)
 
       return `Memory stored: ${value}`;
     } catch (error) {
