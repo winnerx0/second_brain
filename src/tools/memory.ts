@@ -1,22 +1,43 @@
 import { tool } from "langchain";
 import { z } from "zod";
 import { db } from "../db/client.ts";
-import { memories } from "../db/schema.ts";
 import { sql } from "drizzle-orm";
 import { logger } from "../logger.ts";
+import { OpenAI } from "openai";
+import { env } from "bun";
+import { PGVectorStore } from "@langchain/community/vectorstores/pgvector";
+import { memories } from "../db/schema.ts";
+
+const client = new OpenAI({ apiKey: env.OPENAI_API_KEY });
+
+
+// const vectorStore = await PGVectorStore.initialize(embeddings, {columns: {vectorColumnName: "vector"}, tableName: "memories", dimensions: 1536, postgresConnectionOptions: {
+//   connectionString: env.DATABASE_URL,
+// }});
 
 async function ensureRow() {
-  await db.execute(sql`INSERT INTO memories (id, data, updated_at) VALUES (1, '{}', now()) ON CONFLICT (id) DO NOTHING`);
+  await db.execute(
+    sql`INSERT INTO memories (id, data, updated_at) VALUES (1, '{}', now()) ON CONFLICT (id) DO NOTHING`,
+  );
 }
 
 export const storeMemory = tool(
-  async ({ key, value }) => {
+  async ({ value, query }) => {
     try {
-      await ensureRow();
-      await db.execute(
-        sql`UPDATE memories SET data = jsonb_set(data, ${`{${key}}`}::text[], to_jsonb(${value}::text)), updated_at = now() WHERE id = 1`,
-      );
-      return `Memory stored: "${key}" = ${value}`;
+
+      logger.info(`[memory] Storing memory ${value}, query: ${query}`);
+
+      const embeddings = await client.embeddings.create({
+        model: "text-embedding-3-small",
+        input: value
+      });
+
+      await db.insert(memories).values({
+        content: value,
+        vector: embeddings.data[0]!.embedding
+      })
+
+      return `Memory stored: ${value}`;
     } catch (error) {
       logger.error("[memory]", error);
       return `Error storing memory: ${error instanceof Error ? error.message : String(error)}`;
@@ -25,10 +46,10 @@ export const storeMemory = tool(
   {
     name: "store_memory",
     description:
-      "Store or update a memory by key. If the key already exists it will be overwritten. Use for preferences, facts, or anything worth remembering about the user.",
+      "Store a memory. Use for preferences, facts, or anything worth remembering about the user or what the user wants you to remember.",
     schema: z.object({
-      key: z.string().describe("Unique key for this memory (e.g. 'full_name', 'preferred_language')"),
       value: z.string().describe("The value to store"),
+      query: z.string().describe("The user query to embed")
     }),
   },
 );
@@ -36,31 +57,21 @@ export const storeMemory = tool(
 export const recallMemories = tool(
   async ({ query }) => {
     try {
-      await ensureRow();
 
-      if (!query) {
-        const result = await db.execute(sql`SELECT data FROM memories WHERE id = 1`);
-        const data = (result as { data: Record<string, string> }[])?.[0]?.data ?? {};
-        return Object.keys(data).length ? JSON.stringify(data) : "No memories stored.";
+      logger.info(`[memory] Recalling memories for query: ${query}`);
+
+      // const result = await vectorStore.similaritySearch(query, 1);
+
+      const embeddings = await client.embeddings.create({
+        model: "text-embedding-3-small",
+        input: query
+      });
+
+      const result = await db.select().from(memories).where(sql`vector <=> ${JSON.stringify(embeddings.data[0]!.embedding)}::vector < 0.3`).limit(5);
+      
+      return {
+        memories: result.map(r => r.content)
       }
-
-      // Use ILIKE on JSONB keys and values for case-insensitive matching
-      // Split query into words and match any part of key or value
-      const searchPattern = `%${query}%`;
-      const result = await db.execute(sql`
-        SELECT key, value
-        FROM memories,
-        LATERAL jsonb_each_text(data)
-        WHERE id = 1
-          AND (key ILIKE ${searchPattern} OR value ILIKE ${searchPattern})
-      `);
-
-      const entries = result as { key: string; value: string }[];
-      const filtered = Object.fromEntries(entries.map((row) => [row.key, row.value]));
-
-      return Object.keys(filtered).length
-        ? JSON.stringify(filtered)
-        : `No memories found matching "${query}".`;
     } catch (error) {
       logger.error("[memory]", error);
       return `Error recalling memories: ${error instanceof Error ? error.message : String(error)}`;
@@ -69,9 +80,13 @@ export const recallMemories = tool(
   {
     name: "recall_memories",
     description:
-      "Retrieve stored memories. Pass a keyword to fuzzy-search across keys and values, or empty string to retrieve all.",
+      "Retrieve stored memories. Pass a keyword to vector-search across memory keys and values, and return the most relevant memories.",
     schema: z.object({
-      query: z.string().describe("Keyword to search across memory keys and values, or empty string to retrieve all"),
+      query: z
+        .string()
+        .describe(
+          "Keyword to search across memory keys and values",
+        ),
     }),
   },
 );
@@ -80,7 +95,9 @@ export const deleteMemory = tool(
   async ({ key }) => {
     try {
       await ensureRow();
-      await db.execute(sql`UPDATE memories SET data = data - ${key}, updated_at = now() WHERE id = 1`);
+      await db.execute(
+        sql`UPDATE memories SET data = data - ${key}, updated_at = now() WHERE id = 1`,
+      );
       return `Deleted memory: "${key}"`;
     } catch (error) {
       logger.error("[memory]", error);
