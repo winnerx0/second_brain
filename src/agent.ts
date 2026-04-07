@@ -219,7 +219,12 @@ export async function handleMessage(text: string): Promise<string> {
     response.messages[response.messages.length - 1]?.content ?? "",
   );
 
-  const messages: (typeof chatHistory.$inferInsert)[] = response.messages
+  // Only save NEW messages from this turn — skip the input messages we already passed in
+  // (system message + trimmedHistory + new HumanMessage are all in response.messages too)
+  const inputLength = 1 + trimmedHistory.length; // system + history (new HumanMessage is part of this turn)
+  const newMessages = response.messages.slice(inputLength);
+
+  const messages: (typeof chatHistory.$inferInsert)[] = newMessages
     .filter(
       (message) =>
         message instanceof HumanMessage ||
