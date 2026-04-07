@@ -1,9 +1,28 @@
-import { createAgent, HumanMessage, SystemMessage, AIMessage } from "langchain";
+import {
+  createAgent,
+  HumanMessage,
+  SystemMessage,
+  AIMessage,
+  ToolMessage,
+} from "langchain";
 import { ChatOpenAI } from "@langchain/openai";
 import { getEncoding } from "js-tiktoken";
 import { config } from "./config.ts";
-import { getOpenPRs, getAssignedIssues, getRecentPushes, createIssue, closeIssue, deleteIssue } from "./tools/github.ts";
-import { getCalendarEvents, createCalendarEvent, createAllDayCalendarEvent, editCalendarEvent, deleteCalendarEvent } from "./tools/calendar.ts";
+import {
+  getOpenPRs,
+  getAssignedIssues,
+  getRecentPushes,
+  createIssue,
+  closeIssue,
+  deleteIssue,
+} from "./tools/github.ts";
+import {
+  getCalendarEvents,
+  createCalendarEvent,
+  createAllDayCalendarEvent,
+  editCalendarEvent,
+  deleteCalendarEvent,
+} from "./tools/calendar.ts";
 import { storeMemory, recallMemories, deleteMemory } from "./tools/memory.ts";
 import { db } from "./db/client.ts";
 import { agentRuns, chatHistory } from "./db/schema.ts";
@@ -16,21 +35,24 @@ import { mcpClient } from "./mcp/mcp.ts";
 import { tool } from "langchain";
 import { z } from "zod";
 
-const getCurrentDateTime = tool(
-  async () => new Date().toISOString(),
-  {
-    name: "get_current_datetime",
-    description: "Returns the current date and time in ISO 8601 format. Call this whenever you need to know the current time, date, day of the week, or relative time.",
-    schema: z.object({}),
-  },
-);
+const getCurrentDateTime = tool(async () => new Date().toISOString(), {
+  name: "get_current_datetime",
+  description:
+    "Returns the current date and time in ISO 8601 format. Call this whenever you need to know the current time, date, day of the week, or relative time.",
+  schema: z.object({}),
+});
 
 const enc = getEncoding("cl100k_base");
 function countTokens(text: string) {
   return enc.encode(text).length;
 }
-function totalTokensUsed(messages: { usage_metadata?: { total_tokens?: number } }[]): number {
-  return messages.reduce((acc, m) => acc + (m.usage_metadata?.total_tokens ?? 0), 0);
+function totalTokensUsed(
+  messages: { usage_metadata?: { total_tokens?: number } }[],
+): number {
+  return messages.reduce(
+    (acc, m) => acc + (m.usage_metadata?.total_tokens ?? 0),
+    0,
+  );
 }
 
 const model = new ChatOpenAI({
@@ -63,7 +85,25 @@ for (const tool of mcpTools) {
 //   };
 // }), {depth: null})
 
-const tools = [getCurrentDateTime, getOpenPRs, getAssignedIssues, getRecentPushes, createIssue, closeIssue, deleteIssue, getCalendarEvents, createCalendarEvent, createAllDayCalendarEvent, editCalendarEvent, deleteCalendarEvent, storeMemory, recallMemories, deleteMemory, ...notionTools, ...mcpTools];
+const tools = [
+  getCurrentDateTime,
+  getOpenPRs,
+  getAssignedIssues,
+  getRecentPushes,
+  createIssue,
+  closeIssue,
+  deleteIssue,
+  getCalendarEvents,
+  createCalendarEvent,
+  createAllDayCalendarEvent,
+  editCalendarEvent,
+  deleteCalendarEvent,
+  storeMemory,
+  recallMemories,
+  deleteMemory,
+  ...notionTools,
+  ...mcpTools,
+];
 
 export const agent = createAgent({ model, tools });
 
@@ -76,7 +116,6 @@ WATCH OUT
 PERSONAL NOTE (Give a concise note for ${config.MASTER} concerning the day's schedule and upcoming events)
 
 Keep under 400 words. Format for Telegram markdown.`;
-
 
 export async function runBriefing(): Promise<string> {
   const input = BRIEFING_SYSTEM_PROMPT + "Generate my daily briefing now.";
@@ -92,9 +131,13 @@ export async function runBriefing(): Promise<string> {
     { recursionLimit: 25 },
   );
 
-  logger.info(`[briefing] actual tokens used: ${totalTokensUsed(response.messages as never[])}`);
+  logger.info(
+    `[briefing] actual tokens used: ${totalTokensUsed(response.messages as never[])}`,
+  );
 
-  const briefing = String(response.messages[response.messages.length - 1]?.content ?? "");
+  const briefing = String(
+    response.messages[response.messages.length - 1]?.content ?? "",
+  );
 
   await db.insert(agentRuns).values({
     briefingText: briefing,
@@ -130,7 +173,7 @@ Conduct:
 - No emojis in checkmark/status format (no ✅, ❌, etc). If you want to express something positive, use words.
 
 Tool use:
-- Always use your available tools to fulfil requests — do not speculate about what you could retrieve.z
+- Always use your available tools to fulfil requests — do not speculate about what you could retrieve.
 - Google Docs: use the Google Docs MCP tools to read, create, or edit documents and spreadsheets in Google Drive. Use when the user references a doc, report, CV, resume, or spreadsheet.
 - Dates and times: ALWAYS call get_current_datetime first before any operation involving dates, times, "today", "tomorrow", "next week", or any relative time expression. Never assume or guess the current date or time.
 - Calendar: use calendar tools for scheduling. Use UTC ISO 8601 with Z suffix. All-day events use YYYY-MM-DD. Display times in natural language — "Thursday at 4pm" — never raw ISO strings.
@@ -139,7 +182,7 @@ Tool use:
 
 Formatting:
 - For conversational replies, just talk naturally. No bullet points for a one-line answer.
-- Keep it short. Say it once. Don't pad.`
+- Keep it short. Say it once. Don't pad.`,
 );
 
 export async function handleMessage(text: string): Promise<string> {
@@ -151,25 +194,74 @@ export async function handleMessage(text: string): Promise<string> {
     .orderBy(desc(chatHistory.createdAt))
     .limit(10);
 
-  const history = rows.reverse().map((r) =>
-    r.role === "user" ? new HumanMessage(r.content) : new AIMessage(r.content),
-  );
+  const history = rows
+    .reverse()
+    .map((r) => {
+      const data = JSON.parse(r.content);
+      if (r.role === "human") return new HumanMessage(data.content);
+      if (r.role === "tool")
+        return new ToolMessage({
+          tool_call_id: data.tool_call_id,
+          name: data.name,
+          content: data.content,
+        });
+      return new AIMessage({
+        content: data.content,
+        tool_calls: data.tool_calls ?? [],
+      });
+    });
 
-  logger.info(`[chat] estimated input tokens: ${countTokens(CHAT_SYSTEM.content + text)}`);
+  logger.info(
+    `[chat] estimated input tokens: ${countTokens(CHAT_SYSTEM.content + text)}`,
+  );
 
   const response = await agent.invoke(
     { messages: [CHAT_SYSTEM, ...history, new HumanMessage(text)] },
     { recursionLimit: 25 },
   );
 
-  const reply = String(response.messages[response.messages.length - 1]?.content ?? "");
+  const reply = String(
+    response.messages[response.messages.length - 1]?.content ?? "",
+  );
 
-  await db.insert(chatHistory).values([
-    { role: "user", content: text },
-    { role: "assistant", content: reply },
-  ]);
+  const messages: (typeof chatHistory.$inferInsert)[] = response.messages
+    .filter(
+      (message) =>
+        message instanceof HumanMessage ||
+        message instanceof AIMessage ||
+        message instanceof ToolMessage,
+    )
+    .map((message) => {
+      if (message instanceof ToolMessage) {
+        return {
+          role: "tool",
+          content: JSON.stringify({
+            tool_call_id: message.tool_call_id,
+            name: message.name,
+            content: message.content,
+          }),
+        };
+      }
+      if (message instanceof AIMessage) {
+        return {
+          role: "ai",
+          content: JSON.stringify({
+            content: message.content,
+            tool_calls: message.tool_calls ?? [],
+          }),
+        };
+      }
+      return {
+        role: "human",
+        content: JSON.stringify({ content: message.content }),
+      };
+    });
 
-  logger.info(`[chat] actual tokens used: ${totalTokensUsed(response.messages as never[])}`);
+  await db.insert(chatHistory).values(messages);
+
+  logger.info(
+    `[chat] actual tokens used: ${totalTokensUsed(response.messages as never[])}`,
+  );
 
   logger.info(`[chat] reply: ${reply}`);
   return reply;
