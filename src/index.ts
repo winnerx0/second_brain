@@ -10,11 +10,7 @@ const app = new Hono();
 const kivia = new KiviaClient({
   apiKey: env.KIVIA_API_KEY!,
 });
-app.use(async (c, next) => {
-  const log = kivia.logMiddleware()
-
-  log(c, c.res, next)
-});
+app.use("*", kivia.logHono());
 
 app.get("/health", (c) => {
   return c.json({ status: "ok", timestamp: Date.now() });
