@@ -33,9 +33,18 @@ jobs:
     needs: build-and-push
     runs-on: ubuntu-latest
     steps:
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
       - name: Deploy to Railway
         run: |
-          curl -X POST https://backboard.railway.com/graphql/v2 \
+          response=$(curl -X POST https://backboard.railway.com/graphql/v2 \
             -H "Authorization: Bearer $RAILWAY_TOKEN" \
             -H "Content-Type: application/json" \
-            -d '{"query":"mutation deploymentRedeploy($id: String!) {\ndeploymentRedeploy(id: $id) {\n  id\n  status\n}\n}","variables":{"id": "${{ secrets.RAILWAY_DEPLOYMENT_ID }}"}}'
+            -d '{"query":"mutation deploymentRedeploy($id: String!) {\ndeploymentRedeploy(id: $id) {\n  id\n  status\n}\n}","variables":{"id": "${{ secrets.RAILWAY_DEPLOYMENT_ID }}"}}')
+
+            if $response | jq -e '.errors' >> /dev/null; then
+              echo "Deployment failed"
+              exit 1
+            fi
+            echo "Deployment successful"
+
