@@ -8,18 +8,27 @@ RUN apt-get update && apt-get install -y curl \
 
 FROM base AS install
 COPY package.json bun.lock ./
-RUN bun install --frozen-lockfile
+RUN bun install --frozen-lockfile --production
 
-FROM base
+FROM base AS build
+WORKDIR /app
+COPY --from=install /app/node_modules ./node_modules
+COPY src ./src
+COPY drizzle ./drizzle
+COPY drizzle.config.ts ./
+COPY .config/google-docs-mcp /root/.config/google-docs-mcp
+RUN bun build ./src/**/*.ts --outdir ./dist --target bun --minify --external "*"
+
+FROM base AS final
 WORKDIR /app
 
+COPY --from=build /app/dist ./dist
 COPY --from=install /app/node_modules ./node_modules
 COPY package.json bun.lock tsconfig.json ./
-COPY src ./src
 COPY drizzle ./drizzle
 COPY drizzle.config.ts ./
 COPY .config/google-docs-mcp /root/.config/google-docs-mcp
 
 EXPOSE 3000
 
-CMD ["bun", "dev"]
+CMD ["bun", "start"]
