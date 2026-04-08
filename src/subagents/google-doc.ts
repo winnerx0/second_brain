@@ -1,6 +1,6 @@
 import { createAgent, tool } from "langchain";
 import z from "zod";
-import { mcpTools, model } from "../src/shared";
+import { mcpTools, model } from "../shared";
 
 const docsMcpTools = mcpTools.filter((tool) => {
   return [

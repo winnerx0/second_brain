@@ -30,9 +30,9 @@ import { sendTelegramMessage } from "./delivery/telegram.ts";
 import { env } from "bun";
 import { logger } from "./logger.ts";
 import { getCurrentDateTime } from "./tools/miscellaneous.ts";
-import { docsTool } from "../subagents/google-doc.ts";
-import { anilistTool } from "../subagents/anilist.ts";
-import { notionTool } from "../subagents/notion.ts";
+import { docsTool } from "./subagents/google-doc.ts";
+import { anilistTool } from "./subagents/anilist.ts";
+import { notionTool } from "./subagents/notion.ts";
 import { model } from "./shared.ts";
 
 const enc = getEncoding("cl100k_base");

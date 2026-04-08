@@ -1,6 +1,6 @@
 import { createAgent, tool } from "langchain";
-import { mcpTools, model } from "../src/shared";
-import { notionTools } from "../src/tools/notion";
+import { mcpTools, model } from "../shared";
+import { notionTools } from "../tools/notion";
 import z from "zod";
 
 const notionMcpTools = mcpTools.filter((tool) => tool.name.includes("API-"));
