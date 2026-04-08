@@ -6,7 +6,7 @@ export const mcpTools = await mcpClient.getTools();
 
 export const model = new ChatOpenAI({
   apiKey: config.OPENAI_API_KEY,
-  model: "gpt-4.1-mini",
+  model: "gpt-5-nano",
   temperature: 1,
   maxRetries: 3,
 });
