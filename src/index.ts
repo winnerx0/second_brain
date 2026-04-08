@@ -31,7 +31,6 @@ app.post("/chat", async (c) => {
   const { message } = await c.req.json<{ message: { text: string } }>();
   logger.info(`[chat] received: ${message.text}`);
 
-  // Respond immediately so Telegram doesn't retry the webhook
   const reply = await handleMessage(message.text)
 
   await sendTelegramMessage(reply)
