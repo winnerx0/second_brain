@@ -64,8 +64,12 @@ export const recallMemories = tool(
         input: query
       });
 
-      const result = await db.select().from(memories).where(sql`(vector <=> ${JSON.stringify(embeddings.data[0]!.embedding)}::vector )< 0.3`).limit(5);
-      
+      const result = await db
+        .select()
+        .from(memories)
+        .orderBy(sql`vector <=> ${JSON.stringify(embeddings.data[0]!.embedding)}::vector`)
+        .limit(5);
+
       return {
         memories: result.map(r => r.content)
       }
