@@ -16,6 +16,7 @@ const envSchema = z.object({
   GOOGLE_CLIENT_SECRET: z.string().min(1),
   GOOGLE_API_KEY: z.string().min(1),
   KIVIA_API_KEY: z.string().min(1),
+  ANILIST_TOKEN: z.string().min(1),
 });
 
 export const config = envSchema.parse(env);

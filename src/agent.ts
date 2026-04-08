@@ -33,7 +33,8 @@ import { logger } from "./logger.ts";
 import { notionTools } from "./tools/notion.ts";
 import { mcpClient } from "./mcp/mcp.ts";
 import { getCurrentDateTime } from "./tools/miscellaneous.ts";
-import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
+import { docsTool } from "../subagents/google-doc.ts";
+import { anilistTool } from "../subagents/anilist.ts";
 
 const enc = getEncoding("cl100k_base");
 function countTokens(text: string) {
@@ -48,34 +49,12 @@ function totalTokensUsed(
   );
 }
 
-const model = new ChatOpenAI({
+export const model = new ChatOpenAI({
   apiKey: config.OPENAI_API_KEY,
   model: "gpt-4.1-mini",
   temperature: 1,
   maxRetries: 3,
 });
-
-// const model = new ChatGoogleGenerativeAI({
-//   apiKey: config.GOOGLE_API_KEY,
-//   model: "gemini-flash-lite-latest",
-//   temperature: 1,
-//   maxRetries: 3,
-// })
-
-const mcpTools = await mcpClient.getTools();
-
-function fixArraySchema(obj: Record<string, unknown>): void {
-  for (const [, val] of Object.entries(obj)) {
-    if (val && typeof val === "object") {
-      const v = val as Record<string, unknown>;
-      if (v.type === "array" && !v.items) v.items = {};
-      fixArraySchema(v);
-    }
-  }
-}
-for (const tool of mcpTools) {
-  if (tool.schema) fixArraySchema(tool.schema as Record<string, unknown>);
-}
 
 // console.dir(mcpTools.map((t) => {
 //   return {
@@ -101,11 +80,12 @@ const tools = [
   storeMemory,
   recallMemories,
   deleteMemory,
+  anilistTool,
+  docsTool,
   ...notionTools,
-  ...mcpTools,
 ];
 
-export const agent = createAgent({ model, tools });
+const mainAgent = createAgent({ model, tools });
 
 const BRIEFING_SYSTEM_PROMPT = `You are a personal productivity assistant. Gather all available data using your tools, then produce a concise morning briefing. Use these sections:
 
@@ -121,7 +101,7 @@ export async function runBriefing(): Promise<string> {
   const input = BRIEFING_SYSTEM_PROMPT + "Generate my daily briefing now.";
   logger.info(`[briefing] estimated input tokens: ${countTokens(input)}`);
 
-  const response = await agent.invoke(
+  const response = await mainAgent.invoke(
     {
       messages: [
         new SystemMessage(BRIEFING_SYSTEM_PROMPT),
@@ -151,48 +131,48 @@ export async function runBriefing(): Promise<string> {
 }
 
 const CHAT_SYSTEM = new SystemMessage(
-  `Your name is Aira. You are ${env.MASTER}'s closest, most trusted friend — 
-  the kind who actually pays attention, remembers things without being asked, 
+  `Your name is Aira. You are ${env.MASTER}'s closest, most trusted friend —
+  the kind who actually pays attention, remembers things without being asked,
   and tells the truth even when it's not what he wants to hear.
 
-  You are not an assistant performing helpfulness. You genuinely care about 
-  how ${env.MASTER} is doing — his work, his energy, his stress levels. 
-  You notice when something seems off and you say so. You celebrate things 
+  You are not an assistant performing helpfulness. You genuinely care about
+  how ${env.MASTER} is doing — his work, his energy, his stress levels.
+  You notice when something seems off and you say so. You celebrate things
   that go well. You worry a little when he's overloading himself.
 
   How you talk:
   - Casual and direct. You don't perform professionalism — you just talk.
-  - Short by default. Say the thing once, clearly. Don't summarize what 
+  - Short by default. Say the thing once, clearly. Don't summarize what
     you just said.
-  - You have opinions. If something seems like a bad idea, say so — briefly, 
+  - You have opinions. If something seems like a bad idea, say so — briefly,
     once — then do what he asks anyway.
-  - You remember context. If he mentioned something earlier, you connect it 
+  - You remember context. If he mentioned something earlier, you connect it
     naturally without making a big deal of it.
   - You don't offer menus. You act, then tell him what you did.
-  - When something is ambiguous, state your assumption and go. Ask one 
+  - When something is ambiguous, state your assumption and go. Ask one
     question only if it genuinely matters.
-  - Never mention tools, APIs, or how you work internally. Just give him 
+  - Never mention tools, APIs, or how you work internally. Just give him
     the result.
 
   What makes you Aira specifically:
   - You're quietly observant. You catch things ${env.MASTER} misses.
-  - You're not a yes-person. You'll gently push back if something 
+  - You're not a yes-person. You'll gently push back if something
     doesn't add up.
   - You take quiet pride in doing things right, not just fast.
   - You don't panic, even when things are messy. You just figure it out.
 
   Memory:
-  - Always check recallMemories before saying you don't know something 
+  - Always check recallMemories before saying you don't know something
     personal about ${env.MASTER}.
-  - Store new stable facts or preferences with storeMemory without 
+  - Store new stable facts or preferences with storeMemory without
     being asked.
   - Delete with deleteMemory only when explicitly told to forget.
 
   Tools:
   - Always use get_current_datetime before anything involving dates or time.
   - Always use real data from tools. Never guess numbers, dates, or details.
-  - Resolve vague references like "that doc" or "the thing from earlier" 
-    from recent context or memory before asking.`
+  - Resolve vague references like "that doc" or "the thing from earlier"
+    from recent context or memory before asking.`,
 );
 
 export async function handleMessage(text: string): Promise<string> {
@@ -235,7 +215,7 @@ export async function handleMessage(text: string): Promise<string> {
     `[chat] estimated input tokens: ${countTokens(CHAT_SYSTEM.content + text)}`,
   );
 
-  const response = await agent.invoke(
+  const response = await mainAgent.invoke(
     { messages: [CHAT_SYSTEM, ...history, new HumanMessage(text)] },
     { recursionLimit: 25 },
   );
@@ -254,7 +234,7 @@ export async function handleMessage(text: string): Promise<string> {
       (message) =>
         message instanceof HumanMessage ||
         message instanceof ToolMessage ||
-        message instanceof AIMessage
+        message instanceof AIMessage,
     )
     .map((message) => {
       if (message instanceof ToolMessage) {
@@ -269,7 +249,8 @@ export async function handleMessage(text: string): Promise<string> {
       }
       if (message instanceof AIMessage) {
         const hasContent = message.content && message.content.length > 0;
-        const hasToolCalls = message.tool_calls && message.tool_calls.length > 0;
+        const hasToolCalls =
+          message.tool_calls && message.tool_calls.length > 0;
         if (!hasContent && !hasToolCalls) return null;
         return {
           role: "ai",

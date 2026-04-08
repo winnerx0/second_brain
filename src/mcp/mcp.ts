@@ -35,5 +35,18 @@ export const mcpClient = new MultiServerMCPClient({
         delayMs: 1000,
       },
     },
+    anilist: {
+      transport: "stdio",
+      command: "npx",
+      args: ["-y", "anilist-mcp"],
+      env: {
+        ANILIST_TOKEN: config.ANILIST_TOKEN,
+      },
+      restart: {
+        enabled: true,
+        maxAttempts: 3,
+        delayMs: 1000,
+      },
+    }
   },
 });
