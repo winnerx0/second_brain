@@ -14,6 +14,8 @@ const envSchema = z.object({
   NOTION_TOKEN: z.string().min(1),
   GOOGLE_CLIENT_ID: z.string().min(1),
   GOOGLE_CLIENT_SECRET: z.string().min(1),
+  GOOGLE_API_KEY: z.string().min(1),
+  KIVIA_API_KEY: z.string().min(1),
 });
 
 export const config = envSchema.parse(env);
