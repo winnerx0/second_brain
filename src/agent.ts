@@ -5,7 +5,6 @@ import {
   AIMessage,
   ToolMessage,
 } from "langchain";
-import { ChatOpenAI } from "@langchain/openai";
 import { getEncoding } from "js-tiktoken";
 import { config } from "./config.ts";
 import {
@@ -30,11 +29,11 @@ import { asc, desc, eq, gte } from "drizzle-orm";
 import { sendTelegramMessage } from "./delivery/telegram.ts";
 import { env } from "bun";
 import { logger } from "./logger.ts";
-import { mcpClient } from "./mcp/mcp.ts";
 import { getCurrentDateTime } from "./tools/miscellaneous.ts";
 import { docsTool } from "../subagents/google-doc.ts";
 import { anilistTool } from "../subagents/anilist.ts";
 import { notionTool } from "../subagents/notion.ts";
+import { model } from "./shared.ts";
 
 const enc = getEncoding("cl100k_base");
 function countTokens(text: string) {
@@ -48,13 +47,6 @@ function totalTokensUsed(
     0,
   );
 }
-
-export const model = new ChatOpenAI({
-  apiKey: config.OPENAI_API_KEY,
-  model: "gpt-4.1-mini",
-  temperature: 1,
-  maxRetries: 3,
-});
 
 // console.dir(mcpTools.map((t) => {
 //   return {

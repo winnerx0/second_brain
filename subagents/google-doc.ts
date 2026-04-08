@@ -1,18 +1,28 @@
 import { createAgent, tool } from "langchain";
-import { model } from "../src/agent";
-import { mcpClient } from "../src/mcp/mcp";
 import z from "zod";
-
-const mcpTools = await mcpClient.getTools();
+import { mcpTools, model } from "../src/shared";
 
 const docsMcpTools = mcpTools.filter((tool) => {
-  const name = tool.name.toLowerCase();
-  return (
-    name.includes("doc") ||
-    name.includes("docs") ||
-    name.includes("document") ||
-    name.includes("google")
-  );
+  return [
+    "readDocument",
+    "appendText",
+    "insertText",
+    "deleteRange",
+    "modifyText",
+    "findAndReplace",
+    "listTabs",
+    "addTab",
+    "renameTab",
+    "replaceDocumentWithMarkdown",
+    "replaceRangeWithMarkdown",
+    "appendMarkdown",
+    "applyTextStyle",
+    "applyParagraphStyle",
+    "insertTable",
+    "insertTableWithData",
+    "insertPageBreak",
+    "insertImage",
+  ].includes(tool.name.toLowerCase());
 });
 
 const DOCS_SYSTEM_PROMPT = `You are a Document Assistant with access to Google Docs.
@@ -26,7 +36,7 @@ When helping users:
 - When creating documents, ensure proper formatting (headings, lists, paragraphs)
 - If the user refers to "the doc" or "my notes" without being specific, search recent documents first`;
 
-const docsAgent = createAgent({ model, tools: docsMcpTools });
+const docsAgent = createAgent({ model: model, tools: docsMcpTools });
 
 export const docsTool = tool(
   async ({ query }) => {
@@ -40,11 +50,14 @@ export const docsTool = tool(
   },
   {
     name: "docs",
-    description: "Create, search, read, and update Google Docs documents. Can summarize content, find existing docs, and create new structured documents.",
+    description:
+      "Create, search, read, and update Google Docs documents. Can summarize content, find existing docs, and create new structured documents.",
     schema: z.object({
       query: z
         .string()
-        .describe("Natural language request for document operations (e.g., 'Create meeting notes titled Sprint Review', 'Find my notes about the API', 'Summarize the Q3 planning doc')"),
+        .describe(
+          "Natural language request for document operations (e.g., 'Create meeting notes titled Sprint Review', 'Find my notes about the API', 'Summarize the Q3 planning doc')",
+        ),
     }),
   },
 );
