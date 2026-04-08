@@ -30,11 +30,11 @@ import { asc, desc, eq, gte } from "drizzle-orm";
 import { sendTelegramMessage } from "./delivery/telegram.ts";
 import { env } from "bun";
 import { logger } from "./logger.ts";
-import { notionTools } from "./tools/notion.ts";
 import { mcpClient } from "./mcp/mcp.ts";
 import { getCurrentDateTime } from "./tools/miscellaneous.ts";
 import { docsTool } from "../subagents/google-doc.ts";
 import { anilistTool } from "../subagents/anilist.ts";
+import { notionTool } from "../subagents/notion.ts";
 
 const enc = getEncoding("cl100k_base");
 function countTokens(text: string) {
@@ -82,7 +82,7 @@ const tools = [
   deleteMemory,
   anilistTool,
   docsTool,
-  ...notionTools,
+  notionTool,
 ];
 
 const mainAgent = createAgent({ model, tools });
