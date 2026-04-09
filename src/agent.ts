@@ -185,7 +185,7 @@ export async function handleMessage(text: string): Promise<string> {
       .select({ role: chatHistory.role, content: chatHistory.content })
       .from(chatHistory)
       .where(gte(chatHistory.id, lastHuman.id))
-      .orderBy(asc(chatHistory.createdAt));
+      .orderBy(asc(chatHistory.id));
   }
 
   const history = rows.map((r) => {
