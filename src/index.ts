@@ -27,13 +27,22 @@ const cron = new CronJob("0 0 * * *", async () => {
 
 cron.start();
 
+const processedUpdates = new Set<number>();
+
 app.post("/chat", async (c) => {
-  const { message } = await c.req.json<{ message: { text: string } }>();
+  const body = await c.req.json<{ update_id: number; message: { text: string } }>();
+  const { update_id, message } = body;
+
+  if (processedUpdates.has(update_id)) {
+    logger.info(`[chat] skipping duplicate update_id=${update_id}`);
+    return c.json({ success: true });
+  }
+  processedUpdates.add(update_id);
+
   logger.info(`[chat] received: ${message.text}`);
 
-  const reply = await handleMessage(message.text)
-
-  await sendTelegramMessage(reply)
+  const reply = await handleMessage(message.text);
+  await sendTelegramMessage(reply);
 
   return c.json({ success: true });
 });
