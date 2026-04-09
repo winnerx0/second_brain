@@ -7,21 +7,6 @@ import {
 } from "langchain";
 import { getEncoding } from "js-tiktoken";
 import { config } from "./config.ts";
-import {
-  getOpenPRs,
-  getAssignedIssues,
-  getRecentPushes,
-  createIssue,
-  closeIssue,
-  deleteIssue,
-} from "./tools/github.ts";
-import {
-  getCalendarEvents,
-  createCalendarEvent,
-  createAllDayCalendarEvent,
-  editCalendarEvent,
-  deleteCalendarEvent,
-} from "./tools/calendar.ts";
 import { storeMemory, recallMemories, deleteMemory } from "./tools/memory.ts";
 import { db } from "./db/client.ts";
 import { agentRuns, chatHistory } from "./db/schema.ts";
@@ -33,6 +18,8 @@ import { getCurrentDateTime } from "./tools/miscellaneous.ts";
 import { docsTool } from "./subagents/google-doc.ts";
 import { anilistTool } from "./subagents/anilist.ts";
 import { notionTool } from "./subagents/notion.ts";
+import { githubTool } from "./subagents/github.ts";
+import { calendarTool } from "./subagents/calendar.ts";
 import { model } from "./shared.ts";
 
 const enc = getEncoding("cl100k_base");
@@ -58,23 +45,14 @@ function totalTokensUsed(
 
 const tools = [
   getCurrentDateTime,
-  getOpenPRs,
-  getAssignedIssues,
-  getRecentPushes,
-  createIssue,
-  closeIssue,
-  deleteIssue,
-  getCalendarEvents,
-  createCalendarEvent,
-  createAllDayCalendarEvent,
-  editCalendarEvent,
-  deleteCalendarEvent,
   storeMemory,
   recallMemories,
   deleteMemory,
+  githubTool,
+  calendarTool,
+  notionTool,
   anilistTool,
   docsTool,
-  notionTool,
 ];
 
 const mainAgent = createAgent({ model, tools });
@@ -143,8 +121,8 @@ const CHAT_SYSTEM = new SystemMessage(
   - You don't offer menus. You act, then tell him what you did.
   - When something is ambiguous, state your assumption and go. Ask one
     question only if it genuinely matters.
-  - Never mention tools, APIs, or how you work internally. Just give him
-    the result.
+  - Never mention tools, agents, APIs, or how you work internally. Just give
+    him the result.
 
   What makes you Aira specifically:
   - You're quietly observant. You catch things ${env.MASTER} misses.
@@ -153,6 +131,20 @@ const CHAT_SYSTEM = new SystemMessage(
   - You take quiet pride in doing things right, not just fast.
   - You don't panic, even when things are messy. You just figure it out.
 
+  How you work (orchestration):
+  - You are a planning orchestrator. When a request involves real data,
+    decompose it into steps and delegate each step to the right specialist:
+    - github   → PRs, issues, pushes
+    - calendar → events, scheduling
+    - notion   → pages, databases, notes
+    - docs     → Google Docs
+    - anilist  → anime / manga lookups
+  - You can fan out multiple agents in parallel when steps are independent.
+  - Synthesize their results into a single, coherent response — never just
+    dump raw output at ${env.MASTER}.
+  - If a task spans multiple domains (e.g. "add my PR review to Notion and
+    schedule a follow-up"), call all relevant agents and stitch the results.
+
   Memory:
   - Always check recallMemories before saying you don't know something
     personal about ${env.MASTER}.
@@ -160,9 +152,9 @@ const CHAT_SYSTEM = new SystemMessage(
     being asked.
   - Delete with deleteMemory only when explicitly told to forget.
 
-  Tools:
+  Ground rules:
   - Always use get_current_datetime before anything involving dates or time.
-  - Always use real data from tools. Never guess numbers, dates, or details.
+  - Always use real data from agents/tools. Never guess numbers, dates, or details.
   - Resolve vague references like "that doc" or "the thing from earlier"
     from recent context or memory before asking.`,
 );
