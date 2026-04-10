@@ -1,65 +1,61 @@
 import { createAgent, tool } from "langchain";
-import { mcpTools, model } from "../shared";
+import { model } from "../shared";
 import { notionTools } from "../tools/notion";
+import { getCurrentDateTime } from "../tools/miscellaneous";
 import z from "zod";
 
-const notionMcpTools = mcpTools.filter((tool) => tool.name.includes("API-"));
+const NOTION_SYSTEM_PROMPT = `You are a Notion Workspace Assistant with full access to the user's pages, databases, blocks, and comments.
 
-const NOTION_SYSTEM_PROMPT = `You are a Notion Workspace Assistant with access to pages, databases, and content blocks.
+Available operations:
+- Search: search_notion — find pages and databases by keyword
+- Pages: get_notion_page, create_notion_page, update_notion_page_properties, trash_notion_page
+- Blocks: get_block_children, append_notion_blocks, update_notion_block, delete_notion_block
+- Databases: get_notion_database, create_notion_database, update_notion_database, query_notion_database, create_database_entry
+- Comments: get_notion_comments, create_notion_comment
+- Users: list_notion_users
 
-When helping users:
-- Search existing pages/databases before creating new ones to avoid duplicates
-- When creating pages, use clear titles and structure content with proper headings
-- For databases: understand the schema before adding entries
-- Summarize page contents when asked, preserving key details
-- When updating content, append or edit without overwriting important data
-- Always confirm destructive actions (deleting pages, trashing databases)
-- If the user refers to "that page" or "my notes" without specifics, search recent items first
-- Respect Notion's block structure — content is organized as blocks, not just plain text
+How to work correctly:
 
-IMPORTANT - Creating Pages with Content (Two-Step Process):
-There is a known bug where API-post-page's "children" parameter has an incorrect schema. To work around this:
+CREATING PAGES WITH CONTENT (always two steps):
+1. create_notion_page → get the page ID
+2. append_notion_blocks with the page ID → add content
+Never pass content directly to create_notion_page.
 
-1. FIRST: Create the page WITHOUT any children (only title and parent)
-2. THEN: Use API-patch-block-children with the new page ID as block_id to add content
+ADDING CONTENT (append_notion_blocks):
+Pass a JSON array of block objects. Use the block shapes documented in the tool description.
+Example for a structured page:
+[
+  {"type":"heading_1","heading_1":{"rich_text":[{"type":"text","text":{"content":"Title"}}]}},
+  {"type":"paragraph","paragraph":{"rich_text":[{"type":"text","text":{"content":"Body text"}}]}},
+  {"type":"to_do","to_do":{"rich_text":[{"type":"text","text":{"content":"Task"}}],"checked":false}}
+]
 
-When using API-patch-block-children, prefer the minimal block shape first:
-{
-  "block_id": "the-page-id-from-step-1",
-  "children": [
-    {
-      "type": "paragraph",
-      "paragraph": {
-        "rich_text": [{ "type": "text", "text": { "content": "your text here" } }]
-      }
-    }
-  ]
-}
+READING DATABASE ENTRIES (always two steps):
+1. get_notion_database → understand the exact property names and types
+2. query_notion_database → fetch rows
 
-Do NOT include extra fields unless required by the current schema.
+ADDING DATABASE ROWS:
+1. get_notion_database → get schema
+2. create_database_entry with matching property JSON
 
-Common block types: paragraph, heading_1, heading_2, heading_3, bulleted_list_item, numbered_list_item, to_do.
-NEVER pass "children" to API-post-page - always add content separately using API-patch-block-children.`;
+BEST PRACTICES:
+- Always search_notion before creating pages to avoid duplicates
+- For "that page" or vague references, search first
+- When reading a page, use get_notion_page (returns flattened content)
+- For deep/nested content, use get_block_children with pagination
+- Confirm before trashing or deleting blocks
+- Use get_current_datetime when any date/time context is needed`;
 
-const SCHEMA_ERROR_RECOVERY = `
-If any Notion API tool fails with schema validation:
-- Retry once with a simpler payload (remove optional fields and unknown keys)
-- For append-block operations, try children blocks without "object"
-- If API-post-page rejects children, create page without children then append in a second call
-- If MCP API-* schema remains blocked, use fallback local tools:
-  - create_notion_page
-  - append_notion_content
-  - search_notion
-Always complete the user intent whenever possible instead of asking for manual Notion edits.
-`;
-
-const notionAgent = createAgent({ model, tools: [...notionMcpTools, ...notionTools] });
+const notionAgent = createAgent({
+  model,
+  tools: [...notionTools, getCurrentDateTime],
+});
 
 export const notionTool = tool(
   async ({ query }) => {
     const response = await notionAgent.invoke({
       messages: [
-        { role: "system", content: `${NOTION_SYSTEM_PROMPT}\n${SCHEMA_ERROR_RECOVERY}` },
+        { role: "system", content: NOTION_SYSTEM_PROMPT },
         { role: "user", content: query },
       ],
     });
@@ -67,11 +63,14 @@ export const notionTool = tool(
   },
   {
     name: "notion",
-    description: "Create, search, read, and update Notion pages and databases. Can manage structured content, query databases, and organize workspace information.",
+    description:
+      "Full Notion workspace access — search, read, create, and edit pages, databases, blocks, and comments.",
     schema: z.object({
       query: z
         .string()
-        .describe("Natural language request for Notion operations (e.g., 'Create a page titled Meeting Notes', 'Find my sprint planning database', 'Add a task to my todo list')"),
+        .describe(
+          "Natural language request for Notion operations (e.g., 'Create a meeting notes page', 'Add a task to my Sprint board', 'Find my project tracker database', 'List all Done items in my todo database')",
+        ),
     }),
   },
 );

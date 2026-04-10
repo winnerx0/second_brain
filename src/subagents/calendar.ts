@@ -8,6 +8,7 @@ import {
   editCalendarEvent,
   deleteCalendarEvent,
 } from "../tools/calendar";
+import { getCurrentDateTime } from "../tools/miscellaneous";
 
 const CALENDAR_SYSTEM_PROMPT = `You are a Calendar Assistant with access to the user's Google Calendar.
 
@@ -30,6 +31,7 @@ const calendarAgent = createAgent({
     createAllDayCalendarEvent,
     editCalendarEvent,
     deleteCalendarEvent,
+    getCurrentDateTime
   ],
 });
 

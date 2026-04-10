@@ -3,7 +3,11 @@ import { z } from "zod";
 
 const envSchema = z.object({
   MASTER: z.string().min(1),
+  OPENROUTER_API_KEY: z.string().min(1),
+  OPENROUTER_MODEL: z.string().min(1).default("openai/gpt-5"),
+  OPENROUTER_BASE_URL: z.string().url().default("https://openrouter.ai/api/v1"),
   OPENAI_API_KEY: z.string().min(1),
+  EMBEDDING_MODEL: z.string().min(1).default("text-embedding-3-small"),
   GITHUB_TOKEN: z.string().min(1),
   GITHUB_USERNAME: z.string().min(1),
   GOOGLE_CALENDAR_ID: z.string().min(1),
@@ -17,6 +21,8 @@ const envSchema = z.object({
   GOOGLE_API_KEY: z.string().min(1),
   KIVIA_API_KEY: z.string().min(1),
   ANILIST_TOKEN: z.string().min(1),
+  // Gmail
+  GMAIL_REFRESH_TOKEN: z.string().optional(),
 });
 
 export const config = envSchema.parse(env);

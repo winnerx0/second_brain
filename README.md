@@ -30,11 +30,15 @@ Fill in `.env`:
 
 | Variable | Description |
 |---|---|
-| `OPENAI_API_KEY` | OpenAI API key |
+| `OPENROUTER_API_KEY` | OpenRouter API key |
+| `OPENROUTER_MODEL` | OpenRouter model ID (e.g. `openai/gpt-5`) |
+| `OPENROUTER_BASE_URL` | OpenRouter API base URL (default `https://openrouter.ai/api/v1`) |
+| `OPENAI_API_KEY` | OpenAI API key used for embeddings |
+| `EMBEDDING_MODEL` | Embedding model ID (default `text-embedding-3-small`) |
 | `GITHUB_TOKEN` | GitHub personal access token |
 | `GITHUB_USERNAME` | Your GitHub username |
 | `GOOGLE_CALENDAR_ID` | Google Calendar ID (e.g. `primary`) |
-| `GOOGLE_SERVICE_ACCOUNT_JSON` | Base64-encoded service account JSON |
+| `GOOGLE_CREDENTIALS` | Service account JSON string |
 | `TELEGRAM_BOT_TOKEN` | Telegram bot token from @BotFather |
 | `TELEGRAM_CHAT_ID` | Your Telegram chat ID |
 | `DATABASE_URL` | Postgres connection string |

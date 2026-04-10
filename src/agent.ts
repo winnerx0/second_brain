@@ -20,6 +20,7 @@ import { anilistTool } from "./subagents/anilist.ts";
 import { notionTool } from "./subagents/notion.ts";
 import { githubTool } from "./subagents/github.ts";
 import { calendarTool } from "./subagents/calendar.ts";
+import { gmailTool } from "./subagents/gmail.ts";
 import { model } from "./shared.ts";
 
 const enc = getEncoding("cl100k_base");
@@ -53,6 +54,7 @@ const tools = [
   notionTool,
   anilistTool,
   docsTool,
+  gmailTool,
 ];
 
 const mainAgent = createAgent({ model, tools });
@@ -134,11 +136,12 @@ const CHAT_SYSTEM = new SystemMessage(
   How you work (orchestration):
   - You are a planning orchestrator. When a request involves real data,
     decompose it into steps and delegate each step to the right specialist:
-    - github   → PRs, issues, pushes
-    - calendar → events, scheduling
-    - notion   → pages, databases, notes
-    - docs     → Google Docs
-    - anilist  → anime / manga lookups
+    - github    → PRs, issues, pushes
+    - calendar  → events, scheduling
+    - notion    → pages, databases, notes
+    - docs      → Google Docs
+    - anilist   → anime / manga lookups
+    - gmail     → emails (read, search, send, reply, archive)
   - You can fan out multiple agents in parallel when steps are independent.
   - Synthesize their results into a single, coherent response — never just
     dump raw output at ${env.MASTER}.
