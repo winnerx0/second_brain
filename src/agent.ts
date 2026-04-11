@@ -180,7 +180,8 @@ export async function handleMessage(text: string): Promise<string> {
       .select({ role: chatHistory.role, content: chatHistory.content })
       .from(chatHistory)
       .where(gte(chatHistory.id, lastHuman.id))
-      .orderBy(asc(chatHistory.id));
+      .orderBy(asc(chatHistory.id))
+      .limit(10);
   }
 
   const history = rows.map((r) => {
