@@ -255,7 +255,10 @@ export async function handleMessage(text: string): Promise<string> {
     })
     .filter(Boolean) as (typeof chatHistory.$inferInsert)[];
 
-  await db.insert(chatHistory).values(messages);
+  db.insert(chatHistory)
+    .values(messages)
+    .then()
+    .catch((err) => console.log("Error saving to database", err));
 
   logger.info(
     `[chat] actual tokens used: ${totalTokensUsed(response.messages as never[])}`,
