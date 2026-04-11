@@ -181,7 +181,7 @@ export async function handleMessage(text: string): Promise<string> {
       .from(chatHistory)
       .where(gte(chatHistory.id, lastHuman.id))
       .orderBy(asc(chatHistory.id))
-      .limit(10);
+      .limit(20);
   }
 
   const history = rows.map((r) => {
