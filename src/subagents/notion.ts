@@ -1,27 +1,75 @@
 import { createAgent, tool } from "langchain";
 import { model } from "../shared";
-import { notionTools } from "../tools/notion";
+import { mcpTools } from "../shared";
+// import { notionTools } from "../tools/notion";
 import { getCurrentDateTime } from "../tools/miscellaneous";
 import z from "zod";
 
-const NOTION_SYSTEM_PROMPT = `You are a Notion Workspace Assistant with full access to the user's pages, databases, blocks, and comments.
+function flattenAllOf(schema: any): any {
+  if (!schema || typeof schema !== "object") return schema;
 
-Available operations:
-- Search: search_notion — find pages and databases by keyword
-- Pages: get_notion_page, create_notion_page, update_notion_page_properties, trash_notion_page
-- Blocks: get_block_children, append_notion_blocks, update_notion_block, delete_notion_block
-- Databases: get_notion_database, create_notion_database, update_notion_database, query_notion_database, create_database_entry
-- Comments: get_notion_comments, create_notion_comment
-- Users: list_notion_users
+  if (Array.isArray(schema.allOf)) {
+    const merged = schema.allOf.reduce(
+      (acc: any, sub: any) => {
+        const flat = flattenAllOf(sub);
+        return {
+          ...acc,
+          ...flat,
+          properties: { ...acc.properties, ...flat.properties },
+          required: [...new Set([...(acc.required || []), ...(flat.required || [])])],
+        };
+      },
+      { type: "object", properties: {}, required: [] },
+    );
+
+    const { allOf, ...rest } = schema;
+    return flattenAllOf({ ...merged, ...rest });
+  }
+
+  if (schema.properties) {
+    return {
+      ...schema,
+      properties: Object.fromEntries(
+        Object.entries(schema.properties).map(([k, v]) => [k, flattenAllOf(v)]),
+      ),
+    };
+  }
+
+  if (schema.items) {
+    return { ...schema, items: flattenAllOf(schema.items) };
+  }
+
+  if (schema.additionalProperties && typeof schema.additionalProperties === "object") {
+    return {
+      ...schema,
+      additionalProperties: flattenAllOf(schema.additionalProperties),
+    };
+  }
+
+  return schema;
+}
+
+const notionMcpTools = mcpTools
+  .filter((tool) => tool.name.startsWith("API-"))
+  .map((tool) => {
+    if (tool.schema && typeof tool.schema === "object") {
+      tool.schema = flattenAllOf(tool.schema);
+    }
+    return tool;
+  });
+
+const NOTION_SYSTEM_PROMPT = `You are a Notion Workspace Assistant with full access to the user's Notion workspace through Notion MCP tools.
+
+Available operations are provided by the MCP toolset for pages, blocks, databases, users, comments, and search.
 
 How to work correctly:
 
 CREATING PAGES WITH CONTENT (always two steps):
-1. create_notion_page → get the page ID
-2. append_notion_blocks with the page ID → add content
-Never pass content directly to create_notion_page.
+1. Create the page first and get the page ID
+2. Append children blocks in a second call
+Do not try to create a page with full children payload in one step when it fails schema validation.
 
-ADDING CONTENT (append_notion_blocks):
+ADDING CONTENT:
 Pass a JSON array of block objects. Use the block shapes documented in the tool description.
 Example for a structured page:
 [
@@ -31,24 +79,25 @@ Example for a structured page:
 ]
 
 READING DATABASE ENTRIES (always two steps):
-1. get_notion_database → understand the exact property names and types
-2. query_notion_database → fetch rows
+1. Read database schema first to understand exact property names and types
+2. Query the database rows
 
 ADDING DATABASE ROWS:
-1. get_notion_database → get schema
-2. create_database_entry with matching property JSON
+1. Read database schema
+2. Create a row with matching property JSON
 
 BEST PRACTICES:
-- Always search_notion before creating pages to avoid duplicates
+- Always search first before creating pages to avoid duplicates
 - For "that page" or vague references, search first
-- When reading a page, use get_notion_page (returns flattened content)
+- Prefer page retrieval tools before block-level traversal when possible
 - For deep/nested content, use get_block_children with pagination
 - Confirm before trashing or deleting blocks
 - Use get_current_datetime when any date/time context is needed`;
 
 const notionAgent = createAgent({
   model,
-  tools: [...notionTools, getCurrentDateTime],
+  // tools: [...notionTools, getCurrentDateTime],
+  tools: [...notionMcpTools, getCurrentDateTime],
 });
 
 export const notionTool = tool(

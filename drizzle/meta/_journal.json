@@ -5,36 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1775146880310,
-      "tag": "0000_wandering_sumo",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1775311164912,
-      "tag": "0001_fixed_goblin_queen",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1775408903801,
-      "tag": "0002_happy_hydra",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1775410103796,
-      "tag": "0003_safe_the_initiative",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1775557005413,
-      "tag": "0004_luxuriant_korath",
+      "when": 1776000989756,
+      "tag": "0000_fearless_cloak",
       "breakpoints": true
     }
   ]

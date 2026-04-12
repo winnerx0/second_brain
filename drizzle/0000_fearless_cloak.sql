@@ -6,11 +6,19 @@ CREATE TABLE "agent_runs" (
 	"success" boolean NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE "chat_history" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"role" text NOT NULL,
+	"content" text NOT NULL,
+	"created_at" timestamp DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE "memories" (
 	"id" serial PRIMARY KEY NOT NULL,
-	"content" text NOT NULL,
-	"category" text NOT NULL,
-	"created_at" timestamp DEFAULT now() NOT NULL
+	"content" varchar(255) NOT NULL,
+	"metadata" jsonb DEFAULT '{}' NOT NULL,
+	"vector" vector(1536) NOT NULL,
+	"updated_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "task_history" (
