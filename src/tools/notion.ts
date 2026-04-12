@@ -140,7 +140,7 @@ export const getNotionPage = tool(
 );
 
 export const createNotionPage = tool(
-  async ({ title, parentId, parentType, icon }) => {
+  async ({ title, parentId, parentType, icon, children }) => {
     try {
       const parent = parentType === "database_id"
         ? { database_id: parentId }
@@ -149,6 +149,12 @@ export const createNotionPage = tool(
         ? { Name: { title: [{ text: { content: title } }] } }
         : { title: { title: [{ text: { content: title } }] } };
 
+      let parsedChildren: unknown[] | undefined;
+      if (children) {
+        try { parsedChildren = JSON.parse(children); }
+        catch { return "Invalid children JSON array"; }
+      }
+
       const res = await fetch(`${NOTION_API}/pages`, {
         method: "POST",
         headers: headers(),
@@ -156,6 +162,7 @@ export const createNotionPage = tool(
           parent,
           properties,
           ...(icon ? { icon: { type: "emoji", emoji: icon } } : {}),
+          ...(parsedChildren ? { children: parsedChildren } : {}),
         }),
       });
       if (!res.ok) return `Failed to create page (${res.status}): ${await res.text()}`;
@@ -168,12 +175,27 @@ export const createNotionPage = tool(
   },
   {
     name: "create_notion_page",
-    description: "Create a new Notion page under a parent page or database. Use append_notion_blocks after creation to add content.",
+    description: `Create a new Notion page under a parent page or database, optionally with inline content.
+
+If children are provided, the page is created with content in a single call.
+Otherwise, use append_notion_blocks after creation to add content.
+
+Common block shapes for children:
+- paragraph:           {"type":"paragraph","paragraph":{"rich_text":[{"type":"text","text":{"content":"text"}}]}}
+- heading_1/2/3:       {"type":"heading_1","heading_1":{"rich_text":[{"type":"text","text":{"content":"title"}}]}}
+- bulleted_list_item:  {"type":"bulleted_list_item","bulleted_list_item":{"rich_text":[{"type":"text","text":{"content":"item"}}]}}
+- numbered_list_item:  {"type":"numbered_list_item","numbered_list_item":{"rich_text":[{"type":"text","text":{"content":"item"}}]}}
+- to_do:               {"type":"to_do","to_do":{"rich_text":[{"type":"text","text":{"content":"task"}}],"checked":false}}
+- code:                {"type":"code","code":{"rich_text":[{"type":"text","text":{"content":"code"}}],"language":"typescript"}}
+- quote:               {"type":"quote","quote":{"rich_text":[{"type":"text","text":{"content":"quote"}}]}}
+- divider:             {"type":"divider","divider":{}}
+- callout:             {"type":"callout","callout":{"rich_text":[{"type":"text","text":{"content":"note"}}],"icon":{"emoji":"💡"}}}`,
     schema: z.object({
       title: z.string().describe("Page title"),
       parentId: z.string().describe("Parent page or database ID (UUID)"),
       parentType: z.enum(["page_id", "database_id"]).describe("Whether the parent is a page or database"),
       icon: z.string().optional().describe("Optional emoji icon (e.g. '📝', '✅')"),
+      children: z.string().optional().describe("Optional JSON array of Notion block objects to include as page content"),
     }),
   },
 );

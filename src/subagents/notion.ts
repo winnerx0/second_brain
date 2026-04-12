@@ -1,103 +1,56 @@
 import { createAgent, tool } from "langchain";
 import { model } from "../shared";
-import { mcpTools } from "../shared";
-// import { notionTools } from "../tools/notion";
+import { notionTools } from "../tools/notion";
 import { getCurrentDateTime } from "../tools/miscellaneous";
 import z from "zod";
 
-function flattenAllOf(schema: any): any {
-  if (!schema || typeof schema !== "object") return schema;
+const NOTION_SYSTEM_PROMPT = `You are a Notion Workspace Assistant with full access to the user's Notion workspace.
 
-  if (Array.isArray(schema.allOf)) {
-    const merged = schema.allOf.reduce(
-      (acc: any, sub: any) => {
-        const flat = flattenAllOf(sub);
-        return {
-          ...acc,
-          ...flat,
-          properties: { ...acc.properties, ...flat.properties },
-          required: [...new Set([...(acc.required || []), ...(flat.required || [])])],
-        };
-      },
-      { type: "object", properties: {}, required: [] },
-    );
-
-    const { allOf, ...rest } = schema;
-    return flattenAllOf({ ...merged, ...rest });
-  }
-
-  if (schema.properties) {
-    return {
-      ...schema,
-      properties: Object.fromEntries(
-        Object.entries(schema.properties).map(([k, v]) => [k, flattenAllOf(v)]),
-      ),
-    };
-  }
-
-  if (schema.items) {
-    return { ...schema, items: flattenAllOf(schema.items) };
-  }
-
-  if (schema.additionalProperties && typeof schema.additionalProperties === "object") {
-    return {
-      ...schema,
-      additionalProperties: flattenAllOf(schema.additionalProperties),
-    };
-  }
-
-  return schema;
-}
-
-const notionMcpTools = mcpTools
-  .filter((tool) => tool.name.startsWith("API-"))
-  .map((tool) => {
-    if (tool.schema && typeof tool.schema === "object") {
-      tool.schema = flattenAllOf(tool.schema);
-    }
-    return tool;
-  });
-
-const NOTION_SYSTEM_PROMPT = `You are a Notion Workspace Assistant with full access to the user's Notion workspace through Notion MCP tools.
-
-Available operations are provided by the MCP toolset for pages, blocks, databases, users, comments, and search.
+Available tools:
+- search_notion: Search pages and databases by keyword
+- get_notion_page: Read a page's properties and content
+- get_block_children: List child blocks (with pagination)
+- create_notion_page: Create a page (optionally with inline children blocks for rich content)
+- update_notion_page_properties: Update properties, icon, or archive state
+- trash_notion_page: Move a page to trash
+- append_notion_blocks: Add blocks to an existing page or block
+- update_notion_block: Edit an existing block
+- delete_notion_block: Permanently delete a block
+- get_notion_database: Get database schema (property names and types)
+- create_notion_database: Create an inline database under a page
+- update_notion_database: Update database title or properties
+- query_notion_database: Query database rows with filters and sorts
+- create_database_entry: Add a row to a database
+- get_notion_comments: List comments on a page or block
+- create_notion_comment: Add a comment to a page
+- list_notion_users: List workspace users
 
 How to work correctly:
 
-CREATING PAGES WITH CONTENT (always two steps):
-1. Create the page first and get the page ID
-2. Append children blocks in a second call
-Do not try to create a page with full children payload in one step when it fails schema validation.
-
-ADDING CONTENT:
-Pass a JSON array of block objects. Use the block shapes documented in the tool description.
-Example for a structured page:
-[
-  {"type":"heading_1","heading_1":{"rich_text":[{"type":"text","text":{"content":"Title"}}]}},
-  {"type":"paragraph","paragraph":{"rich_text":[{"type":"text","text":{"content":"Body text"}}]}},
-  {"type":"to_do","to_do":{"rich_text":[{"type":"text","text":{"content":"Task"}}],"checked":false}}
-]
+CREATING PAGES WITH CONTENT:
+- Prefer creating pages with inline children in a single call using the children parameter.
+- If the content is very large, create the page first, then use append_notion_blocks.
 
 READING DATABASE ENTRIES (always two steps):
-1. Read database schema first to understand exact property names and types
-2. Query the database rows
+1. Read database schema first with get_notion_database to understand exact property names and types
+2. Query the database rows with query_notion_database
 
 ADDING DATABASE ROWS:
-1. Read database schema
-2. Create a row with matching property JSON
+1. Read database schema with get_notion_database
+2. Create a row with create_database_entry using matching property JSON
 
 BEST PRACTICES:
 - Always search first before creating pages to avoid duplicates
 - For "that page" or vague references, search first
 - Prefer page retrieval tools before block-level traversal when possible
 - For deep/nested content, use get_block_children with pagination
-- Confirm before trashing or deleting blocks
+- If the user explicitly asks to trash/delete, perform it directly in one call
+- Never retry the same delete/trash operation repeatedly for the same ID in a single request
 - Use get_current_datetime when any date/time context is needed`;
 
 const notionAgent = createAgent({
   model,
-  // tools: [...notionTools, getCurrentDateTime],
-  tools: [...notionMcpTools, getCurrentDateTime],
+  tools: [getCurrentDateTime, ...notionTools],
 });
 
 export const notionTool = tool(
@@ -123,3 +76,4 @@ export const notionTool = tool(
     }),
   },
 );
+
