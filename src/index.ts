@@ -27,8 +27,17 @@ const cron = new CronJob("0 0 * * *", async () => {
 
 cron.start();
 app.post("/chat", async (c) => {
-  const body = await c.req.json<{ message: { text: string } }>();
-  const { message } = body;
+
+  const messages = new Set<string>()
+
+  const body = await c.req.json<{ message: { text: string }, update_id: string }>();
+  const { message, update_id } = body;
+
+  if (messages.has(update_id)) {
+    logger.warn(`[chat] duplicate message received with update_id: ${update_id}`);
+    return c.json({ success: false, error: "Duplicate message" });
+  }
+  messages.add(update_id)
 
   logger.info(`[chat] received: ${message.text}`);
 

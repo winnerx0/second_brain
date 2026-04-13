@@ -1,0 +1,85 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "git-empty-commit-checkpoint",
+			"type": "shell",
+			"command": "git",
+			"args": [
+				"-C",
+				"/home/winner/Documents/projects/second_brain",
+				"commit",
+				"--allow-empty",
+				"-m",
+				"chore: checkpoint notion delete loop fix"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "git-status-sb",
+			"type": "shell",
+			"command": "git",
+			"args": [
+				"-C",
+				"/home/winner/Documents/projects/second_brain",
+				"status",
+				"-sb"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "git-diff-shared",
+			"type": "shell",
+			"command": "git",
+			"args": [
+				"-C",
+				"/home/winner/Documents/projects/second_brain",
+				"diff",
+				"--",
+				"src/shared.ts"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "git-commit-notion-changes",
+			"type": "shell",
+			"command": "git",
+			"args": [
+				"-C",
+				"/home/winner/Documents/projects/second_brain",
+				"commit",
+				"-m",
+				"feat(notion): use local notion tools and support inline page children",
+				"src/tools/notion.ts",
+				"src/subagents/notion.ts"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "git-commit-shared-comment",
+			"type": "shell",
+			"command": "git",
+			"args": [
+				"-C",
+				"/home/winner/Documents/projects/second_brain",
+				"commit",
+				"-m",
+				"chore(shared): update commented model example",
+				"src/shared.ts"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "git-status-final",
+			"type": "shell",
+			"command": "git",
+			"args": [
+				"-C",
+				"/home/winner/Documents/projects/second_brain",
+				"status",
+				"-sb"
+			],
+			"isBackground": false
+		}
+	]
+}
