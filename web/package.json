@@ -1,0 +1,28 @@
+{
+  "name": "second-brain-web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite dev --port 3001",
+    "build": "vite build",
+    "preview": "vite preview --port 3001",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@tanstack/react-router": "latest",
+    "@tanstack/react-start": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "@vitejs/plugin-react": "latest",
+    "typescript": "latest",
+    "vite": "latest",
+    "vite-plugin-pwa": "^1.2.0"
+  }
+}

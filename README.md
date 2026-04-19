@@ -64,6 +64,16 @@ bun run start   # production
 
 Server starts on port **3000**.
 
+### 5. Start the web app
+
+The browser UI lives in `web/` and connects to the streaming chat API on the backend.
+
+```bash
+bun run web:dev
+```
+
+The web app runs on port **3001**.
+
 ## API
 
 ### `GET /health`
@@ -85,6 +95,15 @@ Ad-hoc question routing — the agent decides which tools to call.
 curl -X POST http://localhost:3000/chat \
   -H "Content-Type: application/json" \
   -d '{"message": "what commits did I make today?"}'
+```
+
+### `POST /chat/stream`
+Streaming chat endpoint for the browser UI. It returns SSE events for status, tool start/end, assistant token deltas, and the final response.
+
+```bash
+curl -N -X POST http://localhost:3000/chat/stream \
+  -H "Content-Type: application/json" \
+  -d '{"text": "what am I working on right now?"}'
 ```
 
 ## Database

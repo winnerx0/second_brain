@@ -1,6 +1,6 @@
 {
-  "id": "ab51082c-8052-4fa7-b9fc-a26a0eeea172",
-  "prevId": "00000000-0000-0000-0000-000000000000",
+  "id": "0310026b-fad9-4665-b737-260492a8a177",
+  "prevId": "ab51082c-8052-4fa7-b9fc-a26a0eeea172",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -312,6 +312,60 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.memory_cleanup_runs": {
+      "name": "memory_cleanup_runs",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "ran_at": {
+          "name": "ran_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "reviewed_rows": {
+          "name": "reviewed_rows",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "merged_rows": {
+          "name": "merged_rows",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "deleted_rows": {
+          "name": "deleted_rows",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "promoted_rows": {
+          "name": "promoted_rows",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
         }
       },
       "indexes": {},

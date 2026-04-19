@@ -4,15 +4,17 @@ import {
   SystemMessage,
   AIMessage,
   ToolMessage,
+  summarizationMiddleware,
 } from "langchain";
+import { BaseCallbackHandler } from "@langchain/core/callbacks/base";
 import { getEncoding } from "js-tiktoken";
 import { config } from "./config.ts";
-import { storeMemory, recallMemories, deleteMemory } from "./tools/memory.ts";
+import { storeMemory, recallMemories, deleteMemory } from "./tools/memory";
 import { db } from "./db/client.ts";
-import { agentRuns, chatHistory } from "./db/schema.ts";
-import { asc, desc, eq, gte } from "drizzle-orm";
+import { agentRuns, chatHistory, chatSessions } from "./db/schema.ts";
+import { asc, desc, eq, isNull } from "drizzle-orm";
 import { sendTelegramMessage } from "./delivery/telegram.ts";
-import { env } from "bun";
+const env = process.env;
 import { logger } from "./logger.ts";
 import { getCurrentDateTime } from "./tools/miscellaneous.ts";
 import { docsTool } from "./subagents/google-doc.ts";
@@ -21,7 +23,9 @@ import { notionTool } from "./subagents/notion.ts";
 import { githubTool } from "./subagents/github.ts";
 import { calendarTool } from "./subagents/calendar.ts";
 import { gmailTool } from "./subagents/gmail.ts";
+import { knowledgeGraphTool } from "./subagents/knowledge-graph.ts";
 import { model } from "./shared.ts";
+import { ChatOpenAI } from "@langchain/openai";
 
 const enc = getEncoding("cl100k_base");
 function countTokens(text: string) {
@@ -55,9 +59,154 @@ const tools = [
   anilistTool,
   docsTool,
   gmailTool,
+  knowledgeGraphTool,
 ];
 
-const mainAgent = createAgent({ model, tools });
+const mainAgent = createAgent({
+  model,
+  tools,
+  middleware: [
+    summarizationMiddleware({
+      model: new ChatOpenAI({ model: "gpt-5-nano" }),
+      trigger: { tokens: 4000, messages: 10 },
+      keep: { messages: 20 },
+    }),
+  ],
+});
+
+export type AgentStreamEvent =
+  | { type: "status"; message: string }
+  | { type: "assistant_delta"; delta: string }
+  | { type: "tool_start"; tool: string; input: string }
+  | { type: "tool_end"; tool: string; output: string }
+  | { type: "error"; message: string }
+  | { type: "final"; text: string };
+
+type HandleMessageOptions = {
+  onEvent?: (event: AgentStreamEvent) => void | Promise<void>;
+  signal?: AbortSignal;
+  sessionId?: number;
+};
+
+function safeStringify(value: unknown): string {
+  if (typeof value === "string") return value;
+
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}
+
+function emitEvent(
+  onEvent: HandleMessageOptions["onEvent"],
+  event: AgentStreamEvent,
+) {
+  return onEvent?.(event);
+}
+
+function createStreamingCallback(onEvent?: HandleMessageOptions["onEvent"]) {
+  return new (class extends BaseCallbackHandler {
+    name = "agent-stream-callback";
+    private toolNames = new Map<string, string>();
+
+    constructor() {
+      super({ ignoreRetriever: true, _awaitHandler: true });
+    }
+
+    get lc_prefer_streaming() {
+      return true;
+    }
+
+    override async handleLLMNewToken(token: string) {
+      if (token) {
+        await emitEvent(onEvent, { type: "assistant_delta", delta: token });
+      }
+    }
+
+    override async handleToolStart(
+      tool: { name?: string },
+      input: string,
+      runId: string,
+    ) {
+      const toolName = tool.name ?? "tool";
+      this.toolNames.set(runId, toolName);
+      await emitEvent(onEvent, {
+        type: "tool_start",
+        tool: toolName,
+        input: safeStringify(input),
+      });
+    }
+
+    override async handleToolEnd(output: unknown, runId: string) {
+      await emitEvent(onEvent, {
+        type: "tool_end",
+        tool: this.toolNames.get(runId) ?? "tool",
+        output: safeStringify(output),
+      });
+      this.toolNames.delete(runId);
+    }
+
+    override async handleChainError(err: unknown) {
+      await emitEvent(onEvent, {
+        type: "error",
+        message: err instanceof Error ? err.message : String(err),
+      });
+    }
+  })();
+}
+
+function shouldAutoStoreUserMemory(text: string): boolean {
+  const value = text.trim().toLowerCase();
+  if (!value) return false;
+
+  if (value.endsWith("?")) return false;
+
+  if (/^(hi|hello|hey|thanks|thank you|ok|okay|cool|nice|yo)\b/.test(value)) {
+    return false;
+  }
+
+  if (/\b(forget|delete memory|don't remember|do not remember)\b/.test(value)) {
+    return false;
+  }
+
+  if (/\b(i want you to|can you|could you|would you|please)\b/.test(value)) {
+    return false;
+  }
+
+  const hasFirstPerson = /\b(i|i'm|im|my|me|mine)\b/.test(value);
+  if (!hasFirstPerson) return false;
+
+  return /\b(i want to|i want|i like|i love|i dislike|i hate|i prefer|my favorite|i usually|i always|i never|i tend to|i am|i'm)\b/.test(
+    value,
+  );
+}
+
+function didCallStoreMemory(messages: Array<{ content?: unknown; tool_calls?: unknown }>): boolean {
+  for (const message of messages) {
+    const content = message.content;
+    if (Array.isArray(content)) {
+      const foundInContent = content.some((part) => {
+        if (!part || typeof part !== "object") return false;
+        const maybePart = part as { name?: unknown };
+        return maybePart.name === "store_memory";
+      });
+      if (foundInContent) return true;
+    }
+
+    const calls = message.tool_calls;
+    if (Array.isArray(calls)) {
+      const foundInCalls = calls.some((call) => {
+        if (!call || typeof call !== "object") return false;
+        const maybeCall = call as { name?: unknown };
+        return maybeCall.name === "store_memory";
+      });
+      if (foundInCalls) return true;
+    }
+  }
+
+  return false;
+}
 
 const BRIEFING_SYSTEM_PROMPT = `You are a personal productivity assistant. Gather all available data using your tools, then produce a concise morning briefing. Use these sections:
 
@@ -142,6 +291,7 @@ const CHAT_SYSTEM = new SystemMessage(
     - docs      → Google Docs
     - anilist   → anime / manga lookups
     - gmail     → emails (read, search, send, reply, archive)
+    - knowledge_graph → entities, relationships, and graph context
   - You can fan out multiple agents in parallel when steps are independent.
   - Synthesize their results into a single, coherent response — never just
     dump raw output at ${env.MASTER}.
@@ -162,50 +312,60 @@ const CHAT_SYSTEM = new SystemMessage(
     from recent context or memory before asking.`,
 );
 
-export async function handleMessage(text: string): Promise<string> {
+export async function handleMessage(
+  text: string,
+  options: HandleMessageOptions = {},
+): Promise<string> {
   logger.info(`[chat] input: ${text}`);
 
-  // Find the last human message in the chat history and then
-  // load all messages from that point onward in chronological order.
-  const [lastHuman] = await db
-    .select({ id: chatHistory.id })
+  const rows = await db
+    .select({ role: chatHistory.role, content: chatHistory.content })
     .from(chatHistory)
-    .where(eq(chatHistory.role, "human"))
+    .where(
+      options.sessionId
+        ? eq(chatHistory.sessionId, options.sessionId)
+        : isNull(chatHistory.sessionId),
+    )
     .orderBy(desc(chatHistory.id))
-    .limit(1);
+    .limit(40);
 
-  let rows: { role: string; content: string }[] = [];
-  if (lastHuman) {
-    rows = await db
-      .select({ role: chatHistory.role, content: chatHistory.content })
-      .from(chatHistory)
-      .where(gte(chatHistory.id, lastHuman.id))
-      .orderBy(asc(chatHistory.id))
-      .limit(20);
-  }
+  const history = [...rows]
+    .reverse()
+    .map((r) => {
+      const data = JSON.parse(r.content);
+      if (r.role === "human") return new HumanMessage(data.content);
+      if (r.role === "tool") return null;
 
-  const history = rows.map((r) => {
-    const data = JSON.parse(r.content);
-    if (r.role === "human") return new HumanMessage(data.content);
-    if (r.role === "tool")
-      return new ToolMessage({
-        tool_call_id: data.tool_call_id,
-        name: data.name,
+      const toolCalls = Array.isArray(data.tool_calls) ? data.tool_calls : [];
+      if (toolCalls.length > 0) return null;
+
+      return new AIMessage({
         content: data.content,
+        tool_calls: [],
       });
-    return new AIMessage({
-      content: data.content,
-      tool_calls: data.tool_calls ?? [],
-    });
-  });
+    })
+    .filter(Boolean) as (HumanMessage | AIMessage | ToolMessage)[];
 
   logger.info(
     `[chat] estimated input tokens: ${countTokens(CHAT_SYSTEM.content + text)}`,
   );
 
+  const streamingCallback = options.onEvent
+    ? createStreamingCallback(options.onEvent)
+    : undefined;
+
+  await emitEvent(options.onEvent, {
+    type: "status",
+    message: "Thinking...",
+  });
+
   const response = await mainAgent.invoke(
     { messages: [CHAT_SYSTEM, ...history, new HumanMessage(text)] },
-    { recursionLimit: 25 },
+    {
+      recursionLimit: 25,
+      callbacks: streamingCallback ? [streamingCallback] : undefined,
+      signal: options.signal,
+    } as never,
   );
 
   const reply = String(
@@ -227,6 +387,7 @@ export async function handleMessage(text: string): Promise<string> {
     .map((message) => {
       if (message instanceof ToolMessage) {
         return {
+          sessionId: options.sessionId ?? null,
           role: "tool",
           content: JSON.stringify({
             tool_call_id: message.tool_call_id,
@@ -241,6 +402,7 @@ export async function handleMessage(text: string): Promise<string> {
           message.tool_calls && message.tool_calls.length > 0;
         if (!hasContent && !hasToolCalls) return null;
         return {
+          sessionId: options.sessionId ?? null,
           role: "ai",
           content: JSON.stringify({
             content: message.content,
@@ -249,21 +411,64 @@ export async function handleMessage(text: string): Promise<string> {
         };
       }
       return {
+        sessionId: options.sessionId ?? null,
         role: "human",
         content: JSON.stringify({ content: message.content }),
       };
     })
     .filter(Boolean) as (typeof chatHistory.$inferInsert)[];
 
-  db.insert(chatHistory)
-    .values(messages)
-    .then()
-    .catch((err) => console.log("Error saving to database", err));
+  const hasAssistantRow = messages.some((message) => message.role === "ai");
+  if (!hasAssistantRow && reply.trim().length > 0) {
+    messages.push({
+      sessionId: options.sessionId ?? null,
+      role: "ai",
+      content: JSON.stringify({
+        content: reply,
+        tool_calls: [],
+      }),
+    });
+  }
+
+  const modelAlreadyStoredMemory = didCallStoreMemory(
+    newMessages as Array<{ content?: unknown; tool_calls?: unknown }>,
+  );
+
+  if (!modelAlreadyStoredMemory && shouldAutoStoreUserMemory(text)) {
+    try {
+      const autoStoreResult = await storeMemory.invoke({
+        value: text,
+        query: text,
+      });
+      logger.info(`[memory.auto] ${String(autoStoreResult)}`);
+    } catch (error) {
+      logger.warn(
+        `[memory.auto] failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  if (messages.length > 0) {
+    try {
+      await db.insert(chatHistory).values(messages);
+      if (options.sessionId) {
+        await db
+          .update(chatSessions)
+          .set({ updatedAt: new Date() })
+          .where(eq(chatSessions.id, options.sessionId));
+      }
+    } catch (error) {
+      logger.error("[chat.save] failed to persist chat history", error);
+    }
+  }
 
   logger.info(
     `[chat] actual tokens used: ${totalTokensUsed(response.messages as never[])}`,
   );
 
   logger.info(`[chat] reply: ${reply}`);
+
+  await emitEvent(options.onEvent, { type: "final", text: reply });
+
   return reply;
 }

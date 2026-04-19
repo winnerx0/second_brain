@@ -1,5 +1,6 @@
-import { env } from "bun";
 import { z } from "zod";
+
+const env = process.env;
 
 const envSchema = z.object({
   MASTER: z.string().min(1),
@@ -18,6 +19,9 @@ const envSchema = z.object({
   GOOGLE_API_KEY: z.string().min(1),
   KIVIA_API_KEY: z.string().min(1),
   ANILIST_TOKEN: z.string().min(1),
+  OPENROUTER_BASE_URL: z.string().min(1).default("https://openrouter.ai/api/v1"),
+  OPENROUTER_API_KEY: z.string().min(1),
+  GEMINI_API_KEY: z.string().min(1),
   // Gmail
   GMAIL_REFRESH_TOKEN: z.string().optional(),
 });

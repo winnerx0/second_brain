@@ -245,32 +245,14 @@ export const deleteIssue = tool(
   async ({ repo, issue_number, owner }) => {
     try {
       const repoOwner = owner ?? config.GITHUB_USERNAME;
-      const res = await fetch("https://api.github.com/graphql", {
-        method: "POST",
-        headers: { ...headers, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          query: `
-            mutation {
-              deleteIssue(input: { issueId: "${issue_number}", clientMutationId: "delete" }) {
-                repository { name }
-              }
-            }
-          `,
-        }),
-      });
 
-      if (!res.ok) {
-        const err = await res.text();
-        return `Failed to delete issue (${res.status}): ${err}`;
-      }
-
-      // First resolve the node ID, then delete
+      // Resolve the node ID first (GraphQL requires the global node ID, not the issue number)
       const idRes = await fetch(
         `https://api.github.com/repos/${repoOwner}/${repo}/issues/${issue_number}`,
         { headers },
       );
 
-      if (!idRes.ok) return `Issue #${issue_number} not found.`;
+      if (!idRes.ok) return `Issue #${issue_number} not found in ${repoOwner}/${repo}.`;
 
       const issueData = (await idRes.json()) as { node_id: string };
       const nodeId = issueData.node_id;

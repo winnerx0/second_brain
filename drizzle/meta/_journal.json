@@ -5,8 +5,22 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1776000989756,
-      "tag": "0000_fearless_cloak",
+      "when": 1776148559000,
+      "tag": "0000_sleepy_korath",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1776150500513,
+      "tag": "0001_sticky_prowler",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1776151381043,
+      "tag": "0002_volatile_black_cat",
       "breakpoints": true
     }
   ]

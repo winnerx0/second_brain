@@ -6,6 +6,9 @@
   "scripts": {
     "dev": "bun run --hot src/index.ts",
     "start": "bun run dist/index.js",
+    "web:dev": "bun --cwd web run dev",
+    "web:build": "bun --cwd web run build",
+    "web:preview": "bun --cwd web run preview",
     "db:generate": "bunx drizzle-kit generate",
     "db:migrate": "bunx drizzle-kit migrate",
     "db:studio": "bunx drizzle-kit studio"
@@ -20,6 +23,8 @@
     "@langchain/openai": "^1.4.3",
     "@langchain/openrouter": "^0.2.1",
     "@modelcontextprotocol/client": "^2.0.0-alpha.2",
+    "@tanstack/react-router": "latest",
+    "@tanstack/react-start": "latest",
     "cron": "^4.4.0",
     "dotenv": "^17.4.1",
     "drizzle-orm": "latest",
@@ -27,15 +32,22 @@
     "hono": "latest",
     "js-tiktoken": "^1.0.21",
     "langchain": "latest",
-    "openai": "^6.33.0",
+    "openai": "^6.34.0",
     "pg": "^8.20.0",
+    "react": "latest",
+    "react-dom": "latest",
     "winston": "^3.19.0",
     "zod": "latest"
   },
   "devDependencies": {
     "@types/bun": "latest",
+    "@types/node": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "@vitejs/plugin-react": "latest",
     "drizzle-kit": "latest",
     "@types/pg": "^8.20.0",
+    "vite": "latest",
     "typescript": "latest"
   }
 }

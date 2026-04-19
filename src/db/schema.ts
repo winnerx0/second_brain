@@ -1,4 +1,5 @@
 import {
+  pgEnum,
   pgTable,
   serial,
   text,
@@ -6,10 +7,26 @@ import {
   boolean,
   integer,
   date,
-  varchar,
   vector,
   jsonb,
+  real,
 } from "drizzle-orm/pg-core";
+
+export const memoryClassificationEnum = pgEnum("memory_classification", [
+  "identity",
+  "relationships",
+  "behavior",
+  "preferences",
+  "corrections",
+  "knowledge",
+  "unclassified",
+]);
+
+export const memoryTierEnum = pgEnum("memory_tier", [
+  "short_term",
+  "long_term",
+  "lifelong",
+]);
 
 export const agentRuns = pgTable("agent_runs", {
   id: serial("id").primaryKey(),
@@ -30,15 +47,65 @@ export const taskHistory = pgTable("task_history", {
 
 export const memories = pgTable("memories", {
   id: serial("id").primaryKey(),
-  content: varchar("content", { length: 255 }).notNull(),
+  content: text("content").notNull(),
+  classification: memoryClassificationEnum("classification")
+    .notNull()
+    .default("unclassified"),
+  tier: memoryTierEnum("tier").notNull().default("short_term"),
+  importance: real("importance").notNull().default(0.2),
+  accessCount: integer("access_count").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  lastAccessedAt: timestamp("last_accessed_at").notNull().defaultNow(),
+  expiresAt: timestamp("expires_at"),
+  promotedAt: timestamp("promoted_at"),
+  debateHistory: jsonb("debate_history").notNull().default("[]"),
   metadata: jsonb("metadata").notNull().default("{}"),
   vector: vector("vector", { dimensions: 1536 }).notNull(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
+export const memoryCleanupRuns = pgTable("memory_cleanup_runs", {
+  id: serial("id").primaryKey(),
+  ranAt: timestamp("ran_at").notNull().defaultNow(),
+  reviewedRows: integer("reviewed_rows").notNull().default(0),
+  mergedRows: integer("merged_rows").notNull().default(0),
+  deletedRows: integer("deleted_rows").notNull().default(0),
+  promotedRows: integer("promoted_rows").notNull().default(0),
+});
+
+export const chatSessions = pgTable("chat_sessions", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull().default("New Chat"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
 export const chatHistory = pgTable("chat_history", {
   id: serial("id").primaryKey(),
+  sessionId: integer("session_id"),
   role: text("role").notNull(), // "user" | "assistant"
   content: text("content").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const graphNodes = pgTable("graph_nodes", {
+  id: serial("id").primaryKey(),
+  kind: text("kind").notNull(),
+  name: text("name").notNull(),
+  normalizedName: text("normalized_name").notNull(),
+  aliases: text("aliases").array().notNull().default([]),
+  metadata: jsonb("metadata").notNull().default("{}"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const graphEdges = pgTable("graph_edges", {
+  id: serial("id").primaryKey(),
+  fromNodeId: integer("from_node_id").notNull(),
+  toNodeId: integer("to_node_id").notNull(),
+  relation: text("relation").notNull(),
+  weight: integer("weight").notNull().default(1),
+  evidence: text("evidence"),
+  source: text("source"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
