@@ -27,24 +27,24 @@ jobs:
         run: |
           docker build -t ${{ vars.DOCKERHUB_USERNAME }}/second_brain:latest .
           docker push ${{ vars.DOCKERHUB_USERNAME }}/second_brain:latest
-  deploy:
-    env:
-      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-    needs: build-and-push
-    runs-on: ubuntu-latest
-    steps:
-      - name: Install jq
-        run: sudo apt-get update && sudo apt-get install -y jq
-      - name: Deploy to Railway
-        run: |
-          response=$(curl -X POST https://backboard.railway.com/graphql/v2 \
-            -H "Authorization: Bearer $RAILWAY_TOKEN" \
-            -H "Content-Type: application/json" \
-            -d '{"query":"mutation deploymentRedeploy($id: String!) {\ndeploymentRedeploy(id: $id) {\n  id\n  status\n}\n}","variables":{"id": "${{ secrets.RAILWAY_DEPLOYMENT_ID }}"}}')
+  # deploy:
+  #   env:
+  #     RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+  #   needs: build-and-push
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Install jq
+  #       run: sudo apt-get update && sudo apt-get install -y jq
+  #     - name: Deploy to Railway
+  #       run: |
+  #         response=$(curl -X POST https://backboard.railway.com/graphql/v2 \
+  #           -H "Authorization: Bearer $RAILWAY_TOKEN" \
+  #           -H "Content-Type: application/json" \
+  #           -d '{"query":"mutation deploymentRedeploy($id: String!) {\ndeploymentRedeploy(id: $id) {\n  id\n  status\n}\n}","variables":{"id": "${{ secrets.RAILWAY_DEPLOYMENT_ID }}"}}')
 
-            if echo "$response" | jq -e '.errors' > /dev/null; then
-              echo "Deployment failed"
-              exit 1
-            fi
-            echo "Deployment successful"
+  #           if echo "$response" | jq -e '.errors' > /dev/null; then
+  #             echo "Deployment failed"
+  #             exit 1
+  #           fi
+  #           echo "Deployment successful"
 
