@@ -1,9 +1,9 @@
-import { handle } from "hono/vercel";
 import app from "../src/app.ts";
 
 export const config = {
-  runtime: "nodejs20.x",
   maxDuration: 300,
 };
 
-export default handle(app);
+export default async function handler(req: Request): Promise<Response> {
+  return app.fetch(req);
+}
