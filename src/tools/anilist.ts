@@ -55,6 +55,20 @@ async function gql<T>(
   return json.data as T;
 }
 
+async function getAuthenticatedAniListUserName(): Promise<string> {
+  const data = await gql<{ Viewer: { name: string } }>(
+    `query {
+      Viewer {
+        name
+      }
+    }`,
+    {},
+    true,
+  );
+
+  return data.Viewer.name;
+}
+
 /* ─── Search ──────────────────────────────────────────────────────────────── */
 
 export const searchAnime = tool(
@@ -182,6 +196,7 @@ export const getManga = tool(
 export const getUserAnimeList = tool(
   async ({ userName, status }) => {
     try {
+      const targetUserName = userName ?? (await getAuthenticatedAniListUserName());
       const data = await gql<{
         MediaListCollection: unknown;
       }>(
@@ -189,13 +204,17 @@ export const getUserAnimeList = tool(
           MediaListCollection(userName: $userName, type: ANIME, status: $status) {
             lists {
               name entries {
-                mediaId score progress updatedAt
+                mediaId
+                myRating: score(format: POINT_10_DECIMAL)
+                myRating100: score(format: POINT_100)
+                progress
+                updatedAt
                 media { title { romaji english } episodes status }
               }
             }
           }
         }`,
-        { userName, status: status ?? null },
+        { userName: targetUserName, status: status ?? null },
         true,
       );
       return JSON.stringify(data.MediaListCollection);
@@ -207,9 +226,12 @@ export const getUserAnimeList = tool(
   {
     name: 'get_user_anime_list',
     description:
-      "Get a user's AniList anime list, optionally filtered by status.",
+      "Get a user's AniList anime list, optionally filtered by status. If userName is omitted, uses the authenticated AniList account.",
     schema: z.object({
-      userName: z.string().describe('AniList username'),
+      userName: z
+        .string()
+        .optional()
+        .describe('AniList username (optional; defaults to authenticated user)'),
       status: z
         .enum([
           'CURRENT',
@@ -227,6 +249,7 @@ export const getUserAnimeList = tool(
 export const getUserMangaList = tool(
   async ({ userName, status }) => {
     try {
+      const targetUserName = userName ?? (await getAuthenticatedAniListUserName());
       const data = await gql<{
         MediaListCollection: unknown;
       }>(
@@ -234,13 +257,17 @@ export const getUserMangaList = tool(
           MediaListCollection(userName: $userName, type: MANGA, status: $status) {
             lists {
               name entries {
-                mediaId score progress updatedAt
+                mediaId
+                myRating: score(format: POINT_10_DECIMAL)
+                myRating100: score(format: POINT_100)
+                progress
+                updatedAt
                 media { title { romaji english } chapters status }
               }
             }
           }
         }`,
-        { userName, status: status ?? null },
+        { userName: targetUserName, status: status ?? null },
         true,
       );
       return JSON.stringify(data.MediaListCollection);
@@ -252,9 +279,12 @@ export const getUserMangaList = tool(
   {
     name: 'get_user_manga_list',
     description:
-      "Get a user's AniList manga list, optionally filtered by status.",
+      "Get a user's AniList manga list, optionally filtered by status. If userName is omitted, uses the authenticated AniList account.",
     schema: z.object({
-      userName: z.string().describe('AniList username'),
+      userName: z
+        .string()
+        .optional()
+        .describe('AniList username (optional; defaults to authenticated user)'),
       status: z
         .enum([
           'CURRENT',
@@ -297,17 +327,19 @@ export const addListEntry = tool(
   {
     name: 'add_list_entry',
     description:
-      "Add or update an anime/manga entry in the authenticated user's AniList.",
+      "Add or update an anime/manga entry in the authenticated user's AniList. Supports score-only updates when mediaId is known.",
     schema: z.object({
       mediaId: z.number().describe('AniList media ID'),
-      status: z.enum([
-        'CURRENT',
-        'PLANNING',
-        'COMPLETED',
-        'DROPPED',
-        'PAUSED',
-        'REPEATING',
-      ]),
+      status: z
+        .enum([
+          'CURRENT',
+          'PLANNING',
+          'COMPLETED',
+          'DROPPED',
+          'PAUSED',
+          'REPEATING',
+        ])
+        .optional(),
       score: z.number().optional().describe('Score 0-10'),
       progress: z
         .number()
