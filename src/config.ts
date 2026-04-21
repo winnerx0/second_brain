@@ -1,11 +1,11 @@
-import { z } from "zod";
+import { z } from 'zod';
 
 const env = process.env;
 
 const envSchema = z.object({
   MASTER: z.string().min(1),
   OPENAI_API_KEY: z.string().min(1),
-  EMBEDDING_MODEL: z.string().min(1).default("text-embedding-3-small"),
+  EMBEDDING_MODEL: z.string().min(1).default('text-embedding-3-small'),
   GITHUB_TOKEN: z.string().min(1),
   GITHUB_USERNAME: z.string().min(1),
   GOOGLE_CALENDAR_ID: z.string().min(1),
@@ -18,8 +18,11 @@ const envSchema = z.object({
   GOOGLE_CLIENT_SECRET: z.string().min(1),
   GOOGLE_API_KEY: z.string().min(1),
   KIVIA_API_KEY: z.string().min(1),
-  ANILIST_TOKEN: z.string().min(1),
-  OPENROUTER_BASE_URL: z.string().min(1).default("https://openrouter.ai/api/v1"),
+  ANILIST_TOKEN: z.string().min(1).optional(),
+  OPENROUTER_BASE_URL: z
+    .string()
+    .min(1)
+    .default('https://openrouter.ai/api/v1'),
   OPENROUTER_API_KEY: z.string().min(1),
   GEMINI_API_KEY: z.string().min(1),
   // Gmail
