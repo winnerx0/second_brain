@@ -1,29 +1,9 @@
-import { config } from "./config";
-import { mcpClient } from "./mcp/mcp";
-import { ChatOpenRouter } from "@langchain/openrouter";
-import { ChatOpenAI } from "@langchain/openai";
-import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
-
-export const mcpTools = await mcpClient.getTools();
-
-// export const model = new ChatOpenRouter({
-//   apiKey: config.OPENROUTER_API_KEY,
-//   model: "x-ai/grok-4.1-fast",
-//   baseURL: config.OPENROUTER_BASE_URL,
-//   temperature: 1,
-//   maxRetries: 3,
-// });
+import { config } from './config';
+import { ChatOpenAI } from '@langchain/openai';
 
 export const model = new ChatOpenAI({
   apiKey: config.OPENAI_API_KEY,
-  model: "gpt-5-nano",
+  model: 'gpt-5-nano',
   temperature: 1,
   maxRetries: 3,
 });
-
-// export const model = new ChatGoogleGenerativeAI({
-//   apiKey: config.GEMINI_API_KEY,
-//   model: "gemini-2.5-flash",
-//   temperature: 1,
-//   maxRetries: 3,
-// });
