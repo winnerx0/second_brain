@@ -1,12 +1,6 @@
 {
   "version": 2,
-  "builds": [
-    { "src": "api/index.ts", "use": "@vercel/node" }
-  ],
-  "routes": [
-    { "src": "/(.*)", "dest": "/api/index.ts" }
-  ],
-  "crons": [
-    { "path": "/cron/briefing", "schedule": "4 9 * * *" }
-  ]
+  "builds": [{ "src": "api/index.ts", "use": "@vercel/node" }],
+  "routes": [{ "src": "/(.*)", "dest": "/api/index.ts" }],
+  "crons": [{ "path": "/cron/briefing", "schedule": "4 9 * * *" }]
 }

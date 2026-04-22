@@ -390,11 +390,7 @@
     "public.memory_tier": {
       "name": "memory_tier",
       "schema": "public",
-      "values": [
-        "short_term",
-        "long_term",
-        "lifelong"
-      ]
+      "values": ["short_term", "long_term", "lifelong"]
     }
   },
   "schemas": {},
