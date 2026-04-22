@@ -1,29 +1,7 @@
-import { createAgent, tool } from "langchain";
-import z from "zod";
-import { mcpTools, model } from "../shared";
-
-const docsMcpTools = mcpTools.filter((tool) => {
-  return [
-    "readDocument",
-    "appendText",
-    "insertText",
-    "deleteRange",
-    "modifyText",
-    "findAndReplace",
-    "listTabs",
-    "addTab",
-    "renameTab",
-    "replaceDocumentWithMarkdown",
-    "replaceRangeWithMarkdown",
-    "appendMarkdown",
-    "applyTextStyle",
-    "applyParagraphStyle",
-    "insertTable",
-    "insertTableWithData",
-    "insertPageBreak",
-    "insertImage",
-  ].includes(tool.name.toLowerCase());
-});
+import { createAgent, tool } from 'langchain';
+import z from 'zod';
+import { model } from '../shared';
+import { googleDocTools } from '../tools/google-docs';
 
 const DOCS_SYSTEM_PROMPT = `You are a Document Assistant with access to Google Docs.
 
@@ -36,22 +14,22 @@ When helping users:
 - When creating documents, ensure proper formatting (headings, lists, paragraphs)
 - If the user refers to "the doc" or "my notes" without being specific, search recent documents first`;
 
-const docsAgent = createAgent({ model: model, tools: docsMcpTools });
+const docsAgent = createAgent({ model, tools: googleDocTools });
 
 export const docsTool = tool(
   async ({ query }) => {
     const response = await docsAgent.invoke({
       messages: [
-        { role: "system", content: DOCS_SYSTEM_PROMPT },
-        { role: "user", content: query },
+        { role: 'system', content: DOCS_SYSTEM_PROMPT },
+        { role: 'user', content: query },
       ],
     });
     return response.messages[response.messages.length - 1]!.text;
   },
   {
-    name: "docs",
+    name: 'docs',
     description:
-      "Create, search, read, and update Google Docs documents. Can summarize content, find existing docs, and create new structured documents.",
+      'Create, search, read, and update Google Docs documents. Can summarize content, find existing docs, and create new structured documents.',
     schema: z.object({
       query: z
         .string()

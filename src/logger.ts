@@ -1,10 +1,10 @@
-import { createLogger, format, transports } from "winston";
+import { createLogger, format, transports } from 'winston';
 
 export const logger = createLogger({
-  level: "info",
+  level: 'info',
   format: format.combine(
     format.errors({ stack: true }),
-    format.timestamp({ format: "YYYY-MM-DD HH:mm:ss" }),
+    format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
     format.colorize(),
     format.printf(({ level, message, timestamp, stack }) =>
       stack

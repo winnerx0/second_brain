@@ -1,7 +1,7 @@
-import { createAgent, tool } from "langchain";
-import z from "zod";
-import { model } from "../shared";
-import { knowledgeGraphTools } from "../tools/knowledge-graph";
+import { createAgent, tool } from 'langchain';
+import z from 'zod';
+import { model } from '../shared';
+import { knowledgeGraphTools } from '../tools/knowledge-graph';
 
 const KNOWLEDGE_GRAPH_SYSTEM_PROMPT = `You are a Knowledge Graph Assistant.
 
@@ -38,17 +38,20 @@ export const knowledgeGraphTool = tool(
   async ({ query }) => {
     const response = await graphAgent.invoke({
       messages: [
-        { role: "system", content: KNOWLEDGE_GRAPH_SYSTEM_PROMPT },
-        { role: "user", content: query },
+        {
+          role: 'system',
+          content: KNOWLEDGE_GRAPH_SYSTEM_PROMPT,
+        },
+        { role: 'user', content: query },
       ],
     });
 
     return response.messages[response.messages.length - 1]!.text;
   },
   {
-    name: "knowledge_graph",
+    name: 'knowledge_graph',
     description:
-      "Build and query a personal knowledge graph of people, projects, docs, tasks, decisions, and topics.",
+      'Build and query a personal knowledge graph of people, projects, docs, tasks, decisions, and topics.',
     schema: z.object({
       query: z
         .string()

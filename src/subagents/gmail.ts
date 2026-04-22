@@ -1,12 +1,19 @@
-import { createAgent, tool } from "langchain";
-import z from "zod";
-import { model } from "../shared";
+import { createAgent, tool } from 'langchain';
+import z from 'zod';
+import { model } from '../shared';
 import {
-  listEmails, getEmail, sendEmail, replyToEmail,
-  archiveEmail, markEmailRead, trashEmail,
-  listLabels, applyLabel, getThreadEmails,
-} from "../tools/gmail";
-import { getCurrentDateTime } from "../tools/miscellaneous";
+  listEmails,
+  getEmail,
+  sendEmail,
+  replyToEmail,
+  archiveEmail,
+  markEmailRead,
+  trashEmail,
+  listLabels,
+  applyLabel,
+  getThreadEmails,
+} from '../tools/gmail';
+import { getCurrentDateTime } from '../tools/miscellaneous';
 
 const GMAIL_SYSTEM_PROMPT = `You are an Email Assistant with access to the user's Gmail inbox.
 
@@ -26,9 +33,16 @@ When helping:
 const gmailAgent = createAgent({
   model,
   tools: [
-    listEmails, getEmail, sendEmail, replyToEmail,
-    archiveEmail, markEmailRead, trashEmail,
-    listLabels, applyLabel, getThreadEmails,
+    listEmails,
+    getEmail,
+    sendEmail,
+    replyToEmail,
+    archiveEmail,
+    markEmailRead,
+    trashEmail,
+    listLabels,
+    applyLabel,
+    getThreadEmails,
     getCurrentDateTime,
   ],
 });
@@ -37,15 +51,18 @@ export const gmailTool = tool(
   async ({ query }) => {
     const response = await gmailAgent.invoke({
       messages: [
-        { role: "system", content: GMAIL_SYSTEM_PROMPT },
-        { role: "user", content: query },
+        {
+          role: 'system',
+          content: GMAIL_SYSTEM_PROMPT,
+        },
+        { role: 'user', content: query },
       ],
     });
     return response.messages[response.messages.length - 1]!.text;
   },
   {
-    name: "gmail",
-    description: "Read, search, send, reply, archive, and manage Gmail emails.",
+    name: 'gmail',
+    description: 'Read, search, send, reply, archive, and manage Gmail emails.',
     schema: z.object({
       query: z
         .string()

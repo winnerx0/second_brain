@@ -1,35 +1,35 @@
-import { tool } from "langchain";
-import { z } from "zod";
-import { and, desc, eq, ilike, inArray, lt, ne, or, sql } from "drizzle-orm";
-import { db } from "../db/client.ts";
-import { logger } from "../logger.ts";
-import { OpenAI } from "openai";
-import { config } from "../config.ts";
-import { memories, memoryCleanupRuns } from "../db/schema.ts";
-import { ChatOpenRouter } from "@langchain/openrouter";
+import { tool } from 'langchain';
+import { z } from 'zod';
+import { and, desc, eq, ilike, inArray, lt, ne, or, sql } from 'drizzle-orm';
+import { db } from '../db/client.ts';
+import { logger } from '../logger.ts';
+import { OpenAI } from 'openai';
+import { config } from '../config.ts';
+import { memories, memoryCleanupRuns } from '../db/schema.ts';
+import { ChatOpenRouter } from '@langchain/openrouter';
 
 const embeddingClient = new OpenAI({ apiKey: config.OPENAI_API_KEY });
 const debateModel = new ChatOpenRouter({
   apiKey: config.OPENROUTER_API_KEY,
   baseURL: config.OPENROUTER_BASE_URL,
-  model: "openai/gpt-oss-120b:free",
+  model: 'openai/gpt-oss-120b:free',
   temperature: 0.1,
   maxRetries: 2,
 });
 
 const classifications = [
-  "identity",
-  "relationships",
-  "behavior",
-  "preferences",
-  "corrections",
-  "knowledge",
-  "unclassified",
+  'identity',
+  'relationships',
+  'behavior',
+  'preferences',
+  'corrections',
+  'knowledge',
+  'unclassified',
 ] as const;
 
 type Classification = (typeof classifications)[number];
-type Tier = "short_term" | "long_term" | "lifelong";
-type Action = "keep" | "delete" | "merge" | "upgrade" | "downgrade";
+type Tier = 'short_term' | 'long_term' | 'lifelong';
+type Action = 'keep' | 'delete' | 'merge' | 'upgrade' | 'downgrade';
 
 type MemoryRow = typeof memories.$inferSelect;
 
@@ -54,13 +54,13 @@ const defaultImportanceByClassification: Record<Classification, number> = {
 };
 
 const tierByClassification: Record<Classification, Tier> = {
-  identity: "lifelong",
-  relationships: "lifelong",
-  behavior: "lifelong",
-  preferences: "long_term",
-  corrections: "long_term",
-  knowledge: "long_term",
-  unclassified: "short_term",
+  identity: 'lifelong',
+  relationships: 'lifelong',
+  behavior: 'lifelong',
+  preferences: 'long_term',
+  corrections: 'long_term',
+  knowledge: 'long_term',
+  unclassified: 'short_term',
 };
 
 function clamp(value: number, min: number, max: number): number {
@@ -72,14 +72,15 @@ function normalizeImportance(
   rawImportance?: number,
 ): number {
   const floor = minImportanceByClassification[classification];
-  const candidate = rawImportance ?? defaultImportanceByClassification[classification];
+  const candidate =
+    rawImportance ?? defaultImportanceByClassification[classification];
   return clamp(Math.max(floor, candidate), 0.2, 0.9);
 }
 
 function computeExpiresAt(tier: Tier, from: Date): Date | null {
-  if (tier === "lifelong") return null;
+  if (tier === 'lifelong') return null;
 
-  const days = tier === "short_term" ? 7 : 30;
+  const days = tier === 'short_term' ? 7 : 30;
   const expires = new Date(from);
   expires.setUTCDate(expires.getUTCDate() + days);
   return expires;
@@ -88,31 +89,55 @@ function computeExpiresAt(tier: Tier, from: Date): Date | null {
 function inferClassificationFromText(content: string): Classification {
   const value = content.toLowerCase();
 
-  if (/\b(correction|actually|instead|not\s+.+\s+but|i said earlier)\b/.test(value)) {
-    return "corrections";
+  if (
+    /\b(correction|actually|instead|not\s+.+\s+but|i said earlier)\b/.test(
+      value,
+    )
+  ) {
+    return 'corrections';
   }
 
-  if (/\b(my name is|i am\s+\d+|i live in|i work as|i work at|my birthday|my age)\b/.test(value)) {
-    return "identity";
+  if (
+    /\b(my name is|i am\s+\d+|i live in|i work as|i work at|my birthday|my age)\b/.test(
+      value,
+    )
+  ) {
+    return 'identity';
   }
 
-  if (/\b(my manager|my boss|my sister|my brother|my friend|my wife|my husband|my partner|my colleague)\b/.test(value)) {
-    return "relationships";
+  if (
+    /\b(my manager|my boss|my sister|my brother|my friend|my wife|my husband|my partner|my colleague)\b/.test(
+      value,
+    )
+  ) {
+    return 'relationships';
   }
 
-  if (/\b(always|never|tone|style|do not|dont|respond like|when you reply)\b/.test(value)) {
-    return "behavior";
+  if (
+    /\b(always|never|tone|style|do not|dont|respond like|when you reply)\b/.test(
+      value,
+    )
+  ) {
+    return 'behavior';
   }
 
-  if (/\b(prefer|preference|likes|dislikes|favorite|concise|short answers|dark mode|i use)\b/.test(value)) {
-    return "preferences";
+  if (
+    /\b(prefer|preference|likes|dislikes|favorite|concise|short answers|dark mode|i use)\b/.test(
+      value,
+    )
+  ) {
+    return 'preferences';
   }
 
-  if (/\b(i know|i understand|i learned|i am experienced|expert in|familiar with)\b/.test(value)) {
-    return "knowledge";
+  if (
+    /\b(i know|i understand|i learned|i am experienced|expert in|familiar with)\b/.test(
+      value,
+    )
+  ) {
+    return 'knowledge';
   }
 
-  return "unclassified";
+  return 'unclassified';
 }
 
 const classificationDebateSchema = z.object({
@@ -126,7 +151,7 @@ const memoryFactSplitSchema = z.object({
 });
 
 const debateOutputSchema = z.object({
-  action: z.enum(["keep", "delete", "merge", "upgrade", "downgrade"]),
+  action: z.enum(['keep', 'delete', 'merge', 'upgrade', 'downgrade']),
   suggested_importance: z.number().min(0.2).max(0.9),
   reasoning: z.string(),
 });
@@ -147,7 +172,7 @@ function toLogPayload(value: unknown, maxLength = 1600): string {
 
 function fallbackDebateOutput(memory: MemoryRow, reason: string): DebateOutput {
   return {
-    action: "keep",
+    action: 'keep',
     suggested_importance: normalizeImportance(
       memory.classification as Classification,
       memory.importance,
@@ -180,7 +205,10 @@ function asDebateHistory(history: unknown): unknown[] {
   return Array.isArray(history) ? history : [];
 }
 
-async function findRelatedMemories(memory: MemoryRow, limit = 5): Promise<MemoryRow[]> {
+async function findRelatedMemories(
+  memory: MemoryRow,
+  limit = 5,
+): Promise<MemoryRow[]> {
   const embedding = await embed(memory.content);
   const rows = await db
     .select()
@@ -198,7 +226,8 @@ function semanticConflictLikely(correction: string, existing: string): boolean {
 
   if (c === e) return true;
 
-  const mentionsCorrection = /\b(actually|instead|not|correction|i said earlier)\b/.test(c);
+  const mentionsCorrection =
+    /\b(actually|instead|not|correction|i said earlier)\b/.test(c);
   if (!mentionsCorrection) return false;
 
   const words = new Set(c.split(/\W+/).filter(Boolean));
@@ -215,27 +244,32 @@ async function classifyWhenAmbiguous(content: string): Promise<{
   importance: number;
   reasoning: string;
 }> {
-  const structured = debateModel.withStructuredOutput(classificationDebateSchema);
+  const structured = debateModel.withStructuredOutput(
+    classificationDebateSchema,
+  );
   const result = await structured.invoke([
     [
-      "system",
-      "You classify a memory for an agent memory system. Choose the best classification and a practical importance score based on criticality to agent correctness.",
+      'system',
+      'You classify a memory for an agent memory system. Choose the best classification and a practical importance score based on criticality to agent correctness.',
     ],
     [
-      "human",
+      'human',
       [
-        "Return only the structured response.",
-        "",
-        "Classification options:",
-        "identity | relationships | behavior | preferences | corrections | knowledge | unclassified",
-        "",
+        'Return only the structured response.',
+        '',
+        'Classification options:',
+        'identity | relationships | behavior | preferences | corrections | knowledge | unclassified',
+        '',
         `Memory: ${content}`,
-      ].join("\n"),
+      ].join('\n'),
     ],
   ]);
 
   const classification = result.classification;
-  const importance = normalizeImportance(classification, result.suggested_importance);
+  const importance = normalizeImportance(
+    classification,
+    result.suggested_importance,
+  );
 
   logger.info(
     `[memory.model] classification.decision=${toLogPayload({
@@ -255,28 +289,30 @@ async function classifyWhenAmbiguous(content: string): Promise<{
 }
 
 function extractTextFromModelOutput(output: unknown): string {
-  if (!output) return "";
-  if (typeof output === "string") return output;
+  if (!output) return '';
+  if (typeof output === 'string') return output;
 
-  if (typeof output === "object") {
+  if (typeof output === 'object') {
     const maybeObj = output as {
       content?: unknown;
       text?: unknown;
       facts?: unknown;
     };
 
-    if (typeof maybeObj.text === "string") return maybeObj.text;
-    if (typeof maybeObj.content === "string") return maybeObj.content;
+    if (typeof maybeObj.text === 'string') return maybeObj.text;
+    if (typeof maybeObj.content === 'string') return maybeObj.content;
 
     if (Array.isArray(maybeObj.content)) {
       const text = maybeObj.content
         .map((part) => {
-          if (!part || typeof part !== "object") return "";
-          const maybePart = part as { text?: unknown };
-          return typeof maybePart.text === "string" ? maybePart.text : "";
+          if (!part || typeof part !== 'object') return '';
+          const maybePart = part as {
+            text?: unknown;
+          };
+          return typeof maybePart.text === 'string' ? maybePart.text : '';
         })
         .filter(Boolean)
-        .join("\n");
+        .join('\n');
 
       if (text) return text;
     }
@@ -286,7 +322,7 @@ function extractTextFromModelOutput(output: unknown): string {
     }
   }
 
-  return "";
+  return '';
 }
 
 function parseFactsFromModelText(text: string): string[] {
@@ -298,7 +334,7 @@ function parseFactsFromModelText(text: string): string[] {
       const parsed = JSON.parse(value) as { facts?: unknown };
       if (!parsed || !Array.isArray(parsed.facts)) return [];
       return parsed.facts
-        .filter((fact): fact is string => typeof fact === "string")
+        .filter((fact): fact is string => typeof fact === 'string')
         .map((fact) => fact.trim())
         .filter(Boolean);
     } catch {
@@ -318,7 +354,7 @@ function parseFactsFromModelText(text: string): string[] {
   // Last-resort heuristic for non-JSON model outputs.
   return trimmed
     .split(/\n|;|\s+\band\b\s+/i)
-    .map((part) => part.replace(/^[-*\d.)\s]+/, "").trim())
+    .map((part) => part.replace(/^[-*\d.)\s]+/, '').trim())
     .filter(Boolean)
     .slice(0, 10);
 }
@@ -328,7 +364,7 @@ function parseDebateOutputFromModelText(text: string): DebateOutput | null {
   if (!trimmed) return null;
 
   const parseCandidate = (candidate: unknown): DebateOutput | null => {
-    if (!candidate || typeof candidate !== "object") return null;
+    if (!candidate || typeof candidate !== 'object') return null;
 
     const record = candidate as {
       action?: unknown;
@@ -338,29 +374,33 @@ function parseDebateOutputFromModelText(text: string): DebateOutput | null {
     };
 
     const action =
-      typeof record.action === "string"
+      typeof record.action === 'string'
         ? (record.action.trim().toLowerCase() as Action)
         : undefined;
 
     const rawImportance =
-      typeof record.suggested_importance === "number"
+      typeof record.suggested_importance === 'number'
         ? record.suggested_importance
-        : typeof record.suggested_importance === "string"
+        : typeof record.suggested_importance === 'string'
           ? Number(record.suggested_importance)
-          : typeof record.importance === "number"
+          : typeof record.importance === 'number'
             ? record.importance
-            : typeof record.importance === "string"
+            : typeof record.importance === 'string'
               ? Number(record.importance)
               : NaN;
 
     const reasoning =
-      typeof record.reasoning === "string" && record.reasoning.trim().length > 0
+      typeof record.reasoning === 'string' && record.reasoning.trim().length > 0
         ? record.reasoning.trim()
-        : "Recovered from raw model output";
+        : 'Recovered from raw model output';
 
     const normalized = {
       action,
-      suggested_importance: clamp(Number.isFinite(rawImportance) ? rawImportance : 0.5, 0.2, 0.9),
+      suggested_importance: clamp(
+        Number.isFinite(rawImportance) ? rawImportance : 0.5,
+        0.2,
+        0.9,
+      ),
       reasoning,
     };
 
@@ -391,40 +431,42 @@ function parseDebateOutputFromModelText(text: string): DebateOutput | null {
     if (extracted) return extracted;
   }
 
-  const actionMatch = trimmed.match(/\b(keep|delete|merge|upgrade|downgrade)\b/i);
+  const actionMatch = trimmed.match(
+    /\b(keep|delete|merge|upgrade|downgrade)\b/i,
+  );
   if (!actionMatch) return null;
 
-  const importanceMatch = trimmed.match(/(?:suggested_importance|importance)\s*[:=]\s*([0-9]*\.?[0-9]+)/i);
+  const importanceMatch = trimmed.match(
+    /(?:suggested_importance|importance)\s*[:=]\s*([0-9]*\.?[0-9]+)/i,
+  );
   const reasoningMatch = trimmed.match(/reasoning\s*[:=]\s*([\s\S]+)/i);
 
   const heuristic = debateOutputSchema.safeParse({
     action: actionMatch[1]?.toLowerCase(),
-    suggested_importance: clamp(importanceMatch?.[1] ? Number(importanceMatch[1]) : 0.5, 0.2, 0.9),
-    reasoning: reasoningMatch?.[1]?.trim() || "Recovered from heuristic parse",
+    suggested_importance: clamp(
+      importanceMatch?.[1] ? Number(importanceMatch[1]) : 0.5,
+      0.2,
+      0.9,
+    ),
+    reasoning: reasoningMatch?.[1]?.trim() || 'Recovered from heuristic parse',
   });
 
   return heuristic.success ? heuristic.data : null;
 }
 
 async function splitMemoryIntoFacts(content: string): Promise<string[]> {
-  const messages: ["system" | "human", string][] = [
+  const messages: ['system' | 'human', string][] = [
     [
-      "system",
+      'system',
       [
-        "Split user memory text into atomic facts when it contains multiple stable facts.",
-        "Each fact must stand alone and keep original meaning.",
-        "Do not invent details.",
-        "If only one stable fact exists, return a single-item array.",
-        "Return JSON only with shape: {\"facts\":[\"fact 1\",\"fact 2\"]}.",
-      ].join("\n"),
+        'Split user memory text into atomic facts when it contains multiple stable facts.',
+        'Each fact must stand alone and keep original meaning.',
+        'Do not invent details.',
+        'If only one stable fact exists, return a single-item array.',
+        'Return JSON only with shape: {"facts":["fact 1","fact 2"]}.',
+      ].join('\n'),
     ],
-    [
-      "human",
-      [
-        "Memory text:",
-        content,
-      ].join("\n"),
-    ],
+    ['human', ['Memory text:', content].join('\n')],
   ];
 
   let cleaned: string[] = [];
@@ -439,7 +481,7 @@ async function splitMemoryIntoFacts(content: string): Promise<string[]> {
 
     if (Array.isArray(maybeFacts)) {
       cleaned = maybeFacts
-        .filter((fact): fact is string => typeof fact === "string")
+        .filter((fact): fact is string => typeof fact === 'string')
         .map((fact) => fact.trim())
         .filter(Boolean);
     }
@@ -470,7 +512,9 @@ async function splitMemoryIntoFacts(content: string): Promise<string[]> {
   return cleaned;
 }
 
-async function applyCorrectionOverride(newMemory: MemoryRow): Promise<number[]> {
+async function applyCorrectionOverride(
+  newMemory: MemoryRow,
+): Promise<number[]> {
   const related = await findRelatedMemories(newMemory, 10);
   const conflicts = related.filter((candidate) =>
     semanticConflictLikely(newMemory.content, candidate.content),
@@ -482,7 +526,7 @@ async function applyCorrectionOverride(newMemory: MemoryRow): Promise<number[]> 
   await db.delete(memories).where(inArray(memories.id, ids));
 
   const historyEntry = {
-    type: "correction_override",
+    type: 'correction_override',
     at: new Date().toISOString(),
     replaced_memory_ids: ids,
   };
@@ -490,7 +534,10 @@ async function applyCorrectionOverride(newMemory: MemoryRow): Promise<number[]> 
   await db
     .update(memories)
     .set({
-      debateHistory: [...asDebateHistory(newMemory.debateHistory), historyEntry],
+      debateHistory: [
+        ...asDebateHistory(newMemory.debateHistory),
+        historyEntry,
+      ],
       updatedAt: new Date(),
     })
     .where(eq(memories.id, newMemory.id));
@@ -499,8 +546,8 @@ async function applyCorrectionOverride(newMemory: MemoryRow): Promise<number[]> 
 }
 
 function tierRank(tier: Tier): number {
-  if (tier === "lifelong") return 3;
-  if (tier === "long_term") return 2;
+  if (tier === 'lifelong') return 3;
+  if (tier === 'long_term') return 2;
   return 1;
 }
 
@@ -509,26 +556,26 @@ function morePermanentTier(a: Tier, b: Tier): Tier {
 }
 
 async function runDebateAgent(
-  role: "advocate" | "skeptic" | "judge",
+  role: 'advocate' | 'skeptic' | 'judge',
   memory: MemoryRow,
   related: MemoryRow[],
   context: string,
 ): Promise<DebateOutput> {
   const structured = debateModel.withStructuredOutput(debateOutputSchema);
-  const promptMessages: ["system" | "human", string][] = [
+  const promptMessages: ['system' | 'human', string][] = [
     [
-      "system",
+      'system',
       [
         `You are the ${role} in a memory lifecycle debate.`,
-        "Make a decision from: keep | delete | merge | upgrade | downgrade.",
-        "Use practical lifecycle judgment from recency, importance, access_count, and redundancy.",
-        "Return only the structured output.",
-      ].join("\n"),
+        'Make a decision from: keep | delete | merge | upgrade | downgrade.',
+        'Use practical lifecycle judgment from recency, importance, access_count, and redundancy.',
+        'Return only the structured output.',
+      ].join('\n'),
     ],
     [
-      "human",
+      'human',
       [
-        "Memory under review:",
+        'Memory under review:',
         JSON.stringify(
           {
             id: memory.id,
@@ -542,8 +589,8 @@ async function runDebateAgent(
           null,
           2,
         ),
-        "",
-        "Related memories:",
+        '',
+        'Related memories:',
         JSON.stringify(
           related.map((r) => ({
             id: r.id,
@@ -557,10 +604,10 @@ async function runDebateAgent(
           null,
           2,
         ),
-        "",
-        "Transcript/context:",
+        '',
+        'Transcript/context:',
         context,
-      ].join("\n"),
+      ].join('\n'),
     ],
   ];
 
@@ -610,7 +657,9 @@ async function runDebateAgent(
     return fallback;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    logger.warn(`[memory.lifecycle] ${role} debate invocation failed: ${message}`);
+    logger.warn(
+      `[memory.lifecycle] ${role} debate invocation failed: ${message}`,
+    );
     const fallback = fallbackDebateOutput(memory, message);
     logger.info(
       `[memory.model] lifecycle.${role}.fallback=${toLogPayload({ memoryId: memory.id, fallback })}`,
@@ -626,22 +675,22 @@ async function decideWithDebate(memory: MemoryRow): Promise<{
   const related = await findRelatedMemories(memory, 5);
 
   const advocateRound1 = await runDebateAgent(
-    "advocate",
+    'advocate',
     memory,
     related,
-    "Round 1 opening.",
+    'Round 1 opening.',
   );
 
   const skepticRound1 = await runDebateAgent(
-    "skeptic",
+    'skeptic',
     memory,
     related,
     `Advocate round 1: ${JSON.stringify(advocateRound1)}`,
   );
 
   const transcript: unknown[] = [
-    { round: 1, role: "advocate", output: advocateRound1 },
-    { round: 1, role: "skeptic", output: skepticRound1 },
+    { round: 1, role: 'advocate', output: advocateRound1 },
+    { round: 1, role: 'skeptic', output: skepticRound1 },
   ];
 
   logger.info(
@@ -660,31 +709,31 @@ async function decideWithDebate(memory: MemoryRow): Promise<{
   }
 
   const advocateRound2 = await runDebateAgent(
-    "advocate",
+    'advocate',
     memory,
     related,
     [
       `Advocate round 1: ${JSON.stringify(advocateRound1)}`,
       `Skeptic round 1: ${JSON.stringify(skepticRound1)}`,
-      "Round 2: revise based on disagreement.",
-    ].join("\n"),
+      'Round 2: revise based on disagreement.',
+    ].join('\n'),
   );
 
   const skepticRound2 = await runDebateAgent(
-    "skeptic",
+    'skeptic',
     memory,
     related,
     [
       `Advocate round 1: ${JSON.stringify(advocateRound1)}`,
       `Skeptic round 1: ${JSON.stringify(skepticRound1)}`,
       `Advocate round 2: ${JSON.stringify(advocateRound2)}`,
-      "Round 2: final counter.",
-    ].join("\n"),
+      'Round 2: final counter.',
+    ].join('\n'),
   );
 
   transcript.push(
-    { round: 2, role: "advocate", output: advocateRound2 },
-    { round: 2, role: "skeptic", output: skepticRound2 },
+    { round: 2, role: 'advocate', output: advocateRound2 },
+    { round: 2, role: 'skeptic', output: skepticRound2 },
   );
 
   logger.info(
@@ -703,13 +752,13 @@ async function decideWithDebate(memory: MemoryRow): Promise<{
   }
 
   const judge = await runDebateAgent(
-    "judge",
+    'judge',
     memory,
     related,
     `Full transcript:\n${JSON.stringify(transcript, null, 2)}`,
   );
 
-  transcript.push({ round: 3, role: "judge", output: judge });
+  transcript.push({ round: 3, role: 'judge', output: judge });
   logger.info(
     `[memory.model] lifecycle.judge=${toLogPayload({ memoryId: memory.id, judge })}`,
   );
@@ -719,23 +768,28 @@ async function decideWithDebate(memory: MemoryRow): Promise<{
   return { verdict: judge, transcript };
 }
 
-async function applyLifecycleDecision(memory: MemoryRow, action: Action, suggestedImportance: number, transcript: unknown[]) {
+async function applyLifecycleDecision(
+  memory: MemoryRow,
+  action: Action,
+  suggestedImportance: number,
+  transcript: unknown[],
+) {
   const now = new Date();
   const existingHistory = asDebateHistory(memory.debateHistory);
   const historyEntry = {
-    type: "lifecycle_debate",
+    type: 'lifecycle_debate',
     at: now.toISOString(),
     action,
     suggested_importance: suggestedImportance,
     transcript,
   };
 
-  if (action === "delete") {
+  if (action === 'delete') {
     await db.delete(memories).where(eq(memories.id, memory.id));
-    return "deleted";
+    return 'deleted';
   }
 
-  if (action === "keep") {
+  if (action === 'keep') {
     await db
       .update(memories)
       .set({
@@ -743,39 +797,39 @@ async function applyLifecycleDecision(memory: MemoryRow, action: Action, suggest
         updatedAt: now,
       })
       .where(eq(memories.id, memory.id));
-    return "kept";
+    return 'kept';
   }
 
-  if (action === "upgrade") {
+  if (action === 'upgrade') {
     const nextImportance = normalizeImportance(
       memory.classification as Classification,
       Math.max(memory.importance, suggestedImportance),
     );
 
     const nextTier: Tier =
-      memory.tier === "short_term" ? "long_term" : (memory.tier as Tier);
+      memory.tier === 'short_term' ? 'long_term' : (memory.tier as Tier);
 
     await db
       .update(memories)
       .set({
         importance: nextImportance,
         tier: nextTier,
-        promotedAt: memory.tier === "short_term" ? now : memory.promotedAt,
+        promotedAt: memory.tier === 'short_term' ? now : memory.promotedAt,
         expiresAt: computeExpiresAt(nextTier, now),
         debateHistory: [...existingHistory, historyEntry],
         updatedAt: now,
       })
       .where(eq(memories.id, memory.id));
 
-    return "upgraded";
+    return 'upgraded';
   }
 
-  if (action === "downgrade") {
+  if (action === 'downgrade') {
     const nextImportance = clamp(suggestedImportance, 0.2, 0.9);
 
     if (nextImportance < 0.3) {
       await db.delete(memories).where(eq(memories.id, memory.id));
-      return "deleted_after_downgrade";
+      return 'deleted_after_downgrade';
     }
 
     await db
@@ -787,7 +841,7 @@ async function applyLifecycleDecision(memory: MemoryRow, action: Action, suggest
       })
       .where(eq(memories.id, memory.id));
 
-    return "downgraded";
+    return 'downgraded';
   }
 
   const related = await findRelatedMemories(memory, 1);
@@ -801,7 +855,7 @@ async function applyLifecycleDecision(memory: MemoryRow, action: Action, suggest
         updatedAt: now,
       })
       .where(eq(memories.id, memory.id));
-    return "kept_no_merge_target";
+    return 'kept_no_merge_target';
   }
 
   const mergedTier = morePermanentTier(memory.tier as Tier, peer.tier as Tier);
@@ -836,7 +890,7 @@ async function applyLifecycleDecision(memory: MemoryRow, action: Action, suggest
     .where(eq(memories.id, memory.id));
 
   await db.delete(memories).where(eq(memories.id, peer.id));
-  return "merged";
+  return 'merged';
 }
 
 export async function runMemoryLifecycleReview() {
@@ -852,7 +906,7 @@ export async function runMemoryLifecycleReview() {
     .from(memories)
     .where(
       and(
-        eq(memories.tier, "short_term"),
+        eq(memories.tier, 'short_term'),
         lt(memories.lastAccessedAt, shortTermCutoff),
         lt(memories.accessCount, 5),
       ),
@@ -862,7 +916,12 @@ export async function runMemoryLifecycleReview() {
   const longCandidates = await db
     .select()
     .from(memories)
-    .where(and(eq(memories.tier, "long_term"), lt(memories.lastAccessedAt, longTermCutoff)))
+    .where(
+      and(
+        eq(memories.tier, 'long_term'),
+        lt(memories.lastAccessedAt, longTermCutoff),
+      ),
+    )
     .orderBy(desc(memories.lastAccessedAt));
 
   const candidates = [...shortCandidates, ...longCandidates];
@@ -904,21 +963,21 @@ export async function runMemoryLifecycleReview() {
         transcript,
       );
 
-      if (action === "merged") {
+      if (action === 'merged') {
         summary.mergedRows += 1;
       }
 
-      if (action === "deleted" || action === "deleted_after_downgrade") {
+      if (action === 'deleted' || action === 'deleted_after_downgrade') {
         summary.deletedRows += 1;
       }
 
-      if (action === "upgraded") {
+      if (action === 'upgraded') {
         summary.promotedRows += 1;
       }
 
       summary.decisions.push(`memory:${memory.id}:${action}`);
     } catch (error) {
-      logger.error("[memory.lifecycle] debate failed", error);
+      logger.error('[memory.lifecycle] debate failed', error);
       summary.decisions.push(`memory:${memory.id}:debate_failed_keep`);
     }
   }
@@ -944,7 +1003,9 @@ export const storeMemory = tool(
       try {
         facts = await splitMemoryIntoFacts(value);
       } catch (error) {
-        logger.warn(`[memory] fact split failed, falling back to single memory: ${error instanceof Error ? error.message : String(error)}`);
+        logger.warn(
+          `[memory] fact split failed, falling back to single memory: ${error instanceof Error ? error.message : String(error)}`,
+        );
         facts = [value.trim()];
       }
 
@@ -964,9 +1025,12 @@ export const storeMemory = tool(
           try {
             const debated = await classifyWhenAmbiguous(fact);
             finalClassification = debated.classification;
-            finalImportance = normalizeImportance(finalClassification, debated.importance);
+            finalImportance = normalizeImportance(
+              finalClassification,
+              debated.importance,
+            );
             history.push({
-              type: "classification_debate",
+              type: 'classification_debate',
               at: new Date().toISOString(),
               reasoning: debated.reasoning,
               classification: finalClassification,
@@ -977,7 +1041,7 @@ export const storeMemory = tool(
             finalClassification = inferred;
             finalImportance = normalizeImportance(inferred, importance);
             history.push({
-              type: "classification_fallback",
+              type: 'classification_fallback',
               at: new Date().toISOString(),
               reason: error instanceof Error ? error.message : String(error),
               classification: finalClassification,
@@ -985,7 +1049,7 @@ export const storeMemory = tool(
           }
         }
 
-        if (finalClassification === "identity") {
+        if (finalClassification === 'identity') {
           finalImportance = 0.9;
         }
 
@@ -1021,7 +1085,7 @@ export const storeMemory = tool(
           continue;
         }
 
-        if (finalClassification === "corrections") {
+        if (finalClassification === 'corrections') {
           const replacedIds = await applyCorrectionOverride(inserted);
           for (const replacedId of replacedIds) {
             replacedByCorrections.add(replacedId);
@@ -1034,31 +1098,34 @@ export const storeMemory = tool(
       }
 
       if (insertedSummaries.length === 0) {
-        return "Error storing memory: insert failed";
+        return 'Error storing memory: insert failed';
       }
 
       const correctionResult =
         replacedByCorrections.size > 0
-          ? `; replaced conflicting memories: ${Array.from(replacedByCorrections).join(", ")}`
-          : "";
+          ? `; replaced conflicting memories: ${Array.from(replacedByCorrections).join(', ')}`
+          : '';
 
-      return `Stored ${insertedSummaries.length} memory row(s): ${insertedSummaries.join(" | ")}${correctionResult}`;
+      return `Stored ${insertedSummaries.length} memory row(s): ${insertedSummaries.join(' | ')}${correctionResult}`;
     } catch (error) {
-      logger.error("[memory]", error);
+      logger.error('[memory]', error);
       return `Error storing memory: ${error instanceof Error ? error.message : String(error)}`;
     }
   },
   {
-    name: "store_memory",
+    name: 'store_memory',
     description:
-      "Store a memory with classification-aware tiering, scoring, and correction override support.",
+      'Store a memory with classification-aware tiering, scoring, and correction override support.',
     schema: z.object({
-      value: z.string().describe("Memory content"),
-      query: z.string().optional().describe("Optional retrieval text used for embedding"),
+      value: z.string().describe('Memory content'),
+      query: z
+        .string()
+        .optional()
+        .describe('Optional retrieval text used for embedding'),
       classification: z
         .enum(classifications)
         .optional()
-        .describe("Optional override classification"),
+        .describe('Optional override classification'),
       importance: z.number().min(0.2).max(0.9).optional(),
     }),
   },
@@ -1085,7 +1152,9 @@ export const recallMemories = tool(
                   ),
                 ),
               )
-              .orderBy(sql`vector <=> ${JSON.stringify(queryEmbedding)}::vector`)
+              .orderBy(
+                sql`vector <=> ${JSON.stringify(queryEmbedding)}::vector`,
+              )
               .limit(5)
           : [];
 
@@ -1095,15 +1164,17 @@ export const recallMemories = tool(
           : await db
               .select()
               .from(memories)
-              .orderBy(sql`vector <=> ${JSON.stringify(queryEmbedding)}::vector`)
+              .orderBy(
+                sql`vector <=> ${JSON.stringify(queryEmbedding)}::vector`,
+              )
               .limit(5);
 
       const now = new Date();
 
       for (const row of result) {
         const nextCount = row.accessCount + 1;
-        const promote = row.tier === "short_term" && nextCount >= 5;
-        const nextTier: Tier = promote ? "long_term" : (row.tier as Tier);
+        const promote = row.tier === 'short_term' && nextCount >= 5;
+        const nextTier: Tier = promote ? 'long_term' : (row.tier as Tier);
 
         await db
           .update(memories)
@@ -1129,16 +1200,16 @@ export const recallMemories = tool(
         })),
       };
     } catch (error) {
-      logger.error("[memory]", error);
+      logger.error('[memory]', error);
       return `Error recalling memories: ${error instanceof Error ? error.message : String(error)}`;
     }
   },
   {
-    name: "recall_memories",
+    name: 'recall_memories',
     description:
-      "Retrieve top memories by semantic relevance, update access counters, and auto-promote proven short-term memories.",
+      'Retrieve top memories by semantic relevance, update access counters, and auto-promote proven short-term memories.',
     schema: z.object({
-      query: z.string().describe("Semantic query for recall"),
+      query: z.string().describe('Semantic query for recall'),
     }),
   },
 );
@@ -1153,7 +1224,7 @@ export const deleteMemory = tool(
 
       const text = query ?? key;
       if (!text) {
-        return "Error deleting memory: provide id, query, or key";
+        return 'Error deleting memory: provide id, query, or key';
       }
 
       const qEmbedding = await embed(text);
@@ -1164,26 +1235,34 @@ export const deleteMemory = tool(
         .limit(1);
 
       if (!candidate) {
-        return "No memory found to delete";
+        return 'No memory found to delete';
       }
 
       await db.delete(memories).where(eq(memories.id, candidate.id));
       return `Deleted memory id=${candidate.id}`;
     } catch (error) {
-      logger.error("[memory]", error);
+      logger.error('[memory]', error);
       return `Error deleting memory: ${error instanceof Error ? error.message : String(error)}`;
     }
   },
   {
-    name: "delete_memory",
-    description: "Delete a memory by id or by semantic match.",
+    name: 'delete_memory',
+    description: 'Delete a memory by id or by semantic match.',
     schema: z.object({
-      id: z.number().int().min(1).optional().describe("Specific memory id to delete"),
-      query: z.string().optional().describe("Semantic text to locate memory to delete"),
+      id: z
+        .number()
+        .int()
+        .min(1)
+        .optional()
+        .describe('Specific memory id to delete'),
+      query: z
+        .string()
+        .optional()
+        .describe('Semantic text to locate memory to delete'),
       key: z
         .string()
         .optional()
-        .describe("Legacy alias for query; kept for backward compatibility"),
+        .describe('Legacy alias for query; kept for backward compatibility'),
     }),
   },
 );

@@ -1,6 +1,6 @@
-import { createAgent, tool } from "langchain";
-import z from "zod";
-import { model } from "../shared";
+import { createAgent, tool } from 'langchain';
+import z from 'zod';
+import { model } from '../shared';
 import {
   getOpenPRs,
   getAssignedIssues,
@@ -8,7 +8,7 @@ import {
   createIssue,
   closeIssue,
   deleteIssue,
-} from "../tools/github";
+} from '../tools/github';
 
 const GITHUB_SYSTEM_PROMPT = `You are a GitHub Assistant with access to the user's GitHub account.
 
@@ -23,23 +23,33 @@ When helping:
 
 const githubAgent = createAgent({
   model,
-  tools: [getOpenPRs, getAssignedIssues, getRecentPushes, createIssue, closeIssue, deleteIssue],
+  tools: [
+    getOpenPRs,
+    getAssignedIssues,
+    getRecentPushes,
+    createIssue,
+    closeIssue,
+    deleteIssue,
+  ],
 });
 
 export const githubTool = tool(
   async ({ query }) => {
     const response = await githubAgent.invoke({
       messages: [
-        { role: "system", content: GITHUB_SYSTEM_PROMPT },
-        { role: "user", content: query },
+        {
+          role: 'system',
+          content: GITHUB_SYSTEM_PROMPT,
+        },
+        { role: 'user', content: query },
       ],
     });
     return response.messages[response.messages.length - 1]!.text;
   },
   {
-    name: "github",
+    name: 'github',
     description:
-      "Fetch GitHub data (open PRs, assigned issues, recent pushes) or manage issues (create, close, delete).",
+      'Fetch GitHub data (open PRs, assigned issues, recent pushes) or manage issues (create, close, delete).',
     schema: z.object({
       query: z
         .string()

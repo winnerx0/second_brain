@@ -1,14 +1,14 @@
-import { createAgent, tool } from "langchain";
-import z from "zod";
-import { model } from "../shared";
+import { createAgent, tool } from 'langchain';
+import z from 'zod';
+import { model } from '../shared';
 import {
   getCalendarEvents,
   createCalendarEvent,
   createAllDayCalendarEvent,
   editCalendarEvent,
   deleteCalendarEvent,
-} from "../tools/calendar";
-import { getCurrentDateTime } from "../tools/miscellaneous";
+} from '../tools/calendar';
+import { getCurrentDateTime } from '../tools/miscellaneous';
 
 const CALENDAR_SYSTEM_PROMPT = `You are a Calendar Assistant with access to the user's Google Calendar.
 
@@ -31,7 +31,7 @@ const calendarAgent = createAgent({
     createAllDayCalendarEvent,
     editCalendarEvent,
     deleteCalendarEvent,
-    getCurrentDateTime
+    getCurrentDateTime,
   ],
 });
 
@@ -39,16 +39,18 @@ export const calendarTool = tool(
   async ({ query }) => {
     const response = await calendarAgent.invoke({
       messages: [
-        { role: "system", content: CALENDAR_SYSTEM_PROMPT },
-        { role: "user", content: query },
+        {
+          role: 'system',
+          content: CALENDAR_SYSTEM_PROMPT,
+        },
+        { role: 'user', content: query },
       ],
     });
     return response.messages[response.messages.length - 1]!.text;
   },
   {
-    name: "calendar",
-    description:
-      "Fetch, create, edit, or delete Google Calendar events.",
+    name: 'calendar',
+    description: 'Fetch, create, edit, or delete Google Calendar events.',
     schema: z.object({
       query: z
         .string()

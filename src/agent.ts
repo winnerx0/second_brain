@@ -5,29 +5,29 @@ import {
   AIMessage,
   ToolMessage,
   summarizationMiddleware,
-} from "langchain";
-import { BaseCallbackHandler } from "@langchain/core/callbacks/base";
-import { getEncoding } from "js-tiktoken";
-import { config } from "./config.ts";
-import { storeMemory, recallMemories, deleteMemory } from "./tools/memory";
-import { db } from "./db/client.ts";
-import { agentRuns, chatHistory, chatSessions } from "./db/schema.ts";
-import { asc, desc, eq, isNull } from "drizzle-orm";
-import { sendTelegramMessage } from "./delivery/telegram.ts";
+} from 'langchain';
+import { BaseCallbackHandler } from '@langchain/core/callbacks/base';
+import { getEncoding } from 'js-tiktoken';
+import { config } from './config.ts';
+import { storeMemory, recallMemories, deleteMemory } from './tools/memory';
+import { db } from './db/client.ts';
+import { agentRuns, chatHistory, chatSessions } from './db/schema.ts';
+import { asc, desc, eq, isNull } from 'drizzle-orm';
+import { sendTelegramMessage } from './delivery/telegram.ts';
 const env = process.env;
-import { logger } from "./logger.ts";
-import { getCurrentDateTime } from "./tools/miscellaneous.ts";
-import { docsTool } from "./subagents/google-doc.ts";
-import { anilistTool } from "./subagents/anilist.ts";
-import { notionTool } from "./subagents/notion.ts";
-import { githubTool } from "./subagents/github.ts";
-import { calendarTool } from "./subagents/calendar.ts";
-import { gmailTool } from "./subagents/gmail.ts";
-import { knowledgeGraphTool } from "./subagents/knowledge-graph.ts";
-import { model } from "./shared.ts";
-import { ChatOpenAI } from "@langchain/openai";
+import { logger } from './logger.ts';
+import { getCurrentDateTime } from './tools/miscellaneous.ts';
+import { docsTool } from './subagents/google-doc.ts';
+import { anilistTool } from './subagents/anilist.ts';
+import { notionTool } from './subagents/notion.ts';
+import { githubTool } from './subagents/github.ts';
+import { calendarTool } from './subagents/calendar.ts';
+import { gmailTool } from './subagents/gmail.ts';
+import { knowledgeGraphTool } from './subagents/knowledge-graph.ts';
+import { model } from './shared.ts';
+import { ChatOpenAI } from '@langchain/openai';
 
-const enc = getEncoding("cl100k_base");
+const enc = getEncoding('cl100k_base');
 function countTokens(text: string) {
   return enc.encode(text).length;
 }
@@ -67,7 +67,7 @@ const mainAgent = createAgent({
   tools,
   middleware: [
     summarizationMiddleware({
-      model: new ChatOpenAI({ model: "gpt-5-nano" }),
+      model: new ChatOpenAI({ model: 'gpt-5-nano' }),
       trigger: { tokens: 4000, messages: 10 },
       keep: { messages: 20 },
     }),
@@ -75,12 +75,12 @@ const mainAgent = createAgent({
 });
 
 export type AgentStreamEvent =
-  | { type: "status"; message: string }
-  | { type: "assistant_delta"; delta: string }
-  | { type: "tool_start"; tool: string; input: string }
-  | { type: "tool_end"; tool: string; output: string }
-  | { type: "error"; message: string }
-  | { type: "final"; text: string };
+  | { type: 'status'; message: string }
+  | { type: 'assistant_delta'; delta: string }
+  | { type: 'tool_start'; tool: string; input: string }
+  | { type: 'tool_end'; tool: string; output: string }
+  | { type: 'error'; message: string }
+  | { type: 'final'; text: string };
 
 type HandleMessageOptions = {
   onEvent?: (event: AgentStreamEvent) => void | Promise<void>;
@@ -89,7 +89,7 @@ type HandleMessageOptions = {
 };
 
 function safeStringify(value: unknown): string {
-  if (typeof value === "string") return value;
+  if (typeof value === 'string') return value;
 
   try {
     return JSON.stringify(value);
@@ -99,15 +99,15 @@ function safeStringify(value: unknown): string {
 }
 
 function emitEvent(
-  onEvent: HandleMessageOptions["onEvent"],
+  onEvent: HandleMessageOptions['onEvent'],
   event: AgentStreamEvent,
 ) {
   return onEvent?.(event);
 }
 
-function createStreamingCallback(onEvent?: HandleMessageOptions["onEvent"]) {
+function createStreamingCallback(onEvent?: HandleMessageOptions['onEvent']) {
   return new (class extends BaseCallbackHandler {
-    name = "agent-stream-callback";
+    name = 'agent-stream-callback';
     private toolNames = new Map<string, string>();
 
     constructor() {
@@ -120,7 +120,10 @@ function createStreamingCallback(onEvent?: HandleMessageOptions["onEvent"]) {
 
     override async handleLLMNewToken(token: string) {
       if (token) {
-        await emitEvent(onEvent, { type: "assistant_delta", delta: token });
+        await emitEvent(onEvent, {
+          type: 'assistant_delta',
+          delta: token,
+        });
       }
     }
 
@@ -129,10 +132,10 @@ function createStreamingCallback(onEvent?: HandleMessageOptions["onEvent"]) {
       input: string,
       runId: string,
     ) {
-      const toolName = tool.name ?? "tool";
+      const toolName = tool.name ?? 'tool';
       this.toolNames.set(runId, toolName);
       await emitEvent(onEvent, {
-        type: "tool_start",
+        type: 'tool_start',
         tool: toolName,
         input: safeStringify(input),
       });
@@ -140,8 +143,8 @@ function createStreamingCallback(onEvent?: HandleMessageOptions["onEvent"]) {
 
     override async handleToolEnd(output: unknown, runId: string) {
       await emitEvent(onEvent, {
-        type: "tool_end",
-        tool: this.toolNames.get(runId) ?? "tool",
+        type: 'tool_end',
+        tool: this.toolNames.get(runId) ?? 'tool',
         output: safeStringify(output),
       });
       this.toolNames.delete(runId);
@@ -149,7 +152,7 @@ function createStreamingCallback(onEvent?: HandleMessageOptions["onEvent"]) {
 
     override async handleChainError(err: unknown) {
       await emitEvent(onEvent, {
-        type: "error",
+        type: 'error',
         message: err instanceof Error ? err.message : String(err),
       });
     }
@@ -160,7 +163,7 @@ function shouldAutoStoreUserMemory(text: string): boolean {
   const value = text.trim().toLowerCase();
   if (!value) return false;
 
-  if (value.endsWith("?")) return false;
+  if (value.endsWith('?')) return false;
 
   if (/^(hi|hello|hey|thanks|thank you|ok|okay|cool|nice|yo)\b/.test(value)) {
     return false;
@@ -182,14 +185,16 @@ function shouldAutoStoreUserMemory(text: string): boolean {
   );
 }
 
-function didCallStoreMemory(messages: Array<{ content?: unknown; tool_calls?: unknown }>): boolean {
+function didCallStoreMemory(
+  messages: Array<{ content?: unknown; tool_calls?: unknown }>,
+): boolean {
   for (const message of messages) {
     const content = message.content;
     if (Array.isArray(content)) {
       const foundInContent = content.some((part) => {
-        if (!part || typeof part !== "object") return false;
+        if (!part || typeof part !== 'object') return false;
         const maybePart = part as { name?: unknown };
-        return maybePart.name === "store_memory";
+        return maybePart.name === 'store_memory';
       });
       if (foundInContent) return true;
     }
@@ -197,9 +202,9 @@ function didCallStoreMemory(messages: Array<{ content?: unknown; tool_calls?: un
     const calls = message.tool_calls;
     if (Array.isArray(calls)) {
       const foundInCalls = calls.some((call) => {
-        if (!call || typeof call !== "object") return false;
+        if (!call || typeof call !== 'object') return false;
         const maybeCall = call as { name?: unknown };
-        return maybeCall.name === "store_memory";
+        return maybeCall.name === 'store_memory';
       });
       if (foundInCalls) return true;
     }
@@ -219,14 +224,14 @@ PERSONAL NOTE (Give a concise note for ${config.MASTER} concerning the day's sch
 Keep under 400 words. Format for Telegram markdown.`;
 
 export async function runBriefing(): Promise<string> {
-  const input = BRIEFING_SYSTEM_PROMPT + "Generate my daily briefing now.";
+  const input = BRIEFING_SYSTEM_PROMPT + 'Generate my daily briefing now.';
   logger.info(`[briefing] estimated input tokens: ${countTokens(input)}`);
 
   const response = await mainAgent.invoke(
     {
       messages: [
         new SystemMessage(BRIEFING_SYSTEM_PROMPT),
-        new HumanMessage("Generate my daily briefing now."),
+        new HumanMessage('Generate my daily briefing now.'),
       ],
     },
     { recursionLimit: 25 },
@@ -237,12 +242,12 @@ export async function runBriefing(): Promise<string> {
   );
 
   const briefing = String(
-    response.messages[response.messages.length - 1]?.content ?? "",
+    response.messages[response.messages.length - 1]?.content ?? '',
   );
 
   await db.insert(agentRuns).values({
     briefingText: briefing,
-    sourcesFetched: ["github", "calendar"],
+    sourcesFetched: ['github', 'calendar'],
     success: true,
   });
 
@@ -289,7 +294,7 @@ const CHAT_SYSTEM = new SystemMessage(
     - calendar  → events, scheduling
     - notion    → pages, databases, notes
     - docs      → Google Docs
-    - anilist   → anime / manga lookups
+    - anilist   → anime / manga lookups and authenticated list/rating updates
     - gmail     → emails (read, search, send, reply, archive)
     - knowledge_graph → entities, relationships, and graph context
   - You can fan out multiple agents in parallel when steps are independent.
@@ -319,7 +324,10 @@ export async function handleMessage(
   logger.info(`[chat] input: ${text}`);
 
   const rows = await db
-    .select({ role: chatHistory.role, content: chatHistory.content })
+    .select({
+      role: chatHistory.role,
+      content: chatHistory.content,
+    })
     .from(chatHistory)
     .where(
       options.sessionId
@@ -329,22 +337,38 @@ export async function handleMessage(
     .orderBy(desc(chatHistory.id))
     .limit(40);
 
-  const history = [...rows]
+  const rawHistory = [...rows]
     .reverse()
     .map((r) => {
       const data = JSON.parse(r.content);
-      if (r.role === "human") return new HumanMessage(data.content);
-      if (r.role === "tool") return null;
-
+      if (r.role === 'human') return new HumanMessage(data.content);
+      if (r.role === 'tool') return new ToolMessage({
+        content: data.content,
+        tool_call_id: data.tool_call_id,
+        name: data.name,
+      });
+  
       const toolCalls = Array.isArray(data.tool_calls) ? data.tool_calls : [];
-      if (toolCalls.length > 0) return null;
-
       return new AIMessage({
         content: data.content,
-        tool_calls: [],
+        tool_calls: toolCalls,
       });
     })
     .filter(Boolean) as (HumanMessage | AIMessage | ToolMessage)[];
+  
+  // Drop orphaned ToolMessages that have no preceding AI message with tool_calls
+  const history: (HumanMessage | AIMessage | ToolMessage)[] = [];
+  for (const msg of rawHistory) {
+    if (msg instanceof ToolMessage) {
+      const prev = history[history.length - 1];
+      if (prev instanceof AIMessage && prev.tool_calls?.length > 0) {
+        history.push(msg);
+      }
+      // else drop it
+    } else {
+      history.push(msg);
+    }
+  }
 
   logger.info(
     `[chat] estimated input tokens: ${countTokens(CHAT_SYSTEM.content + text)}`,
@@ -355,8 +379,8 @@ export async function handleMessage(
     : undefined;
 
   await emitEvent(options.onEvent, {
-    type: "status",
-    message: "Thinking...",
+    type: 'status',
+    message: 'Thinking...',
   });
 
   const response = await mainAgent.invoke(
@@ -369,7 +393,7 @@ export async function handleMessage(
   );
 
   const reply = String(
-    response.messages[response.messages.length - 1]?.content ?? "",
+    response.messages[response.messages.length - 1]?.content ?? '',
   );
 
   // Only save NEW messages from this turn — skip the input messages we already passed in
@@ -388,7 +412,7 @@ export async function handleMessage(
       if (message instanceof ToolMessage) {
         return {
           sessionId: options.sessionId ?? null,
-          role: "tool",
+          role: 'tool',
           content: JSON.stringify({
             tool_call_id: message.tool_call_id,
             name: message.name,
@@ -403,7 +427,7 @@ export async function handleMessage(
         if (!hasContent && !hasToolCalls) return null;
         return {
           sessionId: options.sessionId ?? null,
-          role: "ai",
+          role: 'ai',
           content: JSON.stringify({
             content: message.content,
             tool_calls: message.tool_calls ?? [],
@@ -412,17 +436,19 @@ export async function handleMessage(
       }
       return {
         sessionId: options.sessionId ?? null,
-        role: "human",
-        content: JSON.stringify({ content: message.content }),
+        role: 'human',
+        content: JSON.stringify({
+          content: message.content,
+        }),
       };
     })
     .filter(Boolean) as (typeof chatHistory.$inferInsert)[];
 
-  const hasAssistantRow = messages.some((message) => message.role === "ai");
+  const hasAssistantRow = messages.some((message) => message.role === 'ai');
   if (!hasAssistantRow && reply.trim().length > 0) {
     messages.push({
       sessionId: options.sessionId ?? null,
-      role: "ai",
+      role: 'ai',
       content: JSON.stringify({
         content: reply,
         tool_calls: [],
@@ -431,7 +457,10 @@ export async function handleMessage(
   }
 
   const modelAlreadyStoredMemory = didCallStoreMemory(
-    newMessages as Array<{ content?: unknown; tool_calls?: unknown }>,
+    newMessages as Array<{
+      content?: unknown;
+      tool_calls?: unknown;
+    }>,
   );
 
   if (!modelAlreadyStoredMemory && shouldAutoStoreUserMemory(text)) {
@@ -458,7 +487,7 @@ export async function handleMessage(
           .where(eq(chatSessions.id, options.sessionId));
       }
     } catch (error) {
-      logger.error("[chat.save] failed to persist chat history", error);
+      logger.error('[chat.save] failed to persist chat history', error);
     }
   }
 
@@ -468,7 +497,7 @@ export async function handleMessage(
 
   logger.info(`[chat] reply: ${reply}`);
 
-  await emitEvent(options.onEvent, { type: "final", text: reply });
+  await emitEvent(options.onEvent, { type: 'final', text: reply });
 
   return reply;
 }
