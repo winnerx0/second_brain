@@ -1,869 +1,1103 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Second Brain — Your AI Personal Assistant</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=JetBrains+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
-
-  <style>
-    :root {
-      --bg:        #060c09;
-      --bg-card:   #0b1510;
-      --bg-code:   #0d1a14;
-      --teal:      #00e5a0;
-      --teal-dim:  #00b07a;
-      --teal-glow: rgba(0, 229, 160, 0.12);
-      --teal-line: rgba(0, 229, 160, 0.25);
-      --text:      #d6ede5;
-      --text-muted:#6e9980;
-      --border:    rgba(0, 229, 160, 0.15);
-      --font-head: 'Syne', sans-serif;
-      --font-mono: 'JetBrains Mono', monospace;
-      --font-body: 'DM Sans', sans-serif;
-    }
-
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    html { scroll-behavior: smooth; }
-
-    body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: var(--font-body);
-      font-weight: 300;
-      line-height: 1.65;
-      overflow-x: hidden;
-    }
-
-    /* ── Grain overlay ─────────────────────────────── */
-    body::before {
-      content: '';
-      position: fixed;
-      inset: 0;
-      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
-      pointer-events: none;
-      z-index: 9999;
-      opacity: 0.35;
-    }
-
-    /* ── Grid bg ───────────────────────────────────── */
-    .grid-bg {
-      position: fixed;
-      inset: 0;
-      background-image:
-        linear-gradient(var(--border) 1px, transparent 1px),
-        linear-gradient(90deg, var(--border) 1px, transparent 1px);
-      background-size: 48px 48px;
-      mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black 30%, transparent 100%);
-      pointer-events: none;
-      z-index: 0;
-    }
-
-    /* ── Nav ───────────────────────────────────────── */
-    nav {
-      position: fixed;
-      top: 0; left: 0; right: 0;
-      z-index: 100;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 1.25rem 3rem;
-      border-bottom: 1px solid var(--border);
-      background: rgba(6, 12, 9, 0.85);
-      backdrop-filter: blur(12px);
-    }
-
-    .nav-logo {
-      font-family: var(--font-mono);
-      font-size: 0.85rem;
-      color: var(--teal);
-      letter-spacing: 0.15em;
-      text-transform: uppercase;
-    }
-
-    .nav-logo span { color: var(--text-muted); }
-
-    nav ul {
-      list-style: none;
-      display: flex;
-      gap: 2.5rem;
-    }
-
-    nav ul a {
-      font-family: var(--font-mono);
-      font-size: 0.78rem;
-      color: var(--text-muted);
-      text-decoration: none;
-      letter-spacing: 0.08em;
-      transition: color 0.2s;
-    }
-
-    nav ul a:hover { color: var(--teal); }
-
-    .nav-cta {
-      font-family: var(--font-mono);
-      font-size: 0.78rem;
-      letter-spacing: 0.1em;
-      color: var(--teal) !important;
-      border: 1px solid var(--teal-line);
-      padding: 0.45rem 1rem;
-      border-radius: 2px;
-      transition: background 0.2s, color 0.2s !important;
-    }
-
-    .nav-cta:hover {
-      background: var(--teal-glow) !important;
-      color: var(--teal) !important;
-    }
-
-    /* ── Sections ──────────────────────────────────── */
-    section { position: relative; z-index: 1; }
-
-    /* ── Hero ──────────────────────────────────────── */
-    .hero {
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      padding: 8rem 2rem 6rem;
-      position: relative;
-      overflow: hidden;
-    }
-
-    .hero-glow {
-      position: absolute;
-      top: -10%;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 700px;
-      height: 500px;
-      background: radial-gradient(ellipse, rgba(0, 229, 160, 0.08) 0%, transparent 70%);
-      pointer-events: none;
-    }
-
-    .hero-kanji {
-      font-size: 11rem;
-      line-height: 1;
-      color: rgba(0, 229, 160, 0.04);
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -52%);
-      pointer-events: none;
-      user-select: none;
-      font-family: serif;
-      letter-spacing: -0.05em;
-    }
-
-    .hero-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
-      font-family: var(--font-mono);
-      font-size: 0.72rem;
-      letter-spacing: 0.15em;
-      text-transform: uppercase;
-      color: var(--teal);
-      border: 1px solid var(--teal-line);
-      padding: 0.35rem 0.9rem;
-      border-radius: 2px;
-      margin-bottom: 2rem;
-      background: var(--teal-glow);
-      animation: fadeUp 0.6s ease both;
-    }
-
-    .hero-badge::before {
-      content: '';
-      width: 6px; height: 6px;
-      background: var(--teal);
-      border-radius: 50%;
-      animation: pulse 2s infinite;
-    }
-
-    @keyframes pulse {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50%       { opacity: 0.4; transform: scale(0.8); }
-    }
-
-    .hero h1 {
-      font-family: var(--font-head);
-      font-size: clamp(3rem, 7vw, 6.5rem);
-      font-weight: 800;
-      line-height: 1.02;
-      letter-spacing: -0.03em;
-      color: #fff;
-      max-width: 900px;
-      margin-bottom: 1.75rem;
-      animation: fadeUp 0.6s 0.1s ease both;
-    }
-
-    .hero h1 em {
-      font-style: normal;
-      color: var(--teal);
-      position: relative;
-    }
-
-    .hero h1 em::after {
-      content: '';
-      position: absolute;
-      bottom: 4px; left: 0; right: 0;
-      height: 2px;
-      background: var(--teal);
-      opacity: 0.4;
-    }
-
-    .hero-sub {
-      font-size: 1.1rem;
-      color: var(--text-muted);
-      max-width: 520px;
-      margin-bottom: 2.75rem;
-      line-height: 1.7;
-      animation: fadeUp 0.6s 0.2s ease both;
-    }
-
-    .hero-actions {
-      display: flex;
-      gap: 1rem;
-      justify-content: center;
-      flex-wrap: wrap;
-      animation: fadeUp 0.6s 0.3s ease both;
-    }
-
-    .btn-primary {
-      font-family: var(--font-mono);
-      font-size: 0.82rem;
-      letter-spacing: 0.1em;
-      background: var(--teal);
-      color: #060c09;
-      border: none;
-      padding: 0.85rem 2rem;
-      border-radius: 2px;
-      cursor: pointer;
-      text-decoration: none;
-      font-weight: 500;
-      transition: transform 0.15s, box-shadow 0.15s;
-    }
-
-    .btn-primary:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 32px rgba(0, 229, 160, 0.3);
-    }
-
-    .btn-ghost {
-      font-family: var(--font-mono);
-      font-size: 0.82rem;
-      letter-spacing: 0.1em;
-      color: var(--text-muted);
-      border: 1px solid var(--border);
-      padding: 0.85rem 2rem;
-      border-radius: 2px;
-      cursor: pointer;
-      text-decoration: none;
-      transition: color 0.15s, border-color 0.15s;
-    }
-
-    .btn-ghost:hover { color: var(--teal); border-color: var(--teal-line); }
-
-    /* ── Terminal mockup ───────────────────────────── */
-    .terminal-wrap {
-      padding: 0 2rem 6rem;
-      display: flex;
-      justify-content: center;
-      position: relative;
-      z-index: 1;
-    }
-
-    .terminal {
-      width: 100%;
-      max-width: 720px;
-      background: var(--bg-code);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      overflow: hidden;
-      box-shadow: 0 24px 80px rgba(0,0,0,0.7), 0 0 0 1px rgba(0,229,160,0.05);
-      animation: fadeUp 0.7s 0.4s ease both;
-    }
-
-    .terminal-bar {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.75rem 1rem;
-      background: rgba(255,255,255,0.03);
-      border-bottom: 1px solid var(--border);
-    }
-
-    .terminal-dot {
-      width: 10px; height: 10px;
-      border-radius: 50%;
-    }
-
-    .terminal-dot:nth-child(1) { background: #ff5f57; }
-    .terminal-dot:nth-child(2) { background: #febc2e; }
-    .terminal-dot:nth-child(3) { background: #28c840; }
-
-    .terminal-title {
-      font-family: var(--font-mono);
-      font-size: 0.7rem;
-      color: var(--text-muted);
-      margin-left: auto;
-      letter-spacing: 0.05em;
-    }
-
-    .terminal-body {
-      padding: 1.5rem;
-      font-family: var(--font-mono);
-      font-size: 0.82rem;
-      line-height: 2;
-    }
-
-    .t-prompt { color: var(--teal); }
-    .t-cmd    { color: var(--text); }
-    .t-out    { color: var(--text-muted); }
-    .t-key    { color: #7ec8a0; }
-    .t-val    { color: #a8d8c0; }
-    .t-section{ color: var(--teal); font-weight: 500; margin-top: 0.5rem; }
-    .t-item   { color: var(--text-muted); padding-left: 1rem; }
-    .t-bullet { color: var(--teal-dim); }
-
-    .typing-cursor {
-      display: inline-block;
-      width: 7px;
-      height: 1em;
-      background: var(--teal);
-      vertical-align: text-bottom;
-      animation: blink 1.1s step-end infinite;
-    }
-
-    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
-
-    /* ── Features ──────────────────────────────────── */
-    .features {
-      padding: 6rem 2rem;
-      max-width: 1200px;
-      margin: 0 auto;
-    }
-
-    .section-label {
-      font-family: var(--font-mono);
-      font-size: 0.72rem;
-      letter-spacing: 0.2em;
-      text-transform: uppercase;
-      color: var(--teal);
-      margin-bottom: 1rem;
-    }
-
-    .section-title {
-      font-family: var(--font-head);
-      font-size: clamp(2rem, 4vw, 3rem);
-      font-weight: 800;
-      color: #fff;
-      letter-spacing: -0.025em;
-      margin-bottom: 1rem;
-    }
-
-    .section-sub {
-      font-size: 1rem;
-      color: var(--text-muted);
-      max-width: 480px;
-      margin-bottom: 4rem;
-    }
-
-    .features-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 1px;
-      background: var(--border);
-      border: 1px solid var(--border);
-    }
-
-    .feature-card {
-      background: var(--bg-card);
-      padding: 2.5rem 2rem;
-      position: relative;
-      overflow: hidden;
-      transition: background 0.2s;
-    }
-
-    .feature-card:hover { background: #0f1e17; }
-
-    .feature-card::before {
-      content: '';
-      position: absolute;
-      top: 0; left: 0; right: 0;
-      height: 1px;
-      background: linear-gradient(90deg, transparent, var(--teal-line), transparent);
-      transform: scaleX(0);
-      transition: transform 0.3s;
-    }
-
-    .feature-card:hover::before { transform: scaleX(1); }
-
-    .feature-icon {
-      font-size: 1.5rem;
-      margin-bottom: 1.25rem;
-      display: block;
-    }
-
-    .feature-name {
-      font-family: var(--font-head);
-      font-size: 1.05rem;
-      font-weight: 700;
-      color: #fff;
-      margin-bottom: 0.6rem;
-    }
-
-    .feature-desc {
-      font-size: 0.88rem;
-      color: var(--text-muted);
-      line-height: 1.6;
-    }
-
-    .feature-tag {
-      display: inline-block;
-      margin-top: 1.25rem;
-      font-family: var(--font-mono);
-      font-size: 0.68rem;
-      letter-spacing: 0.1em;
-      color: var(--teal-dim);
-      text-transform: uppercase;
-    }
-
-    /* ── How it works ──────────────────────────────── */
-    .how {
-      padding: 6rem 2rem;
-      max-width: 1200px;
-      margin: 0 auto;
-    }
-
-    .steps {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 2rem;
-      margin-top: 4rem;
-      position: relative;
-    }
-
-    .steps::before {
-      content: '';
-      position: absolute;
-      top: 2.2rem;
-      left: calc(16.66% + 1rem);
-      right: calc(16.66% + 1rem);
-      height: 1px;
-      background: linear-gradient(90deg, var(--teal-line), var(--teal-line));
-      z-index: 0;
-    }
-
-    .step {
-      position: relative;
-      z-index: 1;
-    }
-
-    .step-num {
-      width: 44px; height: 44px;
-      border: 1px solid var(--border);
-      background: var(--bg-code);
-      border-radius: 2px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-family: var(--font-mono);
-      font-size: 0.78rem;
-      color: var(--teal);
-      margin-bottom: 1.5rem;
-      position: relative;
-    }
-
-    .step-num::after {
-      content: '';
-      position: absolute;
-      inset: -4px;
-      border: 1px solid var(--teal-line);
-      border-radius: 2px;
-      opacity: 0;
-      transition: opacity 0.3s;
-    }
-
-    .step:hover .step-num::after { opacity: 1; }
-
-    .step-title {
-      font-family: var(--font-head);
-      font-size: 1.15rem;
-      font-weight: 700;
-      color: #fff;
-      margin-bottom: 0.75rem;
-    }
-
-    .step-desc {
-      font-size: 0.88rem;
-      color: var(--text-muted);
-      line-height: 1.65;
-      margin-bottom: 1.25rem;
-    }
-
-    .step-code {
-      font-family: var(--font-mono);
-      font-size: 0.75rem;
-      background: var(--bg-code);
-      border: 1px solid var(--border);
-      border-radius: 3px;
-      padding: 1rem;
-      color: var(--teal);
-      line-height: 1.8;
-    }
-
-    .step-code span { color: var(--text-muted); }
-
-    /* ── Quick start ───────────────────────────────── */
-    .quickstart {
-      padding: 6rem 2rem;
-      background: linear-gradient(180deg, transparent 0%, rgba(0,229,160,0.03) 50%, transparent 100%);
-    }
-
-    .quickstart-inner {
-      max-width: 800px;
-      margin: 0 auto;
-    }
-
-    .qs-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 1.5rem;
-      margin-top: 3rem;
-    }
-
-    .qs-block {
-      background: var(--bg-code);
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      overflow: hidden;
-    }
-
-    .qs-block-head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0.65rem 1rem;
-      border-bottom: 1px solid var(--border);
-      font-family: var(--font-mono);
-      font-size: 0.7rem;
-      color: var(--text-muted);
-      letter-spacing: 0.08em;
-    }
-
-    .qs-block-head .copy-btn {
-      background: none;
-      border: none;
-      color: var(--text-muted);
-      cursor: pointer;
-      font-family: var(--font-mono);
-      font-size: 0.68rem;
-      letter-spacing: 0.05em;
-      transition: color 0.2s;
-    }
-
-    .qs-block-head .copy-btn:hover { color: var(--teal); }
-
-    .qs-block pre {
-      padding: 1.25rem;
-      font-family: var(--font-mono);
-      font-size: 0.78rem;
-      line-height: 1.9;
-      color: var(--text-muted);
-      overflow-x: auto;
-    }
-
-    .qs-block pre .cmd { color: var(--teal); }
-    .qs-block pre .comment { color: #3d6e55; }
-    .qs-block pre .key { color: #7ec8a0; }
-    .qs-block pre .val { color: var(--text); }
-
-    .env-note {
-      margin-top: 2rem;
-      padding: 1.25rem 1.5rem;
-      border: 1px solid var(--border);
-      border-left: 3px solid var(--teal-dim);
-      background: var(--bg-card);
-      font-size: 0.84rem;
-      color: var(--text-muted);
-      border-radius: 0 4px 4px 0;
-    }
-
-    .env-note strong { color: var(--text); font-weight: 500; }
-
-    /* ── Divider ───────────────────────────────────── */
-    .divider {
-      max-width: 1200px;
-      margin: 0 auto;
-      height: 1px;
-      background: linear-gradient(90deg, transparent, var(--border), transparent);
-    }
-
-    /* ── Footer ────────────────────────────────────── */
-    footer {
-      position: relative;
-      z-index: 1;
-      padding: 3rem 2rem;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      max-width: 1200px;
-      margin: 0 auto;
-    }
-
-    .footer-logo {
-      font-family: var(--font-mono);
-      font-size: 0.78rem;
-      color: var(--text-muted);
-      letter-spacing: 0.12em;
-    }
-
-    .footer-logo strong { color: var(--teal); }
-
-    .footer-links {
-      display: flex;
-      gap: 2rem;
-      list-style: none;
-    }
-
-    .footer-links a {
-      font-family: var(--font-mono);
-      font-size: 0.72rem;
-      color: var(--text-muted);
-      text-decoration: none;
-      letter-spacing: 0.08em;
-      transition: color 0.2s;
-    }
-
-    .footer-links a:hover { color: var(--teal); }
-
-    /* ── Animations ────────────────────────────────── */
-    @keyframes fadeUp {
-      from { opacity: 0; transform: translateY(20px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
-
-    .reveal {
-      opacity: 0;
-      transform: translateY(24px);
-      transition: opacity 0.6s ease, transform 0.6s ease;
-    }
-
-    .reveal.visible {
-      opacity: 1;
-      transform: translateY(0);
-    }
-
-    /* ── Responsive ────────────────────────────────── */
-    @media (max-width: 900px) {
-      nav { padding: 1rem 1.5rem; }
-      nav ul { display: none; }
-      .features-grid { grid-template-columns: 1fr 1fr; }
-      .steps { grid-template-columns: 1fr; }
-      .steps::before { display: none; }
-      .qs-grid { grid-template-columns: 1fr; }
-      footer { flex-direction: column; gap: 1.5rem; text-align: center; }
-    }
-
-    @media (max-width: 600px) {
-      .features-grid { grid-template-columns: 1fr; }
-    }
-  </style>
-</head>
-<body>
-
-  <div class="grid-bg"></div>
-
-  <!-- Nav -->
-  <nav>
-    <div class="nav-logo">second<span>_</span>brain</div>
-    <ul>
-      <li><a href="#features">Features</a></li>
-      <li><a href="#how">How it works</a></li>
-      <li><a href="#quickstart">Quick Start</a></li>
-      <li><a href="https://github.com" class="nav-cta">GitHub</a></li>
-    </ul>
-  </nav>
-
-  <!-- Hero -->
-  <section class="hero">
-    <div class="hero-glow"></div>
-    <div class="hero-kanji">知</div>
-
-    <div class="hero-badge">Powered by LangChain + GPT</div>
-
-    <h1>Your AI assistant.<br /><em>Always watching.</em></h1>
-
-    <p class="hero-sub">
-      Yuki monitors your GitHub, manages your calendar, and delivers a sharp daily briefing to Telegram — all before you've had your first coffee.
-    </p>
-
-    <div class="hero-actions">
-      <a href="#quickstart" class="btn-primary">Get Started</a>
-      <a href="#features" class="btn-ghost">See Features</a>
-    </div>
-  </section>
-
-  <!-- Terminal mockup -->
-  <div class="terminal-wrap">
-    <div class="terminal">
-      <div class="terminal-bar">
-        <div class="terminal-dot"></div>
-        <div class="terminal-dot"></div>
-        <div class="terminal-dot"></div>
-        <span class="terminal-title">yuki — morning briefing</span>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Second Brain — Your AI Personal Assistant</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=JetBrains+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500&display=swap"
+      rel="stylesheet"
+    />
+
+    <style>
+      :root {
+        --bg: #060c09;
+        --bg-card: #0b1510;
+        --bg-code: #0d1a14;
+        --teal: #00e5a0;
+        --teal-dim: #00b07a;
+        --teal-glow: rgba(0, 229, 160, 0.12);
+        --teal-line: rgba(0, 229, 160, 0.25);
+        --text: #d6ede5;
+        --text-muted: #6e9980;
+        --border: rgba(0, 229, 160, 0.15);
+        --font-head: 'Syne', sans-serif;
+        --font-mono: 'JetBrains Mono', monospace;
+        --font-body: 'DM Sans', sans-serif;
+      }
+
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        background: var(--bg);
+        color: var(--text);
+        font-family: var(--font-body);
+        font-weight: 300;
+        line-height: 1.65;
+        overflow-x: hidden;
+      }
+
+      /* ── Grain overlay ─────────────────────────────── */
+      body::before {
+        content: '';
+        position: fixed;
+        inset: 0;
+        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+        pointer-events: none;
+        z-index: 9999;
+        opacity: 0.35;
+      }
+
+      /* ── Grid bg ───────────────────────────────────── */
+      .grid-bg {
+        position: fixed;
+        inset: 0;
+        background-image:
+          linear-gradient(var(--border) 1px, transparent 1px),
+          linear-gradient(90deg, var(--border) 1px, transparent 1px);
+        background-size: 48px 48px;
+        mask-image: radial-gradient(
+          ellipse 80% 60% at 50% 0%,
+          black 30%,
+          transparent 100%
+        );
+        pointer-events: none;
+        z-index: 0;
+      }
+
+      /* ── Nav ───────────────────────────────────────── */
+      nav {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 100;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 1.25rem 3rem;
+        border-bottom: 1px solid var(--border);
+        background: rgba(6, 12, 9, 0.85);
+        backdrop-filter: blur(12px);
+      }
+
+      .nav-logo {
+        font-family: var(--font-mono);
+        font-size: 0.85rem;
+        color: var(--teal);
+        letter-spacing: 0.15em;
+        text-transform: uppercase;
+      }
+
+      .nav-logo span {
+        color: var(--text-muted);
+      }
+
+      nav ul {
+        list-style: none;
+        display: flex;
+        gap: 2.5rem;
+      }
+
+      nav ul a {
+        font-family: var(--font-mono);
+        font-size: 0.78rem;
+        color: var(--text-muted);
+        text-decoration: none;
+        letter-spacing: 0.08em;
+        transition: color 0.2s;
+      }
+
+      nav ul a:hover {
+        color: var(--teal);
+      }
+
+      .nav-cta {
+        font-family: var(--font-mono);
+        font-size: 0.78rem;
+        letter-spacing: 0.1em;
+        color: var(--teal) !important;
+        border: 1px solid var(--teal-line);
+        padding: 0.45rem 1rem;
+        border-radius: 2px;
+        transition:
+          background 0.2s,
+          color 0.2s !important;
+      }
+
+      .nav-cta:hover {
+        background: var(--teal-glow) !important;
+        color: var(--teal) !important;
+      }
+
+      /* ── Sections ──────────────────────────────────── */
+      section {
+        position: relative;
+        z-index: 1;
+      }
+
+      /* ── Hero ──────────────────────────────────────── */
+      .hero {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 8rem 2rem 6rem;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .hero-glow {
+        position: absolute;
+        top: -10%;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 700px;
+        height: 500px;
+        background: radial-gradient(
+          ellipse,
+          rgba(0, 229, 160, 0.08) 0%,
+          transparent 70%
+        );
+        pointer-events: none;
+      }
+
+      .hero-kanji {
+        font-size: 11rem;
+        line-height: 1;
+        color: rgba(0, 229, 160, 0.04);
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -52%);
+        pointer-events: none;
+        user-select: none;
+        font-family: serif;
+        letter-spacing: -0.05em;
+      }
+
+      .hero-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-family: var(--font-mono);
+        font-size: 0.72rem;
+        letter-spacing: 0.15em;
+        text-transform: uppercase;
+        color: var(--teal);
+        border: 1px solid var(--teal-line);
+        padding: 0.35rem 0.9rem;
+        border-radius: 2px;
+        margin-bottom: 2rem;
+        background: var(--teal-glow);
+        animation: fadeUp 0.6s ease both;
+      }
+
+      .hero-badge::before {
+        content: '';
+        width: 6px;
+        height: 6px;
+        background: var(--teal);
+        border-radius: 50%;
+        animation: pulse 2s infinite;
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+          transform: scale(1);
+        }
+        50% {
+          opacity: 0.4;
+          transform: scale(0.8);
+        }
+      }
+
+      .hero h1 {
+        font-family: var(--font-head);
+        font-size: clamp(3rem, 7vw, 6.5rem);
+        font-weight: 800;
+        line-height: 1.02;
+        letter-spacing: -0.03em;
+        color: #fff;
+        max-width: 900px;
+        margin-bottom: 1.75rem;
+        animation: fadeUp 0.6s 0.1s ease both;
+      }
+
+      .hero h1 em {
+        font-style: normal;
+        color: var(--teal);
+        position: relative;
+      }
+
+      .hero h1 em::after {
+        content: '';
+        position: absolute;
+        bottom: 4px;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background: var(--teal);
+        opacity: 0.4;
+      }
+
+      .hero-sub {
+        font-size: 1.1rem;
+        color: var(--text-muted);
+        max-width: 520px;
+        margin-bottom: 2.75rem;
+        line-height: 1.7;
+        animation: fadeUp 0.6s 0.2s ease both;
+      }
+
+      .hero-actions {
+        display: flex;
+        gap: 1rem;
+        justify-content: center;
+        flex-wrap: wrap;
+        animation: fadeUp 0.6s 0.3s ease both;
+      }
+
+      .btn-primary {
+        font-family: var(--font-mono);
+        font-size: 0.82rem;
+        letter-spacing: 0.1em;
+        background: var(--teal);
+        color: #060c09;
+        border: none;
+        padding: 0.85rem 2rem;
+        border-radius: 2px;
+        cursor: pointer;
+        text-decoration: none;
+        font-weight: 500;
+        transition:
+          transform 0.15s,
+          box-shadow 0.15s;
+      }
+
+      .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 32px rgba(0, 229, 160, 0.3);
+      }
+
+      .btn-ghost {
+        font-family: var(--font-mono);
+        font-size: 0.82rem;
+        letter-spacing: 0.1em;
+        color: var(--text-muted);
+        border: 1px solid var(--border);
+        padding: 0.85rem 2rem;
+        border-radius: 2px;
+        cursor: pointer;
+        text-decoration: none;
+        transition:
+          color 0.15s,
+          border-color 0.15s;
+      }
+
+      .btn-ghost:hover {
+        color: var(--teal);
+        border-color: var(--teal-line);
+      }
+
+      /* ── Terminal mockup ───────────────────────────── */
+      .terminal-wrap {
+        padding: 0 2rem 6rem;
+        display: flex;
+        justify-content: center;
+        position: relative;
+        z-index: 1;
+      }
+
+      .terminal {
+        width: 100%;
+        max-width: 720px;
+        background: var(--bg-code);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        overflow: hidden;
+        box-shadow:
+          0 24px 80px rgba(0, 0, 0, 0.7),
+          0 0 0 1px rgba(0, 229, 160, 0.05);
+        animation: fadeUp 0.7s 0.4s ease both;
+      }
+
+      .terminal-bar {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.75rem 1rem;
+        background: rgba(255, 255, 255, 0.03);
+        border-bottom: 1px solid var(--border);
+      }
+
+      .terminal-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+      }
+
+      .terminal-dot:nth-child(1) {
+        background: #ff5f57;
+      }
+      .terminal-dot:nth-child(2) {
+        background: #febc2e;
+      }
+      .terminal-dot:nth-child(3) {
+        background: #28c840;
+      }
+
+      .terminal-title {
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        color: var(--text-muted);
+        margin-left: auto;
+        letter-spacing: 0.05em;
+      }
+
+      .terminal-body {
+        padding: 1.5rem;
+        font-family: var(--font-mono);
+        font-size: 0.82rem;
+        line-height: 2;
+      }
+
+      .t-prompt {
+        color: var(--teal);
+      }
+      .t-cmd {
+        color: var(--text);
+      }
+      .t-out {
+        color: var(--text-muted);
+      }
+      .t-key {
+        color: #7ec8a0;
+      }
+      .t-val {
+        color: #a8d8c0;
+      }
+      .t-section {
+        color: var(--teal);
+        font-weight: 500;
+        margin-top: 0.5rem;
+      }
+      .t-item {
+        color: var(--text-muted);
+        padding-left: 1rem;
+      }
+      .t-bullet {
+        color: var(--teal-dim);
+      }
+
+      .typing-cursor {
+        display: inline-block;
+        width: 7px;
+        height: 1em;
+        background: var(--teal);
+        vertical-align: text-bottom;
+        animation: blink 1.1s step-end infinite;
+      }
+
+      @keyframes blink {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0;
+        }
+      }
+
+      /* ── Features ──────────────────────────────────── */
+      .features {
+        padding: 6rem 2rem;
+        max-width: 1200px;
+        margin: 0 auto;
+      }
+
+      .section-label {
+        font-family: var(--font-mono);
+        font-size: 0.72rem;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: var(--teal);
+        margin-bottom: 1rem;
+      }
+
+      .section-title {
+        font-family: var(--font-head);
+        font-size: clamp(2rem, 4vw, 3rem);
+        font-weight: 800;
+        color: #fff;
+        letter-spacing: -0.025em;
+        margin-bottom: 1rem;
+      }
+
+      .section-sub {
+        font-size: 1rem;
+        color: var(--text-muted);
+        max-width: 480px;
+        margin-bottom: 4rem;
+      }
+
+      .features-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1px;
+        background: var(--border);
+        border: 1px solid var(--border);
+      }
+
+      .feature-card {
+        background: var(--bg-card);
+        padding: 2.5rem 2rem;
+        position: relative;
+        overflow: hidden;
+        transition: background 0.2s;
+      }
+
+      .feature-card:hover {
+        background: #0f1e17;
+      }
+
+      .feature-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 1px;
+        background: linear-gradient(
+          90deg,
+          transparent,
+          var(--teal-line),
+          transparent
+        );
+        transform: scaleX(0);
+        transition: transform 0.3s;
+      }
+
+      .feature-card:hover::before {
+        transform: scaleX(1);
+      }
+
+      .feature-icon {
+        font-size: 1.5rem;
+        margin-bottom: 1.25rem;
+        display: block;
+      }
+
+      .feature-name {
+        font-family: var(--font-head);
+        font-size: 1.05rem;
+        font-weight: 700;
+        color: #fff;
+        margin-bottom: 0.6rem;
+      }
+
+      .feature-desc {
+        font-size: 0.88rem;
+        color: var(--text-muted);
+        line-height: 1.6;
+      }
+
+      .feature-tag {
+        display: inline-block;
+        margin-top: 1.25rem;
+        font-family: var(--font-mono);
+        font-size: 0.68rem;
+        letter-spacing: 0.1em;
+        color: var(--teal-dim);
+        text-transform: uppercase;
+      }
+
+      /* ── How it works ──────────────────────────────── */
+      .how {
+        padding: 6rem 2rem;
+        max-width: 1200px;
+        margin: 0 auto;
+      }
+
+      .steps {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 2rem;
+        margin-top: 4rem;
+        position: relative;
+      }
+
+      .steps::before {
+        content: '';
+        position: absolute;
+        top: 2.2rem;
+        left: calc(16.66% + 1rem);
+        right: calc(16.66% + 1rem);
+        height: 1px;
+        background: linear-gradient(90deg, var(--teal-line), var(--teal-line));
+        z-index: 0;
+      }
+
+      .step {
+        position: relative;
+        z-index: 1;
+      }
+
+      .step-num {
+        width: 44px;
+        height: 44px;
+        border: 1px solid var(--border);
+        background: var(--bg-code);
+        border-radius: 2px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: var(--font-mono);
+        font-size: 0.78rem;
+        color: var(--teal);
+        margin-bottom: 1.5rem;
+        position: relative;
+      }
+
+      .step-num::after {
+        content: '';
+        position: absolute;
+        inset: -4px;
+        border: 1px solid var(--teal-line);
+        border-radius: 2px;
+        opacity: 0;
+        transition: opacity 0.3s;
+      }
+
+      .step:hover .step-num::after {
+        opacity: 1;
+      }
+
+      .step-title {
+        font-family: var(--font-head);
+        font-size: 1.15rem;
+        font-weight: 700;
+        color: #fff;
+        margin-bottom: 0.75rem;
+      }
+
+      .step-desc {
+        font-size: 0.88rem;
+        color: var(--text-muted);
+        line-height: 1.65;
+        margin-bottom: 1.25rem;
+      }
+
+      .step-code {
+        font-family: var(--font-mono);
+        font-size: 0.75rem;
+        background: var(--bg-code);
+        border: 1px solid var(--border);
+        border-radius: 3px;
+        padding: 1rem;
+        color: var(--teal);
+        line-height: 1.8;
+      }
+
+      .step-code span {
+        color: var(--text-muted);
+      }
+
+      /* ── Quick start ───────────────────────────────── */
+      .quickstart {
+        padding: 6rem 2rem;
+        background: linear-gradient(
+          180deg,
+          transparent 0%,
+          rgba(0, 229, 160, 0.03) 50%,
+          transparent 100%
+        );
+      }
+
+      .quickstart-inner {
+        max-width: 800px;
+        margin: 0 auto;
+      }
+
+      .qs-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1.5rem;
+        margin-top: 3rem;
+      }
+
+      .qs-block {
+        background: var(--bg-code);
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        overflow: hidden;
+      }
+
+      .qs-block-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.65rem 1rem;
+        border-bottom: 1px solid var(--border);
+        font-family: var(--font-mono);
+        font-size: 0.7rem;
+        color: var(--text-muted);
+        letter-spacing: 0.08em;
+      }
+
+      .qs-block-head .copy-btn {
+        background: none;
+        border: none;
+        color: var(--text-muted);
+        cursor: pointer;
+        font-family: var(--font-mono);
+        font-size: 0.68rem;
+        letter-spacing: 0.05em;
+        transition: color 0.2s;
+      }
+
+      .qs-block-head .copy-btn:hover {
+        color: var(--teal);
+      }
+
+      .qs-block pre {
+        padding: 1.25rem;
+        font-family: var(--font-mono);
+        font-size: 0.78rem;
+        line-height: 1.9;
+        color: var(--text-muted);
+        overflow-x: auto;
+      }
+
+      .qs-block pre .cmd {
+        color: var(--teal);
+      }
+      .qs-block pre .comment {
+        color: #3d6e55;
+      }
+      .qs-block pre .key {
+        color: #7ec8a0;
+      }
+      .qs-block pre .val {
+        color: var(--text);
+      }
+
+      .env-note {
+        margin-top: 2rem;
+        padding: 1.25rem 1.5rem;
+        border: 1px solid var(--border);
+        border-left: 3px solid var(--teal-dim);
+        background: var(--bg-card);
+        font-size: 0.84rem;
+        color: var(--text-muted);
+        border-radius: 0 4px 4px 0;
+      }
+
+      .env-note strong {
+        color: var(--text);
+        font-weight: 500;
+      }
+
+      /* ── Divider ───────────────────────────────────── */
+      .divider {
+        max-width: 1200px;
+        margin: 0 auto;
+        height: 1px;
+        background: linear-gradient(
+          90deg,
+          transparent,
+          var(--border),
+          transparent
+        );
+      }
+
+      /* ── Footer ────────────────────────────────────── */
+      footer {
+        position: relative;
+        z-index: 1;
+        padding: 3rem 2rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        max-width: 1200px;
+        margin: 0 auto;
+      }
+
+      .footer-logo {
+        font-family: var(--font-mono);
+        font-size: 0.78rem;
+        color: var(--text-muted);
+        letter-spacing: 0.12em;
+      }
+
+      .footer-logo strong {
+        color: var(--teal);
+      }
+
+      .footer-links {
+        display: flex;
+        gap: 2rem;
+        list-style: none;
+      }
+
+      .footer-links a {
+        font-family: var(--font-mono);
+        font-size: 0.72rem;
+        color: var(--text-muted);
+        text-decoration: none;
+        letter-spacing: 0.08em;
+        transition: color 0.2s;
+      }
+
+      .footer-links a:hover {
+        color: var(--teal);
+      }
+
+      /* ── Animations ────────────────────────────────── */
+      @keyframes fadeUp {
+        from {
+          opacity: 0;
+          transform: translateY(20px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .reveal {
+        opacity: 0;
+        transform: translateY(24px);
+        transition:
+          opacity 0.6s ease,
+          transform 0.6s ease;
+      }
+
+      .reveal.visible {
+        opacity: 1;
+        transform: translateY(0);
+      }
+
+      /* ── Responsive ────────────────────────────────── */
+      @media (max-width: 900px) {
+        nav {
+          padding: 1rem 1.5rem;
+        }
+        nav ul {
+          display: none;
+        }
+        .features-grid {
+          grid-template-columns: 1fr 1fr;
+        }
+        .steps {
+          grid-template-columns: 1fr;
+        }
+        .steps::before {
+          display: none;
+        }
+        .qs-grid {
+          grid-template-columns: 1fr;
+        }
+        footer {
+          flex-direction: column;
+          gap: 1.5rem;
+          text-align: center;
+        }
+      }
+
+      @media (max-width: 600px) {
+        .features-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="grid-bg"></div>
+
+    <!-- Nav -->
+    <nav>
+      <div class="nav-logo">second<span>_</span>brain</div>
+      <ul>
+        <li><a href="#features">Features</a></li>
+        <li><a href="#how">How it works</a></li>
+        <li><a href="#quickstart">Quick Start</a></li>
+        <li>
+          <a href="https://github.com" class="nav-cta">GitHub</a>
+        </li>
+      </ul>
+    </nav>
+
+    <!-- Hero -->
+    <section class="hero">
+      <div class="hero-glow"></div>
+      <div class="hero-kanji">知</div>
+
+      <div class="hero-badge">Powered by LangChain + GPT</div>
+
+      <h1>Your AI assistant.<br /><em>Always watching.</em></h1>
+
+      <p class="hero-sub">
+        Yuki monitors your GitHub, manages your calendar, and delivers a sharp
+        daily briefing to Telegram — all before you've had your first coffee.
+      </p>
+
+      <div class="hero-actions">
+        <a href="#quickstart" class="btn-primary">Get Started</a>
+        <a href="#features" class="btn-ghost">See Features</a>
       </div>
-      <div class="terminal-body">
-        <div><span class="t-prompt">$ </span><span class="t-cmd">curl -X POST localhost:3000/briefing</span></div>
-        <br />
-        <div class="t-section">FOCUS FOR TODAY</div>
-        <div class="t-item"><span class="t-bullet">▸</span> 3 open PRs need review — oldest is 2 days stale</div>
-        <div class="t-item"><span class="t-bullet">▸</span> Issue #47 "Auth middleware rewrite" assigned to you</div>
-        <br />
-        <div class="t-section">TODAY'S SCHEDULE</div>
-        <div class="t-item"><span class="t-bullet">▸</span> 10:00 — Standup with backend team</div>
-        <div class="t-item"><span class="t-bullet">▸</span> 14:30 — Design review (calendar invite)</div>
-        <br />
-        <div class="t-section">RECENT PUSHES</div>
-        <div class="t-item"><span class="t-bullet">▸</span> <span class="t-key">second-brain</span> — "fix(calendar): parse service account from env"</div>
-        <div class="t-item"><span class="t-bullet">▸</span> <span class="t-key">api-service</span> — "feat: add rate limiting middleware"</div>
-        <br />
-        <div class="t-section">ONE THING</div>
-        <div class="t-item"><span class="t-bullet">▸</span> Wakarimashita. The auth PR is the critical path today.</div>
-        <br />
-        <div><span class="t-out">✓ Briefing delivered to Telegram</span> <span class="typing-cursor"></span></div>
-      </div>
-    </div>
-  </div>
+    </section>
 
-  <!-- Features -->
-  <section class="features" id="features">
-    <div class="reveal">
-      <div class="section-label">// Capabilities</div>
-      <h2 class="section-title">Everything in one agent.</h2>
-      <p class="section-sub">Six tools. One assistant. Zero context-switching.</p>
-    </div>
-
-    <div class="features-grid reveal">
-      <div class="feature-card">
-        <span class="feature-icon">⬡</span>
-        <div class="feature-name">GitHub Intelligence</div>
-        <p class="feature-desc">Monitors all open PRs authored by you, issues assigned to you, and every push from the last 24 hours — including commit messages.</p>
-        <span class="feature-tag">get_open_prs · get_recent_pushes</span>
-      </div>
-      <div class="feature-card">
-        <span class="feature-icon">◈</span>
-        <div class="feature-name">Calendar Management</div>
-        <p class="feature-desc">Create, edit, and delete Google Calendar events via natural language. All-day events, attendees, and UTC scheduling handled precisely.</p>
-        <span class="feature-tag">create · edit · delete · list</span>
-      </div>
-      <div class="feature-card">
-        <span class="feature-icon">◉</span>
-        <div class="feature-name">Telegram Delivery</div>
-        <p class="feature-desc">Briefings and responses flow directly to your Telegram. Markdown formatting with graceful plain-text fallback on parse errors.</p>
-        <span class="feature-tag">sendMessage · fallback</span>
-      </div>
-      <div class="feature-card">
-        <span class="feature-icon">⬡</span>
-        <div class="feature-name">Persistent Memory</div>
-        <p class="feature-desc">Store and recall facts, preferences, and patterns across sessions. Memory is backed by Postgres — no context window limits.</p>
-        <span class="feature-tag">store_memory · recall_memories</span>
-      </div>
-      <div class="feature-card">
-        <span class="feature-icon">◈</span>
-        <div class="feature-name">Daily Briefings</div>
-        <p class="feature-desc">A cron-triggered morning briefing gathers all data, synthesises it through the planning agent, and pushes a concise summary each day.</p>
-        <span class="feature-tag">cron · 0 0 * * *</span>
-      </div>
-      <div class="feature-card">
-        <span class="feature-icon">◉</span>
-        <div class="feature-name">Chat Interface</div>
-        <p class="feature-desc">Ask anything ad-hoc. The agent decides which tools to call, chains them as needed, and responds in Yuki's composed, precise tone.</p>
-        <span class="feature-tag">POST /chat</span>
-      </div>
-    </div>
-  </section>
-
-  <div class="divider"></div>
-
-  <!-- How it works -->
-  <section class="how" id="how">
-    <div class="reveal">
-      <div class="section-label">// Architecture</div>
-      <h2 class="section-title">Three commands. That's it.</h2>
-      <p class="section-sub">No dashboards. No configuration UI. Just a server and a bot.</p>
-    </div>
-
-    <div class="steps">
-      <div class="step reveal">
-        <div class="step-num">01</div>
-        <div class="step-title">Configure</div>
-        <p class="step-desc">Copy the example env and fill in your API keys. GitHub token, Google service account JSON, Telegram bot — all in one file.</p>
-        <div class="step-code">
-          <span>cp .env.example .env</span><br/>
-          <span># fill in keys, then:</span><br/>
-          bun run db:migrate
+    <!-- Terminal mockup -->
+    <div class="terminal-wrap">
+      <div class="terminal">
+        <div class="terminal-bar">
+          <div class="terminal-dot"></div>
+          <div class="terminal-dot"></div>
+          <div class="terminal-dot"></div>
+          <span class="terminal-title">yuki — morning briefing</span>
         </div>
-      </div>
-      <div class="step reveal" style="transition-delay: 0.1s">
-        <div class="step-num">02</div>
-        <div class="step-title">Start</div>
-        <p class="step-desc">Bun starts the Hono server. The cron fires at midnight, the chat endpoint is live, and Yuki is listening.</p>
-        <div class="step-code">
-          bun run dev<br/>
-          <span># server: localhost:3000</span><br/>
-          <span># cron: 00:00 daily</span>
-        </div>
-      </div>
-      <div class="step reveal" style="transition-delay: 0.2s">
-        <div class="step-num">03</div>
-        <div class="step-title">Chat</div>
-        <p class="step-desc">Send messages through your Telegram bot. Yuki fetches live data, reasons across tools, and replies with precision.</p>
-        <div class="step-code">
-          curl -X POST /chat \<br/>
-          <span>  -d '{"message":</span><br/>
-          <span>    {"text":"briefing"}}'</span>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <div class="divider"></div>
-
-  <!-- Quick Start -->
-  <section class="quickstart" id="quickstart">
-    <div class="quickstart-inner">
-      <div class="reveal">
-        <div class="section-label">// Quick Start</div>
-        <h2 class="section-title">Up in under a minute.</h2>
-        <p class="section-sub">Bun, Postgres, and a few API keys are all you need.</p>
-      </div>
-
-      <div class="qs-grid reveal">
-        <div class="qs-block">
-          <div class="qs-block-head">
-            <span>install &amp; run</span>
-            <button class="copy-btn" onclick="copy(this, 'bun install\nbun run db:migrate\nbun run dev')">copy</button>
+        <div class="terminal-body">
+          <div>
+            <span class="t-prompt">$ </span
+            ><span class="t-cmd">curl -X POST localhost:3000/briefing</span>
           </div>
-          <pre>
+          <br />
+          <div class="t-section">FOCUS FOR TODAY</div>
+          <div class="t-item">
+            <span class="t-bullet">▸</span>
+            3 open PRs need review — oldest is 2 days stale
+          </div>
+          <div class="t-item">
+            <span class="t-bullet">▸</span>
+            Issue #47 "Auth middleware rewrite" assigned to you
+          </div>
+          <br />
+          <div class="t-section">TODAY'S SCHEDULE</div>
+          <div class="t-item">
+            <span class="t-bullet">▸</span>
+            10:00 — Standup with backend team
+          </div>
+          <div class="t-item">
+            <span class="t-bullet">▸</span>
+            14:30 — Design review (calendar invite)
+          </div>
+          <br />
+          <div class="t-section">RECENT PUSHES</div>
+          <div class="t-item">
+            <span class="t-bullet">▸</span>
+            <span class="t-key">second-brain</span>
+            — "fix(calendar): parse service account from env"
+          </div>
+          <div class="t-item">
+            <span class="t-bullet">▸</span>
+            <span class="t-key">api-service</span>
+            — "feat: add rate limiting middleware"
+          </div>
+          <br />
+          <div class="t-section">ONE THING</div>
+          <div class="t-item">
+            <span class="t-bullet">▸</span>
+            Wakarimashita. The auth PR is the critical path today.
+          </div>
+          <br />
+          <div>
+            <span class="t-out">✓ Briefing delivered to Telegram</span>
+            <span class="typing-cursor"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Features -->
+    <section class="features" id="features">
+      <div class="reveal">
+        <div class="section-label">// Capabilities</div>
+        <h2 class="section-title">Everything in one agent.</h2>
+        <p class="section-sub">
+          Six tools. One assistant. Zero context-switching.
+        </p>
+      </div>
+
+      <div class="features-grid reveal">
+        <div class="feature-card">
+          <span class="feature-icon">⬡</span>
+          <div class="feature-name">GitHub Intelligence</div>
+          <p class="feature-desc">
+            Monitors all open PRs authored by you, issues assigned to you, and
+            every push from the last 24 hours — including commit messages.
+          </p>
+          <span class="feature-tag">get_open_prs · get_recent_pushes</span>
+        </div>
+        <div class="feature-card">
+          <span class="feature-icon">◈</span>
+          <div class="feature-name">Calendar Management</div>
+          <p class="feature-desc">
+            Create, edit, and delete Google Calendar events via natural
+            language. All-day events, attendees, and UTC scheduling handled
+            precisely.
+          </p>
+          <span class="feature-tag">create · edit · delete · list</span>
+        </div>
+        <div class="feature-card">
+          <span class="feature-icon">◉</span>
+          <div class="feature-name">Telegram Delivery</div>
+          <p class="feature-desc">
+            Briefings and responses flow directly to your Telegram. Markdown
+            formatting with graceful plain-text fallback on parse errors.
+          </p>
+          <span class="feature-tag">sendMessage · fallback</span>
+        </div>
+        <div class="feature-card">
+          <span class="feature-icon">⬡</span>
+          <div class="feature-name">Persistent Memory</div>
+          <p class="feature-desc">
+            Store and recall facts, preferences, and patterns across sessions.
+            Memory is backed by Postgres — no context window limits.
+          </p>
+          <span class="feature-tag">store_memory · recall_memories</span>
+        </div>
+        <div class="feature-card">
+          <span class="feature-icon">◈</span>
+          <div class="feature-name">Daily Briefings</div>
+          <p class="feature-desc">
+            A cron-triggered morning briefing gathers all data, synthesises it
+            through the planning agent, and pushes a concise summary each day.
+          </p>
+          <span class="feature-tag">cron · 0 0 * * *</span>
+        </div>
+        <div class="feature-card">
+          <span class="feature-icon">◉</span>
+          <div class="feature-name">Chat Interface</div>
+          <p class="feature-desc">
+            Ask anything ad-hoc. The agent decides which tools to call, chains
+            them as needed, and responds in Yuki's composed, precise tone.
+          </p>
+          <span class="feature-tag">POST /chat</span>
+        </div>
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <!-- How it works -->
+    <section class="how" id="how">
+      <div class="reveal">
+        <div class="section-label">// Architecture</div>
+        <h2 class="section-title">Three commands. That's it.</h2>
+        <p class="section-sub">
+          No dashboards. No configuration UI. Just a server and a bot.
+        </p>
+      </div>
+
+      <div class="steps">
+        <div class="step reveal">
+          <div class="step-num">01</div>
+          <div class="step-title">Configure</div>
+          <p class="step-desc">
+            Copy the example env and fill in your API keys. GitHub token, Google
+            service account JSON, Telegram bot — all in one file.
+          </p>
+          <div class="step-code">
+            <span>cp .env.example .env</span><br />
+            <span># fill in keys, then:</span><br />
+            bun run db:migrate
+          </div>
+        </div>
+        <div class="step reveal" style="transition-delay: 0.1s">
+          <div class="step-num">02</div>
+          <div class="step-title">Start</div>
+          <p class="step-desc">
+            Bun starts the Hono server. The cron fires at midnight, the chat
+            endpoint is live, and Yuki is listening.
+          </p>
+          <div class="step-code">
+            bun run dev<br />
+            <span># server: localhost:3000</span><br />
+            <span># cron: 00:00 daily</span>
+          </div>
+        </div>
+        <div class="step reveal" style="transition-delay: 0.2s">
+          <div class="step-num">03</div>
+          <div class="step-title">Chat</div>
+          <p class="step-desc">
+            Send messages through your Telegram bot. Yuki fetches live data,
+            reasons across tools, and replies with precision.
+          </p>
+          <div class="step-code">
+            curl -X POST /chat \<br />
+            <span> -d '{"message":</span><br />
+            <span> {"text":"briefing"}}'</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="divider"></div>
+
+    <!-- Quick Start -->
+    <section class="quickstart" id="quickstart">
+      <div class="quickstart-inner">
+        <div class="reveal">
+          <div class="section-label">// Quick Start</div>
+          <h2 class="section-title">Up in under a minute.</h2>
+          <p class="section-sub">
+            Bun, Postgres, and a few API keys are all you need.
+          </p>
+        </div>
+
+        <div class="qs-grid reveal">
+          <div class="qs-block">
+            <div class="qs-block-head">
+              <span>install &amp; run</span>
+              <button
+                class="copy-btn"
+                onclick="
+                  copy(this, 'bun install\nbun run db:migrate\nbun run dev')
+                "
+              >
+                copy
+              </button>
+            </div>
+            <pre>
 <span class="cmd">bun install</span>
 <span class="cmd">bun run db:migrate</span>
 <span class="cmd">bun run dev</span>
 <span class="comment"># → http://localhost:3000</span></pre>
-        </div>
-
-        <div class="qs-block">
-          <div class="qs-block-head">
-            <span>.env variables</span>
-            <button class="copy-btn" onclick="copy(this, 'OPENAI_API_KEY=sk-...\nGITHUB_TOKEN=ghp_...\nGITHUB_USERNAME=you\nGOOGLE_CALENDAR_ID=primary\nGOOGLE_CREDENTIALS={...}\nTELEGRAM_BOT_TOKEN=...\nTELEGRAM_CHAT_ID=...\nDATABASE_URL=postgres://...')">copy</button>
           </div>
-          <pre>
+
+          <div class="qs-block">
+            <div class="qs-block-head">
+              <span>.env variables</span>
+              <button
+                class="copy-btn"
+                onclick="
+                  copy(
+                    this,
+                    'OPENAI_API_KEY=sk-...\nGITHUB_TOKEN=ghp_...\nGITHUB_USERNAME=you\nGOOGLE_CALENDAR_ID=primary\nGOOGLE_CREDENTIALS={...}\nTELEGRAM_BOT_TOKEN=...\nTELEGRAM_CHAT_ID=...\nDATABASE_URL=postgres://...',
+                  )
+                "
+              >
+                copy
+              </button>
+            </div>
+            <pre>
 <span class="key">OPENAI_API_KEY</span>=<span class="val">sk-...</span>
 <span class="key">GITHUB_TOKEN</span>=<span class="val">ghp_...</span>
 <span class="key">GITHUB_USERNAME</span>=<span class="val">you</span>
@@ -872,49 +1106,62 @@
 <span class="key">TELEGRAM_BOT_TOKEN</span>=<span class="val">...</span>
 <span class="key">TELEGRAM_CHAT_ID</span>=<span class="val">...</span>
 <span class="key">DATABASE_URL</span>=<span class="val">postgres://...</span></pre>
+          </div>
+        </div>
+
+        <div class="env-note reveal">
+          <strong>Note:</strong>
+          <code>GOOGLE_CREDENTIALS</code> accepts the service account JSON
+          directly as a string. No file path, no base64 — just paste the raw
+          JSON value.
         </div>
       </div>
+    </section>
 
-      <div class="env-note reveal">
-        <strong>Note:</strong> <code>GOOGLE_CREDENTIALS</code> accepts the service account JSON directly as a string. No file path, no base64 — just paste the raw JSON value.
+    <!-- Footer -->
+    <div class="divider"></div>
+    <footer>
+      <div class="footer-logo">
+        <strong>second_brain</strong> · built with Bun + LangChain
       </div>
-    </div>
-  </section>
+      <ul class="footer-links">
+        <li><a href="#features">Features</a></li>
+        <li><a href="#how">How it works</a></li>
+        <li><a href="#quickstart">Quick Start</a></li>
+        <li><a href="https://github.com">GitHub</a></li>
+      </ul>
+    </footer>
 
-  <!-- Footer -->
-  <div class="divider"></div>
-  <footer>
-    <div class="footer-logo"><strong>second_brain</strong> · built with Bun + LangChain</div>
-    <ul class="footer-links">
-      <li><a href="#features">Features</a></li>
-      <li><a href="#how">How it works</a></li>
-      <li><a href="#quickstart">Quick Start</a></li>
-      <li><a href="https://github.com">GitHub</a></li>
-    </ul>
-  </footer>
+    <script>
+      // Intersection observer for reveal animations
+      const observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((e) => {
+            if (e.isIntersecting) {
+              e.target.classList.add('visible');
+              observer.unobserve(e.target);
+            }
+          });
+        },
+        { threshold: 0.1 },
+      );
 
-  <script>
-    // Intersection observer for reveal animations
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach(e => {
-        if (e.isIntersecting) {
-          e.target.classList.add('visible');
-          observer.unobserve(e.target);
-        }
-      });
-    }, { threshold: 0.1 });
+      document
+        .querySelectorAll('.reveal')
+        .forEach((el) => observer.observe(el));
 
-    document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
-
-    // Copy to clipboard
-    function copy(btn, text) {
-      navigator.clipboard.writeText(text).then(() => {
-        const orig = btn.textContent;
-        btn.textContent = 'copied!';
-        btn.style.color = 'var(--teal)';
-        setTimeout(() => { btn.textContent = orig; btn.style.color = ''; }, 1500);
-      });
-    }
-  </script>
-</body>
+      // Copy to clipboard
+      function copy(btn, text) {
+        navigator.clipboard.writeText(text).then(() => {
+          const orig = btn.textContent;
+          btn.textContent = 'copied!';
+          btn.style.color = 'var(--teal)';
+          setTimeout(() => {
+            btn.textContent = orig;
+            btn.style.color = '';
+          }, 1500);
+        });
+      }
+    </script>
+  </body>
 </html>

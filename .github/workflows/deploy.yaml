@@ -1,4 +1,4 @@
-name: "deploy"
+name: 'deploy'
 
 on:
   push:
@@ -47,4 +47,3 @@ jobs:
   #             exit 1
   #           fi
   #           echo "Deployment successful"
-

@@ -1,4 +1,4 @@
-import server from "../dist/server/server.js";
+import server from '../dist/server/server.js';
 
 export const config = {
   maxDuration: 30,

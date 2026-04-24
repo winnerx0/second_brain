@@ -1,6 +1,5 @@
-
-import { createRouter } from "@tanstack/react-router";
-import { routeTree } from "./routeTree.gen";
+import { createRouter } from '@tanstack/react-router';
+import { routeTree } from './routeTree.gen';
 
 export function getRouter() {
   return createRouter({
@@ -9,7 +8,7 @@ export function getRouter() {
   });
 }
 
-declare module "@tanstack/react-router" {
+declare module '@tanstack/react-router' {
   interface Register {
     router: ReturnType<typeof getRouter>;
   }
