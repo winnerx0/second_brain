@@ -1,5 +1,8 @@
 import { createRoute, Link } from '@tanstack/react-router';
 import React, { useEffect, useState } from 'react';
+import { FaCalendarDays, FaGithub, FaSpotify, FaXTwitter } from 'react-icons/fa6';
+import { FiCheck, FiFileText, FiFilm, FiMail, FiPlus, FiShare2, FiX } from 'react-icons/fi';
+import { SiClickup, SiNotion, SiTodoist } from 'react-icons/si';
 import { Route as RootRoute } from './__root';
 
 /* ─── Route ──────────────────────────────────────────────────────────────── */
@@ -31,7 +34,7 @@ const CONNECTIONS_URL = `${API_BASE.replace(/\/$/, '')}/connections`;
 type ConnMeta = {
   description: string;
   category: 'productivity' | 'communication' | 'entertainment' | 'development';
-  icon: () => React.ReactElement;
+  icon: React.ComponentType<{ size?: number; className?: string }>;
   iconStyle: React.CSSProperties;
 };
 
@@ -44,11 +47,7 @@ const META: Record<string, ConnMeta> = {
       color: '#24292f',
       borderColor: '#d0d7de',
     },
-    icon: () => (
-      <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
-        <path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0 1 12 6.844a9.59 9.59 0 0 1 2.504.337c1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.02 10.02 0 0 0 22 12.017C22 6.484 17.522 2 12 2z" />
-      </svg>
-    ),
+    icon: FaGithub,
   },
   gmail: {
     description: 'Read, search, send, and manage emails',
@@ -58,20 +57,7 @@ const META: Record<string, ConnMeta> = {
       color: '#dc2626',
       borderColor: '#fca5a5',
     },
-    icon: () => (
-      <svg
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        width="18"
-        height="18"
-      >
-        <rect width="20" height="16" x="2" y="4" rx="2" />
-        <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
-      </svg>
-    ),
+    icon: FiMail,
   },
   google_calendar: {
     description: 'Events, scheduling, and meeting management',
@@ -81,22 +67,7 @@ const META: Record<string, ConnMeta> = {
       color: '#2563eb',
       borderColor: '#93c5fd',
     },
-    icon: () => (
-      <svg
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        width="18"
-        height="18"
-      >
-        <rect width="18" height="18" x="3" y="4" rx="2" ry="2" />
-        <line x1="16" x2="16" y1="2" y2="6" />
-        <line x1="8" x2="8" y1="2" y2="6" />
-        <line x1="3" x2="21" y1="10" y2="10" />
-      </svg>
-    ),
+    icon: FaCalendarDays,
   },
   notion: {
     description: 'Pages, databases, notes, and workspace',
@@ -106,20 +77,7 @@ const META: Record<string, ConnMeta> = {
       color: '#374151',
       borderColor: '#d1d5db',
     },
-    icon: () => (
-      <svg
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        width="18"
-        height="18"
-      >
-        <rect width="18" height="18" x="3" y="3" rx="2" />
-        <path d="M9 9h6M9 12h6M9 15h4" />
-      </svg>
-    ),
+    icon: SiNotion,
   },
   anilist: {
     description: 'Anime & manga tracking and recommendations',
@@ -129,19 +87,7 @@ const META: Record<string, ConnMeta> = {
       color: '#4338ca',
       borderColor: '#a5b4fc',
     },
-    icon: () => (
-      <svg
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        width="18"
-        height="18"
-      >
-        <polygon points="5 3 19 12 5 21 5 3" />
-      </svg>
-    ),
+    icon: FiFilm,
   },
   google_docs: {
     description: 'Create, read, and edit Google Documents',
@@ -151,22 +97,7 @@ const META: Record<string, ConnMeta> = {
       color: '#16a34a',
       borderColor: '#86efac',
     },
-    icon: () => (
-      <svg
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        width="18"
-        height="18"
-      >
-        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14 2z" />
-        <polyline points="14 2 14 8 20 8" />
-        <line x1="9" x2="15" y1="13" y2="13" />
-        <line x1="9" x2="15" y1="17" y2="17" />
-      </svg>
-    ),
+    icon: FiFileText,
   },
   knowledge_graph: {
     description: 'Entity relationships and knowledge graph context',
@@ -176,23 +107,7 @@ const META: Record<string, ConnMeta> = {
       color: '#a86828',
       borderColor: 'rgba(168,104,40,0.3)',
     },
-    icon: () => (
-      <svg
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        width="18"
-        height="18"
-      >
-        <circle cx="18" cy="5" r="3" />
-        <circle cx="6" cy="12" r="3" />
-        <circle cx="18" cy="19" r="3" />
-        <line x1="8.59" x2="15.42" y1="13.51" y2="17.49" />
-        <line x1="15.41" x2="8.59" y1="6.51" y2="10.49" />
-      </svg>
-    ),
+    icon: FiShare2,
   },
   spotify: {
     description: 'Music playback, playlists, and listening history',
@@ -202,11 +117,7 @@ const META: Record<string, ConnMeta> = {
       color: '#16a34a',
       borderColor: '#86efac',
     },
-    icon: () => (
-      <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
-        <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm4.586 14.424a.623.623 0 0 1-.857.207c-2.348-1.435-5.304-1.76-8.785-.964a.623.623 0 0 1-.277-1.215c3.809-.87 7.076-.496 9.712 1.115a.623.623 0 0 1 .207.857zm1.223-2.722a.78.78 0 0 1-1.072.257c-2.687-1.652-6.785-2.131-9.965-1.166a.78.78 0 0 1-.973-.519.781.781 0 0 1 .52-.973c3.632-1.102 8.147-.568 11.233 1.329a.78.78 0 0 1 .257 1.072zm.105-2.835C14.692 8.95 9.375 8.775 6.297 9.71a.937.937 0 1 1-.543-1.793c3.563-1.081 9.483-.872 13.22 1.37a.937.937 0 0 1-.061 1.58z" />
-      </svg>
-    ),
+    icon: FaSpotify,
   },
   clickup: {
     description: 'Tasks, projects, and team collaboration',
@@ -216,12 +127,7 @@ const META: Record<string, ConnMeta> = {
       color: '#7c3aed',
       borderColor: '#c4b5fd',
     },
-    icon: () => (
-      <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
-        <path d="M3.486 17.425 5.97 15.44a7.37 7.37 0 0 0 5.84 2.784A7.37 7.37 0 0 0 17.65 15.4l2.496 1.968A10.432 10.432 0 0 1 11.81 21.6a10.431 10.431 0 0 1-8.323-4.175z" />
-        <path d="m3 9.426 2.948 2.215 5.864-7.196 5.807 7.19L20.6 9.427l-8.789-8.024z" />
-      </svg>
-    ),
+    icon: SiClickup,
   },
   todoist: {
     description: 'Personal tasks and to-do lists',
@@ -231,21 +137,7 @@ const META: Record<string, ConnMeta> = {
       color: '#dc2626',
       borderColor: '#fca5a5',
     },
-    icon: () => (
-      <svg
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        width="18"
-        height="18"
-      >
-        <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z" />
-        <path d="m9 12 2 2 4-4" />
-      </svg>
-    ),
+    icon: SiTodoist,
   },
   twitter: {
     description: 'Posts, mentions, and social media activity',
@@ -255,11 +147,7 @@ const META: Record<string, ConnMeta> = {
       color: '#0284c7',
       borderColor: '#7dd3fc',
     },
-    icon: () => (
-      <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
-        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-      </svg>
-    ),
+    icon: FaXTwitter,
   },
 };
 
@@ -344,19 +232,7 @@ function ConnectionCard({
             }
           }
         >
-          {meta?.icon() ?? (
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              width="18"
-              height="18"
-            >
-              <circle cx="12" cy="12" r="9" />
-              <path d="M12 8v4M12 16h.01" />
-            </svg>
-          )}
+          {meta?.icon ? <meta.icon size={18} /> : <FiShare2 size={18} />}
         </div>
 
         {conn.oauthConnected ? (
@@ -459,17 +335,7 @@ function AddConnectionModal({
             onClick={onClose}
             className="conn-modal-close"
           >
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              width="13"
-              height="13"
-            >
-              <path d="M18 6 6 18M6 6l12 12" />
-            </svg>
+            <FiX size={13} />
           </button>
         </div>
 
@@ -494,7 +360,7 @@ function AddConnectionModal({
                   }}
                 >
                   <span className="conn-modal-item-icon" style={meta.iconStyle}>
-                    {meta.icon()}
+                    <meta.icon size={18} />
                   </span>
                   <div className="conn-modal-item-info">
                     <span className="conn-modal-item-name">
@@ -719,17 +585,7 @@ function ConnectionsPage() {
               onClick={() => setShowModal(true)}
               className="conn-add-btn"
             >
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                width="13"
-                height="13"
-              >
-                <path d="M12 5v14M5 12h14" />
-              </svg>
+              <FiPlus size={13} />
               Add Connection
             </button>
           </div>
@@ -739,34 +595,14 @@ function ConnectionsPage() {
           {/* Notice */}
           {notice && (
             <div className="conn-notice">
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                width="13"
-                height="13"
-              >
-                <path d="M20 6 9 17l-5-5" />
-              </svg>
+              <FiCheck size={13} />
               {notice}
               <button
                 type="button"
                 onClick={() => setNotice(null)}
                 className="conn-notice-close"
               >
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  width="12"
-                  height="12"
-                >
-                  <path d="M18 6 6 18M6 6l12 12" />
-                </svg>
+                <FiX size={12} />
               </button>
             </div>
           )}

@@ -4,6 +4,8 @@ import { tanstackStart } from '@tanstack/react-start/plugin/vite';
 import { VitePWA } from 'vite-plugin-pwa';
 import tailwindcss from '@tailwindcss/vite';
 
+const isVinxi = Boolean(process.env.VINXI);
+
 export default defineConfig({
   server: {
     port: 3001,
@@ -12,7 +14,7 @@ export default defineConfig({
     tailwindcss(),
     tanstackStart(),
     react(),
-    VitePWA({
+    !isVinxi && VitePWA({
       registerType: 'autoUpdate',
       injectRegister: 'script',
       includeAssets: ['icon.svg'],
