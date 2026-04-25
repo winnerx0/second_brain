@@ -134,47 +134,132 @@ function extractTextContent(content: unknown): string {
   return '';
 }
 
+function stringifyToolInput(input: unknown): string {
+  if (typeof input === 'string') return input;
+  try {
+    return JSON.stringify(input ?? {});
+  } catch {
+    return String(input);
+  }
+}
+
+function extractToolInput(toolCall: unknown): string {
+  if (!toolCall || typeof toolCall !== 'object') return '{}';
+  const call = toolCall as {
+    args?: unknown;
+    input?: unknown;
+    arguments?: unknown;
+  };
+
+  if (call.args !== undefined) return stringifyToolInput(call.args);
+  if (call.input !== undefined) return stringifyToolInput(call.input);
+  if (call.arguments !== undefined) return stringifyToolInput(call.arguments);
+  return '{}';
+}
+
 function mapHistoryToThread(messages: HistoryMessage[]): ThreadItem[] {
-  return messages.flatMap((message): ThreadItem[] => {
+  const thread: ThreadItem[] = [];
+  const pendingToolCalls = new Map<string, { name: string; input: string }>();
+
+  for (const message of messages) {
     let parsed: unknown;
     try {
       parsed = JSON.parse(message.content);
     } catch {
-      return [];
+      continue;
     }
 
-    if (!parsed || typeof parsed !== 'object') return [];
+    if (!parsed || typeof parsed !== 'object') continue;
 
-    if (message.role === 'human') {
+    if (message.role === 'human' || message.role === 'user') {
       const content = extractTextContent(
         (parsed as { content?: unknown }).content,
       ).trim();
-      if (!content) return [];
-      return [
-        {
-          id: `h-${message.id}`,
-          kind: 'user',
-          content,
-        },
-      ];
+      if (!content) continue;
+      thread.push({
+        id: `h-${message.id}`,
+        kind: 'user',
+        content,
+      });
+      continue;
     }
 
     if (message.role === 'ai' || message.role === 'assistant') {
+      const toolCalls = Array.isArray(
+        (parsed as { tool_calls?: unknown }).tool_calls,
+      )
+        ? ((parsed as { tool_calls: unknown[] }).tool_calls ?? [])
+        : [];
+
+      for (let index = 0; index < toolCalls.length; index += 1) {
+        const call = toolCalls[index];
+        if (!call || typeof call !== 'object') continue;
+        const callObj = call as { id?: unknown; name?: unknown; type?: unknown };
+        const callId =
+          typeof callObj.id === 'string' && callObj.id.length > 0
+            ? callObj.id
+            : `legacy-${message.id}-${index}`;
+        const toolName =
+          typeof callObj.name === 'string' && callObj.name.length > 0
+            ? callObj.name
+            : typeof callObj.type === 'string' && callObj.type.length > 0
+              ? callObj.type
+              : 'tool';
+
+        pendingToolCalls.set(callId, {
+          name: toolName,
+          input: extractToolInput(call),
+        });
+      }
+
       const content = extractTextContent(
         (parsed as { content?: unknown }).content,
       ).trim();
-      if (!content) return [];
-      return [
-        {
+      if (content) {
+        thread.push({
           id: `a-${message.id}`,
           kind: 'assistant',
           content,
-        },
-      ];
+        });
+      }
+      continue;
     }
 
-    return [];
-  });
+    if (message.role === 'tool') {
+      const toolParsed = parsed as {
+        tool_call_id?: unknown;
+        name?: unknown;
+        content?: unknown;
+      };
+      const toolCallId =
+        typeof toolParsed.tool_call_id === 'string'
+          ? toolParsed.tool_call_id
+          : '';
+      const pending = toolCallId ? pendingToolCalls.get(toolCallId) : undefined;
+
+      const name =
+        pending?.name ??
+        (typeof toolParsed.name === 'string' && toolParsed.name.length > 0
+          ? toolParsed.name
+          : 'tool');
+      const input = pending?.input ?? '{}';
+      const output = extractTextContent(toolParsed.content).trim();
+
+      if (toolCallId) pendingToolCalls.delete(toolCallId);
+
+      thread.push({
+        id: `t-${message.id}`,
+        kind: 'tool',
+        name,
+        input,
+        output,
+        status: 'done',
+      });
+    }
+
+  }
+
+  return thread;
 }
 
 /* ─── Route ──────────────────────────────────────────────────────────────── */
@@ -668,7 +753,6 @@ function Chat() {
 
   const toolStackRef = useRef<string[]>([]);
   const endRef = useRef<HTMLDivElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const loadSessions = async () => {
     const response = await fetch(SESSIONS_URL);
@@ -771,13 +855,6 @@ function Chat() {
     };
   }, [currentSessionId]);
 
-  /* Auto-resize textarea */
-  useEffect(() => {
-    if (!textareaRef.current) return;
-    textareaRef.current.style.height = 'auto';
-    textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
-  }, [input]);
-
   /* Scroll to bottom */
   useEffect(() => {
     endRef.current?.scrollIntoView({
@@ -792,23 +869,20 @@ function Chat() {
 
   const appendAssistantDelta = (delta: string) => {
     setThread((t) => {
-      // Find the last assistant message (it may not be the last item if tools ran)
-      const lastAssistantIndex = t.findLastIndex(
-        (item): item is Extract<ThreadItem, { kind: 'assistant' }> =>
-          item.kind === 'assistant',
-      );
+      const lastItem = t[t.length - 1];
 
-      if (lastAssistantIndex >= 0) {
+      // Only append to an existing assistant item if it is the very last item.
+      // If tools were added after it, we must create a new assistant item so
+      // the response appears below the tool rows rather than above them.
+      if (lastItem?.kind === 'assistant') {
         const next = [...t];
-        const assistant = t[lastAssistantIndex]!;
-        next[lastAssistantIndex] = {
-          ...assistant,
-          content: assistant.content + delta,
+        next[t.length - 1] = {
+          ...lastItem,
+          content: lastItem.content + delta,
         };
         return next;
       }
 
-      // No assistant exists yet, create one
       return [
         ...t,
         {
@@ -841,6 +915,31 @@ function Chat() {
     updateItem(id, (item) => {
       if (item.kind !== 'tool') return item;
       return { ...item, status: s, output };
+    });
+  };
+
+  const syncAssistantWithFinal = (text: string) => {
+    if (!text.trim()) return;
+    setThread((t) => {
+      const lastItem = t[t.length - 1];
+
+      // Only update the assistant item when it is the last item (i.e. placed
+      // after all tools). If the tail is a tool row, append a fresh item so
+      // the final text appears at the bottom of the thread.
+      if (lastItem?.kind === 'assistant') {
+        const next = [...t];
+        next[t.length - 1] = { ...lastItem, content: text };
+        return next;
+      }
+
+      return [
+        ...t,
+        {
+          id: crypto.randomUUID(),
+          kind: 'assistant',
+          content: text,
+        },
+      ];
     });
   };
 
@@ -959,6 +1058,7 @@ function Chat() {
 
           case 'final':
             setStatus('Done');
+            syncAssistantWithFinal(event.text);
             break;
         }
       });
@@ -1218,17 +1318,13 @@ function Chat() {
         </main>
 
         {/* Input bar */}
-        <div className="input-area flex w-full items-center justify-center">
-          <form
-            onSubmit={handleSubmit}
-            className="input-container w-full max-w-200"
-          >
-            <div className="input-wrapper max-w-200">
+        <div className="input-area">
+          <form onSubmit={handleSubmit} className="input-container">
+            <div className="input-wrapper">
               <label className="sr-only" htmlFor="prompt">
                 Message
               </label>
               <Textarea
-                ref={textareaRef}
                 id="prompt"
                 className="input-textarea"
                 rows={1}
