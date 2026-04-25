@@ -33,48 +33,27 @@ type Action = 'keep' | 'delete' | 'merge' | 'upgrade' | 'downgrade';
 
 type MemoryRow = typeof memories.$inferSelect;
 
-const minImportanceByClassification: Record<Classification, number> = {
-  identity: 0.9,
-  relationships: 0.7,
-  behavior: 0.7,
-  corrections: 0.8,
-  preferences: 0.4,
-  knowledge: 0.4,
-  unclassified: 0.2,
+// Importance is a fixed constant per classification — never variable, never
+// suggested by the LLM, never mutated by lifecycle actions. Classification
+// alone determines importance; importance alone determines the initial tier.
+const importanceByClassification: Record<Classification, number> = {
+  identity: 0.9,       // → lifelong
+  relationships: 0.9,  // → lifelong
+  behavior: 0.9,       // → lifelong
+  corrections: 0.75,   // → long_term
+  preferences: 0.65,   // → long_term
+  knowledge: 0.65,     // → long_term
+  unclassified: 0.3,   // → short_term
 };
 
-const defaultImportanceByClassification: Record<Classification, number> = {
-  identity: 0.9,
-  relationships: 0.8,
-  behavior: 0.8,
-  corrections: 0.8,
-  preferences: 0.5,
-  knowledge: 0.5,
-  unclassified: 0.2,
-};
+const lifelongClassifications = new Set<Classification>([
+  'identity',
+  'relationships',
+  'behavior',
+]);
 
-const tierByClassification: Record<Classification, Tier> = {
-  identity: 'lifelong',
-  relationships: 'lifelong',
-  behavior: 'lifelong',
-  preferences: 'long_term',
-  corrections: 'long_term',
-  knowledge: 'long_term',
-  unclassified: 'short_term',
-};
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
-}
-
-function normalizeImportance(
-  classification: Classification,
-  rawImportance?: number,
-): number {
-  const floor = minImportanceByClassification[classification];
-  const candidate =
-    rawImportance ?? defaultImportanceByClassification[classification];
-  return clamp(Math.max(floor, candidate), 0.2, 0.9);
+function importanceForClassification(classification: Classification): number {
+  return importanceByClassification[classification];
 }
 
 function computeExpiresAt(tier: Tier, from: Date): Date | null {
@@ -84,6 +63,20 @@ function computeExpiresAt(tier: Tier, from: Date): Date | null {
   const expires = new Date(from);
   expires.setUTCDate(expires.getUTCDate() + days);
   return expires;
+}
+
+function determineTier(classification: Classification): Tier {
+  const importance = importanceForClassification(classification);
+
+  if (lifelongClassifications.has(classification) && importance >= 0.85) {
+    return 'lifelong';
+  }
+
+  if (importance >= 0.55) {
+    return 'long_term';
+  }
+
+  return 'short_term';
 }
 
 function inferClassificationFromText(content: string): Classification {
@@ -142,7 +135,6 @@ function inferClassificationFromText(content: string): Classification {
 
 const classificationDebateSchema = z.object({
   classification: z.enum(classifications),
-  suggested_importance: z.number().min(0.2).max(0.9),
   reasoning: z.string(),
 });
 
@@ -150,9 +142,10 @@ const memoryFactSplitSchema = z.object({
   facts: z.array(z.string()).min(1).max(10),
 });
 
+// Importance is not part of the debate output — it is always derived from
+// classification and never changes after the memory is created.
 const debateOutputSchema = z.object({
   action: z.enum(['keep', 'delete', 'merge', 'upgrade', 'downgrade']),
-  suggested_importance: z.number().min(0.2).max(0.9),
   reasoning: z.string(),
 });
 
@@ -170,13 +163,9 @@ function toLogPayload(value: unknown, maxLength = 1600): string {
   }
 }
 
-function fallbackDebateOutput(memory: MemoryRow, reason: string): DebateOutput {
+function fallbackDebateOutput(_memory: MemoryRow, reason: string): DebateOutput {
   return {
     action: 'keep',
-    suggested_importance: normalizeImportance(
-      memory.classification as Classification,
-      memory.importance,
-    ),
     reasoning: `Fallback decision used because debate output was invalid: ${reason}`,
   };
 }
@@ -241,7 +230,6 @@ function semanticConflictLikely(correction: string, existing: string): boolean {
 
 async function classifyWhenAmbiguous(content: string): Promise<{
   classification: Classification;
-  importance: number;
   reasoning: string;
 }> {
   const structured = debateModel.withStructuredOutput(
@@ -250,42 +238,37 @@ async function classifyWhenAmbiguous(content: string): Promise<{
   const result = await structured.invoke([
     [
       'system',
-      'You classify a memory for an agent memory system. Choose the best classification and a practical importance score based on criticality to agent correctness.',
+      [
+        'You classify a memory for an agent memory system.',
+        'Choose the best classification based on the content.',
+        'Classification options: identity | relationships | behavior | preferences | corrections | knowledge | unclassified',
+        '- identity: facts about who the user is (name, age, location, job)',
+        '- relationships: the user\'s relationships with people',
+        '- behavior: instructions on how to behave or respond',
+        '- preferences: what the user likes, dislikes, or prefers',
+        '- corrections: explicit corrections of previously stated information',
+        '- knowledge: things the user knows or has learned',
+        '- unclassified: anything that does not clearly fit the above',
+      ].join('\n'),
     ],
     [
       'human',
-      [
-        'Return only the structured response.',
-        '',
-        'Classification options:',
-        'identity | relationships | behavior | preferences | corrections | knowledge | unclassified',
-        '',
-        `Memory: ${content}`,
-      ].join('\n'),
+      `Memory: ${content}\n\nReturn only the structured response.`,
     ],
   ]);
 
-  const classification = result.classification;
-  const importance = normalizeImportance(
-    classification,
-    result.suggested_importance,
-  );
+  const { classification, reasoning } = result;
 
   logger.info(
     `[memory.model] classification.decision=${toLogPayload({
       content,
       classification,
-      suggested_importance: result.suggested_importance,
-      normalized_importance: importance,
-      reasoning: result.reasoning,
+      importance: importanceForClassification(classification),
+      reasoning,
     })}`,
   );
 
-  return {
-    classification,
-    importance,
-    reasoning: result.reasoning,
-  };
+  return { classification, reasoning };
 }
 
 function extractTextFromModelOutput(output: unknown): string {
@@ -366,45 +349,19 @@ function parseDebateOutputFromModelText(text: string): DebateOutput | null {
   const parseCandidate = (candidate: unknown): DebateOutput | null => {
     if (!candidate || typeof candidate !== 'object') return null;
 
-    const record = candidate as {
-      action?: unknown;
-      suggested_importance?: unknown;
-      importance?: unknown;
-      reasoning?: unknown;
-    };
+    const record = candidate as { action?: unknown; reasoning?: unknown };
 
     const action =
       typeof record.action === 'string'
         ? (record.action.trim().toLowerCase() as Action)
         : undefined;
 
-    const rawImportance =
-      typeof record.suggested_importance === 'number'
-        ? record.suggested_importance
-        : typeof record.suggested_importance === 'string'
-          ? Number(record.suggested_importance)
-          : typeof record.importance === 'number'
-            ? record.importance
-            : typeof record.importance === 'string'
-              ? Number(record.importance)
-              : NaN;
-
     const reasoning =
       typeof record.reasoning === 'string' && record.reasoning.trim().length > 0
         ? record.reasoning.trim()
         : 'Recovered from raw model output';
 
-    const normalized = {
-      action,
-      suggested_importance: clamp(
-        Number.isFinite(rawImportance) ? rawImportance : 0.5,
-        0.2,
-        0.9,
-      ),
-      reasoning,
-    };
-
-    const parsed = debateOutputSchema.safeParse(normalized);
+    const parsed = debateOutputSchema.safeParse({ action, reasoning });
     return parsed.success ? parsed.data : null;
   };
 
@@ -436,18 +393,10 @@ function parseDebateOutputFromModelText(text: string): DebateOutput | null {
   );
   if (!actionMatch) return null;
 
-  const importanceMatch = trimmed.match(
-    /(?:suggested_importance|importance)\s*[:=]\s*([0-9]*\.?[0-9]+)/i,
-  );
   const reasoningMatch = trimmed.match(/reasoning\s*[:=]\s*([\s\S]+)/i);
 
   const heuristic = debateOutputSchema.safeParse({
     action: actionMatch[1]?.toLowerCase(),
-    suggested_importance: clamp(
-      importanceMatch?.[1] ? Number(importanceMatch[1]) : 0.5,
-      0.2,
-      0.9,
-    ),
     reasoning: reasoningMatch?.[1]?.trim() || 'Recovered from heuristic parse',
   });
 
@@ -567,8 +516,14 @@ async function runDebateAgent(
       'system',
       [
         `You are the ${role} in a memory lifecycle debate.`,
-        'Make a decision from: keep | delete | merge | upgrade | downgrade.',
-        'Use practical lifecycle judgment from recency, importance, access_count, and redundancy.',
+        'Decide whether to: keep | delete | merge | upgrade | downgrade the memory.',
+        '- keep: memory is still relevant and should remain at its current tier',
+        '- upgrade: memory has proven valuable and should move to a higher tier',
+        '- downgrade: memory is stale or less relevant; move it to a lower tier',
+        '- merge: memory duplicates a related memory; consolidate them',
+        '- delete: memory is no longer useful',
+        'Base your judgment on recency, access_count, and redundancy.',
+        'Do NOT suggest or alter importance — it is fixed by classification.',
         'Return only the structured output.',
       ].join('\n'),
     ],
@@ -771,7 +726,6 @@ async function decideWithDebate(memory: MemoryRow): Promise<{
 async function applyLifecycleDecision(
   memory: MemoryRow,
   action: Action,
-  suggestedImportance: number,
   transcript: unknown[],
 ) {
   const now = new Date();
@@ -780,7 +734,6 @@ async function applyLifecycleDecision(
     type: 'lifecycle_debate',
     at: now.toISOString(),
     action,
-    suggested_importance: suggestedImportance,
     transcript,
   };
 
@@ -801,20 +754,16 @@ async function applyLifecycleDecision(
   }
 
   if (action === 'upgrade') {
-    const nextImportance = normalizeImportance(
-      memory.classification as Classification,
-      Math.max(memory.importance, suggestedImportance),
-    );
-
-    const nextTier: Tier =
-      memory.tier === 'short_term' ? 'long_term' : (memory.tier as Tier);
+    // Importance stays constant — only advance the tier.
+    const tierOrder: Tier[] = ['short_term', 'long_term', 'lifelong'];
+    const currentIdx = tierOrder.indexOf(memory.tier as Tier);
+    const nextTier: Tier = tierOrder[Math.min(currentIdx + 1, tierOrder.length - 1)] ?? memory.tier as Tier;
 
     await db
       .update(memories)
       .set({
-        importance: nextImportance,
         tier: nextTier,
-        promotedAt: memory.tier === 'short_term' ? now : memory.promotedAt,
+        promotedAt: currentIdx === 0 ? now : memory.promotedAt,
         expiresAt: computeExpiresAt(nextTier, now),
         debateHistory: [...existingHistory, historyEntry],
         updatedAt: now,
@@ -825,17 +774,23 @@ async function applyLifecycleDecision(
   }
 
   if (action === 'downgrade') {
-    const nextImportance = clamp(suggestedImportance, 0.2, 0.9);
+    // Importance stays constant — only retreat the tier (or delete if at bottom).
+    const tierOrder: Tier[] = ['short_term', 'long_term', 'lifelong'];
+    const currentIdx = tierOrder.indexOf(memory.tier as Tier);
 
-    if (nextImportance < 0.3) {
+    if (currentIdx <= 0) {
+      // Already at short_term — remove it.
       await db.delete(memories).where(eq(memories.id, memory.id));
       return 'deleted_after_downgrade';
     }
 
+    const nextTier: Tier = tierOrder[currentIdx - 1] ?? 'short_term';
+
     await db
       .update(memories)
       .set({
-        importance: nextImportance,
+        tier: nextTier,
+        expiresAt: computeExpiresAt(nextTier, now),
         debateHistory: [...existingHistory, historyEntry],
         updatedAt: now,
       })
@@ -959,7 +914,6 @@ export async function runMemoryLifecycleReview() {
       const action = await applyLifecycleDecision(
         memory,
         verdict.action,
-        verdict.suggested_importance,
         transcript,
       );
 
@@ -995,7 +949,7 @@ export async function runMemoryLifecycleReview() {
 }
 
 export const storeMemory = tool(
-  async ({ value, query, classification, importance }) => {
+  async ({ value, query, classification }) => {
     try {
       logger.info(`[memory] storing value=${value}`);
 
@@ -1016,30 +970,21 @@ export const storeMemory = tool(
         const history: unknown[] = [];
 
         let finalClassification: Classification;
-        let finalImportance: number;
 
         if (classification) {
           finalClassification = classification;
-          finalImportance = normalizeImportance(classification, importance);
         } else {
           try {
             const debated = await classifyWhenAmbiguous(fact);
             finalClassification = debated.classification;
-            finalImportance = normalizeImportance(
-              finalClassification,
-              debated.importance,
-            );
             history.push({
               type: 'classification_debate',
               at: new Date().toISOString(),
               reasoning: debated.reasoning,
               classification: finalClassification,
-              suggested_importance: finalImportance,
             });
           } catch (error) {
-            const inferred = inferClassificationFromText(fact);
-            finalClassification = inferred;
-            finalImportance = normalizeImportance(inferred, importance);
+            finalClassification = inferClassificationFromText(fact);
             history.push({
               type: 'classification_fallback',
               at: new Date().toISOString(),
@@ -1049,11 +994,9 @@ export const storeMemory = tool(
           }
         }
 
-        if (finalClassification === 'identity') {
-          finalImportance = 0.9;
-        }
-
-        const tier = tierByClassification[finalClassification];
+        // Importance is always the fixed constant for this classification.
+        const finalImportance = importanceForClassification(finalClassification);
+        const tier = determineTier(finalClassification);
         const now = new Date();
         const expiresAt = computeExpiresAt(tier, now);
         const embedding = await embed(query || fact);
@@ -1115,18 +1058,17 @@ export const storeMemory = tool(
   {
     name: 'store_memory',
     description:
-      'Store a memory with classification-aware tiering, scoring, and correction override support.',
+      'Store a memory. Classification is inferred automatically; importance and tier are derived from classification and are fixed.',
     schema: z.object({
-      value: z.string().describe('Memory content'),
+      value: z.string().describe('Memory content to store'),
       query: z
         .string()
         .optional()
-        .describe('Optional retrieval text used for embedding'),
+        .describe('Optional retrieval text used for embedding (defaults to value)'),
       classification: z
         .enum(classifications)
         .optional()
-        .describe('Optional override classification'),
-      importance: z.number().min(0.2).max(0.9).optional(),
+        .describe('Optional classification override — if omitted it is inferred from the content'),
     }),
   },
 );
