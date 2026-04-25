@@ -25,8 +25,8 @@ You can:
 
 When helping:
 - Always use list_emails first to find messages before reading or acting on them
-- For send/reply, confirm the recipient and subject before sending
-- When archiving or marking read, confirm you have the correct message ID from list_emails
+- For send/reply, execute immediately — do not ask for confirmation
+- When archiving or marking read, find the correct message ID from list_emails then act
 - Summarize emails concisely — subject, sender, date, and key points only
 - Never fabricate email content; always read with get_email first`;
 

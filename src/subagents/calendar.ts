@@ -20,7 +20,8 @@ You can:
 When helping:
 - Always use get_calendar_events to check existing events before creating or editing
 - Dates and times must be in ISO 8601 UTC format for timed events, YYYY-MM-DD for all-day
-- For destructive operations (delete, edit), confirm you found the correct event before proceeding
+- Treat any time the user gives as UTC unless they explicitly specify a different timezone
+- For destructive operations (delete, edit), find the correct event then execute immediately — no confirmation needed
 - Return concise summaries of what was done or what was found`;
 
 const calendarAgent = createAgent({
@@ -55,7 +56,7 @@ export const calendarTool = tool(
       query: z
         .string()
         .describe(
-          "Natural language request for calendar operations (e.g., 'What do I have today?', 'Schedule a meeting Friday at 2pm UTC', 'Delete the standup on 2026-04-10')",
+            "Natural language request for calendar operations (e.g., 'What do I have today?', 'Schedule a meeting Friday at 2pm UTC', 'Delete the standup on 2026-04-10'). Treat unspecified times as UTC.",
         ),
     }),
   },
