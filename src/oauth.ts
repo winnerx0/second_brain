@@ -42,7 +42,10 @@ export const OAUTH_CONFIGS: Record<string, OAuthConfig> = {
   google_docs: {
     authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
     tokenUrl: 'https://oauth2.googleapis.com/token',
-    scopes: ['https://www.googleapis.com/auth/documents'],
+    scopes: [
+      'https://www.googleapis.com/auth/documents',
+      'https://www.googleapis.com/auth/drive',
+    ],
     clientIdEnv: 'GOOGLE_OAUTH_CLIENT_ID',
     clientSecretEnv: 'GOOGLE_OAUTH_CLIENT_SECRET',
     extra: { access_type: 'offline', prompt: 'consent' },
@@ -175,8 +178,6 @@ export async function handleCallback(
   state: string,
 ): Promise<{ connectionName: string } | { error: string }> {
   const entry = pendingStates.get(state);
-  
-  console.log("panding state", pendingStates)
   if (!entry) return { error: 'Invalid or expired OAuth state' };
   if (entry.expiresAt < Date.now()) {
     pendingStates.delete(state);
@@ -258,6 +259,97 @@ export async function handleCallback(
       error: err instanceof Error ? err.message : String(err),
     };
   }
+}
+
+export async function getValidToken(
+  connectionName: string,
+): Promise<string | null> {
+  const [conn] = await db
+    .select({
+      accessToken: connections.accessToken,
+      refreshToken: connections.refreshToken,
+      tokenExpiry: connections.tokenExpiry,
+    })
+    .from(connections)
+    .where(eq(connections.name, connectionName));
+
+  if (!conn?.accessToken) return null;
+
+  const needsRefresh =
+    conn.refreshToken &&
+    conn.tokenExpiry &&
+    conn.tokenExpiry.getTime() - Date.now() < 60_000;
+
+  if (!needsRefresh) return conn.accessToken;
+
+  const cfg = OAUTH_CONFIGS[connectionName];
+  if (!cfg) return conn.accessToken;
+
+  const clientId = process.env[cfg.clientIdEnv] ?? '';
+  const clientSecret = process.env[cfg.clientSecretEnv] ?? '';
+
+  const body = new URLSearchParams({
+    grant_type: 'refresh_token',
+    refresh_token: conn.refreshToken!,
+  });
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/x-www-form-urlencoded',
+    Accept: 'application/json',
+  };
+
+  if (cfg.basicAuth) {
+    headers['Authorization'] = `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`;
+  } else {
+    body.set('client_id', clientId);
+    body.set('client_secret', clientSecret);
+  }
+
+  try {
+    const res = await fetch(cfg.tokenUrl, {
+      method: 'POST',
+      headers,
+      body: body.toString(),
+    });
+    const data = (await res.json()) as Record<string, unknown>;
+
+    if (!res.ok || data.error) {
+      logger.error(`[oauth] token refresh failed for ${connectionName}`, data);
+      return conn.accessToken;
+    }
+
+    const accessToken = String(data.access_token ?? '');
+    const newRefreshToken =
+      typeof data.refresh_token === 'string'
+        ? data.refresh_token
+        : conn.refreshToken;
+    const expiresIn =
+      typeof data.expires_in === 'number' ? data.expires_in : null;
+    const tokenExpiry = expiresIn
+      ? new Date(Date.now() + expiresIn * 1000)
+      : null;
+
+    await db
+      .update(connections)
+      .set({ accessToken, refreshToken: newRefreshToken, tokenExpiry, updatedAt: new Date() })
+      .where(eq(connections.name, connectionName));
+
+    logger.info(`[oauth] ${connectionName} token refreshed`);
+    return accessToken;
+  } catch (err) {
+    logger.error(`[oauth] refresh error for ${connectionName}`, err);
+    return conn.accessToken;
+  }
+}
+
+export async function getDbRefreshToken(
+  connectionName: string,
+): Promise<string | null> {
+  const [conn] = await db
+    .select({ refreshToken: connections.refreshToken })
+    .from(connections)
+    .where(eq(connections.name, connectionName));
+  return conn?.refreshToken ?? null;
 }
 
 export async function disconnectOAuth(connectionName: string): Promise<void> {

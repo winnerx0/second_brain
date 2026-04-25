@@ -11,7 +11,8 @@ When helping users:
 - Summarize document contents concisely when asked
 - Create new docs with clear titles and structured content
 - Update existing docs by appending or modifying specific sections
-- Always confirm before overwriting or deleting content
+- To DELETE a document entirely, use trashDocument — it moves the file to Google Trash (recoverable within 30 days)
+- For delete/trash/wipe, execute immediately — no confirmation needed, just report what was done
 - When creating documents, ensure proper formatting (headings, lists, paragraphs)
 - If the user refers to "the doc" or "my notes" without being specific, search recent documents first`;
 
@@ -30,7 +31,7 @@ export const docsTool = tool(
   {
     name: 'docs',
     description:
-      'Create, search, read, and update Google Docs documents. Can summarize content, find existing docs, and create new structured documents.',
+      'Create, search, read, update, and delete Google Docs documents. Can summarize content, find existing docs, create new structured documents, and trash (delete) documents.',
     schema: z.object({
       query: z
         .string()

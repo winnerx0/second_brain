@@ -10,21 +10,21 @@ type GoogleAuthCredential =
   | { refreshToken: string };
 
 async function getGoogleCredential(): Promise<GoogleAuthCredential> {
-  const dbAccessToken =
-    (await getValidToken('google_docs')) ?? (await getValidToken('gmail'));
+  // Only use the google_docs token — never fall back to gmail's token.
+  // Gmail's token only carries gmail.modify scope and will be rejected by
+  // the Docs and Drive APIs with "caller does not have permission".
+  const dbAccessToken = await getValidToken('google_docs');
   if (dbAccessToken) {
     return { accessToken: dbAccessToken };
   }
 
   const refreshToken =
     (await getDbRefreshToken('google_docs')) ??
-    (await getDbRefreshToken('gmail')) ??
-    process.env.GOOGLE_DOCS_REFRESH_TOKEN ??
-    config.GMAIL_REFRESH_TOKEN;
+    process.env.GOOGLE_DOCS_REFRESH_TOKEN;
 
   if (!refreshToken) {
     throw new Error(
-      'Google Docs not configured: connect Google Docs in Connections or set GOOGLE_DOCS_REFRESH_TOKEN.',
+      'Google Docs not connected. Go to Connections → Google Docs and reconnect to grant the required scopes.',
     );
   }
 
@@ -328,6 +328,30 @@ export const appendMarkdown = tool(
   },
 );
 
+export const trashDocument = tool(
+  async ({ documentId }) => {
+    try {
+      const drive = await getDriveClient();
+      await drive.files.update({
+        fileId: documentId,
+        requestBody: { trashed: true },
+      });
+      return `Document ${documentId} moved to trash.`;
+    } catch (error) {
+      logger.error('[google-docs] trashDocument', error);
+      return `Error trashing document: ${error instanceof Error ? error.message : String(error)}`;
+    }
+  },
+  {
+    name: 'trashDocument',
+    description:
+      'Move a Google Doc to the trash (equivalent to deleting it). The file can be restored from Trash within 30 days.',
+    schema: z.object({
+      documentId: z.string().describe('Google Docs document ID (from the URL)'),
+    }),
+  },
+);
+
 export const googleDocTools = [
   searchDocuments,
   readDocument,
@@ -336,4 +360,5 @@ export const googleDocTools = [
   findAndReplace,
   deleteRange,
   appendMarkdown,
+  trashDocument,
 ];
