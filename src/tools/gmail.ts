@@ -3,11 +3,14 @@ import { z } from 'zod';
 import { google } from 'googleapis';
 import { config } from '../config.ts';
 import { logger } from '../logger.ts';
+import { getDbRefreshToken } from '../oauth.ts';
 
-function getGmailClient() {
-  if (!config.GMAIL_REFRESH_TOKEN) {
+async function getGmailClient() {
+  const dbRefreshToken = await getDbRefreshToken('gmail');
+  const refreshToken = dbRefreshToken ?? config.GMAIL_REFRESH_TOKEN;
+  if (!refreshToken) {
     throw new Error(
-      'Gmail not configured: GMAIL_REFRESH_TOKEN is missing. Run scripts/gmail-auth.ts to set it up.',
+      'Gmail not configured: connect Gmail in Connections or set GMAIL_REFRESH_TOKEN.',
     );
   }
   const auth = new google.auth.OAuth2(
@@ -15,7 +18,7 @@ function getGmailClient() {
     config.GOOGLE_CLIENT_SECRET,
     'http://localhost:3000',
   );
-  auth.setCredentials({ refresh_token: config.GMAIL_REFRESH_TOKEN });
+  auth.setCredentials({ refresh_token: refreshToken });
   return google.gmail({ version: 'v1', auth });
 }
 
@@ -73,14 +76,11 @@ function buildRaw(
   return Buffer.from(lines.join('\r\n')).toString('base64url');
 }
 
-const NOT_CONFIGURED =
-  'Gmail not configured: run scripts/gmail-auth.ts to get your GMAIL_REFRESH_TOKEN';
 
 export const listEmails = tool(
   async ({ query, maxResults }) => {
-    if (!config.GMAIL_REFRESH_TOKEN) return NOT_CONFIGURED;
     try {
-      const gmail = getGmailClient();
+      const gmail = await getGmailClient();
       const listRes = await gmail.users.messages.list({
         userId: 'me',
         q: query,
@@ -134,9 +134,8 @@ export const listEmails = tool(
 
 export const getEmail = tool(
   async ({ messageId }) => {
-    if (!config.GMAIL_REFRESH_TOKEN) return NOT_CONFIGURED;
     try {
-      const gmail = getGmailClient();
+      const gmail = await getGmailClient();
       const res = await gmail.users.messages.get({
         userId: 'me',
         id: messageId,
@@ -173,9 +172,8 @@ export const getEmail = tool(
 
 export const sendEmail = tool(
   async ({ to, subject, body, cc }) => {
-    if (!config.GMAIL_REFRESH_TOKEN) return NOT_CONFIGURED;
     try {
-      const gmail = getGmailClient();
+      const gmail = await getGmailClient();
       const raw = buildRaw(to, subject, body, cc);
       const res = await gmail.users.messages.send({
         userId: 'me',
@@ -201,9 +199,8 @@ export const sendEmail = tool(
 
 export const replyToEmail = tool(
   async ({ messageId, body }) => {
-    if (!config.GMAIL_REFRESH_TOKEN) return NOT_CONFIGURED;
     try {
-      const gmail = getGmailClient();
+      const gmail = await getGmailClient();
       const original = await gmail.users.messages.get({
         userId: 'me',
         id: messageId,
@@ -247,9 +244,8 @@ export const replyToEmail = tool(
 
 export const archiveEmail = tool(
   async ({ messageId }) => {
-    if (!config.GMAIL_REFRESH_TOKEN) return NOT_CONFIGURED;
     try {
-      const gmail = getGmailClient();
+      const gmail = await getGmailClient();
       await gmail.users.messages.modify({
         userId: 'me',
         id: messageId,
@@ -272,9 +268,8 @@ export const archiveEmail = tool(
 
 export const markEmailRead = tool(
   async ({ messageId }) => {
-    if (!config.GMAIL_REFRESH_TOKEN) return NOT_CONFIGURED;
     try {
-      const gmail = getGmailClient();
+      const gmail = await getGmailClient();
       await gmail.users.messages.modify({
         userId: 'me',
         id: messageId,
@@ -297,9 +292,8 @@ export const markEmailRead = tool(
 
 export const trashEmail = tool(
   async ({ messageId }) => {
-    if (!config.GMAIL_REFRESH_TOKEN) return NOT_CONFIGURED;
     try {
-      const gmail = getGmailClient();
+      const gmail = await getGmailClient();
       await gmail.users.messages.trash({
         userId: 'me',
         id: messageId,
@@ -321,9 +315,8 @@ export const trashEmail = tool(
 
 export const listLabels = tool(
   async () => {
-    if (!config.GMAIL_REFRESH_TOKEN) return NOT_CONFIGURED;
     try {
-      const gmail = getGmailClient();
+      const gmail = await getGmailClient();
       const res = await gmail.users.labels.list({
         userId: 'me',
       });
@@ -347,9 +340,8 @@ export const listLabels = tool(
 
 export const applyLabel = tool(
   async ({ messageId, addLabelIds, removeLabelIds }) => {
-    if (!config.GMAIL_REFRESH_TOKEN) return NOT_CONFIGURED;
     try {
-      const gmail = getGmailClient();
+      const gmail = await getGmailClient();
       await gmail.users.messages.modify({
         userId: 'me',
         id: messageId,
@@ -381,9 +373,8 @@ export const applyLabel = tool(
 
 export const getThreadEmails = tool(
   async ({ threadId }) => {
-    if (!config.GMAIL_REFRESH_TOKEN) return NOT_CONFIGURED;
     try {
-      const gmail = getGmailClient();
+      const gmail = await getGmailClient();
       const res = await gmail.users.threads.get({
         userId: 'me',
         id: threadId,

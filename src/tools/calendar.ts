@@ -116,7 +116,7 @@ export const createCalendarEvent = tool(
   {
     name: 'create_calendar_event',
     description:
-      'Create a new event on Google Calendar. Start and end must be ISO 8601 datetime strings (e.g. "2026-04-03T14:00:00Z"). Attendees are optional email addresses.',
+      'Create a new event on Google Calendar. Start and end must be ISO 8601 UTC datetime strings (e.g. "2026-04-03T14:00:00Z"). Attendees are optional email addresses.',
     schema: z.object({
       summary: z.string().describe('Event title'),
       start: z
@@ -278,7 +278,7 @@ export const editCalendarEvent = tool(
   {
     name: 'edit_calendar_event',
     description:
-      'Edit an existing Google Calendar event found by its current start datetime.',
+      'Edit an existing Google Calendar event found by its current start datetime. Use ISO 8601 UTC datetimes.',
     schema: z.object({
       startDateTime: z
         .string()
@@ -329,7 +329,7 @@ export const deleteCalendarEvent = tool(
   },
   {
     name: 'delete_calendar_event',
-    description: 'Delete a Google Calendar event found by its start datetime.',
+    description: 'Delete a Google Calendar event found by its start datetime. Use ISO 8601 UTC datetimes.',
     schema: z.object({
       startDateTime: z
         .string()
