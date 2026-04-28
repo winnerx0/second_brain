@@ -1,0 +1,37 @@
+services:
+  nginx:
+    image: "nginx:stable-alpine3.23-perl"
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - backend
+  backend:
+    container_name: "aira_backend"
+    build: "./"
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+  db:
+    container_name: "aira_db"
+    image: "pgvector/pgvector:0.8.2-pg18-trixie"
+    environment:
+      POSTGRES_USER: "postgres"
+      POSTGRES_PASSWORD: "2007"
+      POSTGRES_DB: "second_brain"
+    ports:
+      - "5432:5432"
+    volumes:
+      - aira:/var/lib/postgresql/18/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 10s
+      timeout: 10s
+      retries: 3
+volumes:
+  aira:

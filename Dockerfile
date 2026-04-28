@@ -14,9 +14,7 @@ FROM base AS build
 WORKDIR /app
 COPY --from=install /app/node_modules ./node_modules
 COPY src ./src
-COPY drizzle ./drizzle
-COPY drizzle.config.ts ./
-COPY .config/google-docs-mcp /root/.config/google-docs-mcp
+# COPY .config/google-docs-mcp /root/.config/google-docs-mcp
 RUN bun build --target=bun --production --outfile=dist/index.js --minify ./src/index.ts  
 
 FROM base AS final
@@ -27,8 +25,8 @@ COPY --from=install /app/node_modules ./node_modules
 COPY package.json bun.lock tsconfig.json ./
 COPY drizzle ./drizzle
 COPY drizzle.config.ts ./
-COPY .config/google-docs-mcp /root/.config/google-docs-mcp
+# COPY .config/google-docs-mcp /root/.config/google-docs-mcp
 
-EXPOSE 8080
+EXPOSE 3000
 
 CMD ["bun", "start"]
