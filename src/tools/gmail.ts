@@ -410,3 +410,16 @@ export const getThreadEmails = tool(
     }),
   },
 );
+
+export const gmailTools = [
+  listEmails,
+  getEmail,
+  sendEmail,
+  replyToEmail,
+  archiveEmail,
+  markEmailRead,
+  trashEmail,
+  listLabels,
+  applyLabel,
+  getThreadEmails,
+];

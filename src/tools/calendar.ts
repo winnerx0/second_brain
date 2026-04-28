@@ -339,3 +339,11 @@ export const deleteCalendarEvent = tool(
     }),
   },
 );
+
+export const calendarTools = [
+  getCalendarEvents,
+  createCalendarEvent,
+  createAllDayCalendarEvent,
+  editCalendarEvent,
+  deleteCalendarEvent,
+];

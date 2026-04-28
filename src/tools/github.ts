@@ -329,3 +329,12 @@ export const deleteIssue = tool(
     }),
   },
 );
+
+export const githubTools = [
+  getOpenPRs,
+  getAssignedIssues,
+  getRecentPushes,
+  createIssue,
+  closeIssue,
+  deleteIssue,
+];
