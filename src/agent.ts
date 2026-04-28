@@ -17,7 +17,13 @@ import { sendTelegramMessage } from './delivery/telegram.ts';
 const env = process.env;
 import { logger } from './logger.ts';
 import { getCurrentDateTime } from './tools/miscellaneous.ts';
-import { getAllIntegrationTools } from './integrations/index.ts';
+import { githubTool } from './subagents/github.ts';
+import { calendarTool } from './subagents/calendar.ts';
+import { gmailTool } from './subagents/gmail.ts';
+import { docsTool } from './subagents/google-docs.ts';
+import { anilistTool } from './subagents/anilist.ts';
+import { knowledgeGraphTool } from './subagents/knowledge-graph.ts';
+import { notionTool } from './subagents/notion.ts';
 import { model } from './shared.ts';
 import { ChatOpenAI } from '@langchain/openai';
 
@@ -47,7 +53,13 @@ const tools = [
   storeMemory,
   recallMemories,
   deleteMemory,
-  ...getAllIntegrationTools(),
+  githubTool,
+  calendarTool,
+  gmailTool,
+  docsTool,
+  anilistTool,
+  knowledgeGraphTool,
+  notionTool,
 ];
 
 const mainAgent = createAgent({
