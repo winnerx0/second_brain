@@ -9,6 +9,7 @@ import {
 } from '@tanstack/react-router';
 
 import '../styles.css';
+import { SidebarProvider } from '../contexts/sidebar-context';
 
 export const Route = createRootRoute({
   head: () => ({
@@ -18,7 +19,7 @@ export const Route = createRootRoute({
         name: 'viewport',
         content: 'width=device-width, initial-scale=1',
       },
-      { name: 'theme-color', content: '#09090b' },
+      { name: 'theme-color', content: '#a86828' },
       { name: 'mobile-web-app-capable', content: 'yes' },
       {
         name: 'apple-mobile-web-app-capable',
@@ -48,7 +49,9 @@ export const Route = createRootRoute({
 function RootComponent() {
   return (
     <RootDocument>
-      <Outlet />
+      <SidebarProvider>
+        <Outlet />
+      </SidebarProvider>
     </RootDocument>
   );
 }
