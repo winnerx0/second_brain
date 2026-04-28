@@ -10,6 +10,7 @@ import {
   vector,
   jsonb,
   real,
+  unique,
 } from 'drizzle-orm/pg-core';
 
 export const memoryClassificationEnum = pgEnum('memory_classification', [
@@ -108,7 +109,7 @@ export const graphEdges = pgTable('graph_edges', {
   evidence: text('evidence'),
   source: text('source'),
   createdAt: timestamp('created_at').notNull().defaultNow(),
-});
+}, (t) => [unique('graph_edges_unique').on(t.fromNodeId, t.toNodeId, t.relation)]);
 
 export const connections = pgTable('connections', {
   id: serial('id').primaryKey(),
