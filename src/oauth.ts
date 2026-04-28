@@ -123,7 +123,7 @@ setInterval(
 );
 
 export function getRedirectUri(): string {
-  const base = process.env.OAUTH_REDIRECT_BASE_URL ?? 'http://localhost:3000';
+  const base = process.env.OAUTH_REDIRECT_BASE_URL ?? 'http://localhost:80';
   return `${base.replace(/\/$/, '')}/oauth/callback`;
 }
 

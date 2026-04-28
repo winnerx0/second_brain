@@ -3,7 +3,6 @@ import { cors } from 'hono/cors';
 import { runBriefing, handleMessage, type AgentStreamEvent } from './agent.ts';
 import { sendTelegramMessage } from './delivery/telegram.ts';
 import { logger } from './logger.ts';
-import { runMemoryLifecycleReview } from './tools/memory.ts';
 import { db } from './db/client.ts';
 import {
   chatHistory,
@@ -235,8 +234,6 @@ app.get('/memories', async (c) => {
   }
 });
 
-const processedUpdateIds = new Set<string>();
-
 /* ─── Connections ───────────────────────────────────────────────────────────── */
 
 app.get('/connections', async (c) => {
@@ -411,20 +408,21 @@ app.delete('/connections/:name/oauth', async (c) => {
   }
 });
 
+const processedUpdateIds = new Set<number>();
+
 app.post('/chat', async (c) => {
   const body = await c.req.json<{
     message: { text: string };
-    update_id: string;
+    update_id: number;
   }>();
   const { message, update_id } = body;
 
   if (processedUpdateIds.has(update_id)) {
-    logger.warn(
-      `[chat] duplicate message received with update_id: ${update_id}`,
-    );
+    logger.warn(`[chat] duplicate message received with update_id: ${update_id}`);
     return c.json({ success: false, error: 'Duplicate message' });
   }
   processedUpdateIds.add(update_id);
+  if (processedUpdateIds.size > 10_000) processedUpdateIds.clear();
 
   logger.info(`[chat] received: ${message.text}`);
 
@@ -513,7 +511,7 @@ app.post('/cron/briefing', async (c) => {
 
   try {
     logger.info('Running briefing via cron endpoint');
-    await runMemoryLifecycleReview();
+    await runBriefing();
     return c.json({ success: true });
   } catch (error) {
     logger.error('[cron.briefing]', error);

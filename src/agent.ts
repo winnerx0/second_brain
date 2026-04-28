@@ -6,24 +6,18 @@ import {
   ToolMessage,
   summarizationMiddleware,
 } from 'langchain';
-import { BaseCallbackHandler } from '@langchain/core/callbacks/base';
+import type { AIMessageChunk } from '@langchain/core/messages';
 import { getEncoding } from 'js-tiktoken';
 import { config } from './config.ts';
 import { storeMemory, recallMemories, deleteMemory } from './tools/memory';
 import { db } from './db/client.ts';
 import { agentRuns, chatHistory, chatSessions } from './db/schema.ts';
-import { asc, desc, eq, isNull } from 'drizzle-orm';
+import { desc, eq, isNull } from 'drizzle-orm';
 import { sendTelegramMessage } from './delivery/telegram.ts';
 const env = process.env;
 import { logger } from './logger.ts';
 import { getCurrentDateTime } from './tools/miscellaneous.ts';
-import { docsTool } from './subagents/google-doc.ts';
-import { anilistTool } from './subagents/anilist.ts';
-import { notionTool } from './subagents/notion.ts';
-import { githubTool } from './subagents/github.ts';
-import { calendarTool } from './subagents/calendar.ts';
-import { gmailTool } from './subagents/gmail.ts';
-import { knowledgeGraphTool } from './subagents/knowledge-graph.ts';
+import { getAllIntegrationTools } from './integrations/index.ts';
 import { model } from './shared.ts';
 import { ChatOpenAI } from '@langchain/openai';
 
@@ -53,13 +47,7 @@ const tools = [
   storeMemory,
   recallMemories,
   deleteMemory,
-  githubTool,
-  calendarTool,
-  notionTool,
-  anilistTool,
-  docsTool,
-  gmailTool,
-  knowledgeGraphTool,
+  ...getAllIntegrationTools(),
 ];
 
 const mainAgent = createAgent({
@@ -105,59 +93,6 @@ function emitEvent(
   return onEvent?.(event);
 }
 
-function createStreamingCallback(onEvent?: HandleMessageOptions['onEvent']) {
-  return new (class extends BaseCallbackHandler {
-    name = 'agent-stream-callback';
-    private toolNames = new Map<string, string>();
-
-    constructor() {
-      super({ ignoreRetriever: true, _awaitHandler: true });
-    }
-
-    get lc_prefer_streaming() {
-      return true;
-    }
-
-    override async handleLLMNewToken(token: string) {
-      if (token) {
-        await emitEvent(onEvent, {
-          type: 'assistant_delta',
-          delta: token,
-        });
-      }
-    }
-
-    override async handleToolStart(
-      tool: { name?: string },
-      input: string,
-      runId: string,
-    ) {
-      const toolName = tool.name ?? 'tool';
-      this.toolNames.set(runId, toolName);
-      await emitEvent(onEvent, {
-        type: 'tool_start',
-        tool: toolName,
-        input: safeStringify(input),
-      });
-    }
-
-    override async handleToolEnd(output: unknown, runId: string) {
-      await emitEvent(onEvent, {
-        type: 'tool_end',
-        tool: this.toolNames.get(runId) ?? 'tool',
-        output: safeStringify(output),
-      });
-      this.toolNames.delete(runId);
-    }
-
-    override async handleChainError(err: unknown) {
-      await emitEvent(onEvent, {
-        type: 'error',
-        message: err instanceof Error ? err.message : String(err),
-      });
-    }
-  })();
-}
 
 function shouldAutoStoreUserMemory(text: string): boolean {
   const value = text.trim().toLowerCase();
@@ -288,6 +223,9 @@ const CHAT_SYSTEM = new SystemMessage(
   - You don't panic, even when things are messy. You just figure it out.
 
   How you work (orchestration):
+  - Only use tools when ${env.MASTER} is explicitly asking for information
+    or an action. Casual messages, personal statements, and simple chat do
+    NOT trigger tool calls — just respond directly.
   - You are a planning orchestrator. When a request involves real data,
     decompose it into steps and delegate each step to the right specialist:
     - github    → PRs, issues, pushes
@@ -363,7 +301,7 @@ export async function handleMessage(
   for (const msg of rawHistory) {
     if (msg instanceof ToolMessage) {
       const prev = history[history.length - 1];
-      if (prev instanceof AIMessage && prev.tool_calls?.length > 0) {
+      if (prev instanceof AIMessage && (prev.tool_calls?.length ?? 0) > 0) {
         history.push(msg);
       }
       // else drop it
@@ -376,32 +314,71 @@ export async function handleMessage(
     `[chat] estimated input tokens: ${countTokens(CHAT_SYSTEM.content + text)}`,
   );
 
-  const streamingCallback = options.onEvent
-    ? createStreamingCallback(options.onEvent)
-    : undefined;
-
   await emitEvent(options.onEvent, {
     type: 'status',
     message: 'Thinking...',
   });
 
-  const response = await mainAgent.invoke(
-    { messages: [CHAT_SYSTEM, ...history, new HumanMessage(text)] },
-    {
-      recursionLimit: 25,
-      callbacks: streamingCallback ? [streamingCallback] : undefined,
-      signal: options.signal,
-    } as never,
+  const inputMessages = [CHAT_SYSTEM, ...history, new HumanMessage(text)];
+  const toolRunNames = new Map<string, string>();
+  let latestMessages: typeof inputMessages | null = null;
+
+  const eventStream = mainAgent.streamEvents(
+    { messages: inputMessages },
+    { recursionLimit: 25, signal: options.signal, version: 'v2' } as never,
   );
 
-  const reply = String(
-    response.messages[response.messages.length - 1]?.content ?? '',
-  );
+  for await (const event of eventStream) {
+    if (event.event === 'on_chat_model_stream' && options.onEvent) {
+      const chunk = event.data?.chunk as AIMessageChunk | undefined;
+      if (!chunk) continue;
+      const raw = chunk.content;
+      const token =
+        typeof raw === 'string'
+          ? raw
+          : Array.isArray(raw)
+            ? raw
+                .map((p) =>
+                  typeof p === 'string'
+                    ? p
+                    : p && typeof p === 'object' && 'text' in p
+                      ? String((p as { text: unknown }).text)
+                      : '',
+                )
+                .join('')
+            : '';
+      if (token) {
+        await emitEvent(options.onEvent, { type: 'assistant_delta', delta: token });
+      }
+    } else if (event.event === 'on_tool_start' && options.onEvent) {
+      const name = String(event.name ?? 'tool');
+      toolRunNames.set(event.run_id, name);
+      await emitEvent(options.onEvent, {
+        type: 'tool_start',
+        tool: name,
+        input: safeStringify(event.data?.input),
+      });
+    } else if (event.event === 'on_tool_end' && options.onEvent) {
+      const name = toolRunNames.get(event.run_id) ?? String(event.name ?? 'tool');
+      toolRunNames.delete(event.run_id);
+      await emitEvent(options.onEvent, {
+        type: 'tool_end',
+        tool: name,
+        output: safeStringify(event.data?.output),
+      });
+    } else if (event.event === 'on_chain_end') {
+      const out = event.data?.output as { messages?: typeof inputMessages } | undefined;
+      if (Array.isArray(out?.messages) && out.messages.length > 0) {
+        latestMessages = out.messages;
+      }
+    }
+  }
 
-  // Only save NEW messages from this turn — skip the input messages we already passed in
-  // (system message + trimmedHistory + new HumanMessage are all in response.messages too)
+  const allMessages = latestMessages ?? inputMessages;
+  const reply = String(allMessages[allMessages.length - 1]?.content ?? '');
+
   const inputLength = 1 + history.length; // system + history (new HumanMessage is part of this turn)
-  const newMessages = response.messages.slice(inputLength);
+  const newMessages = allMessages.slice(inputLength);
 
   const messages: (typeof chatHistory.$inferInsert)[] = newMessages
     .filter(
@@ -494,7 +471,7 @@ export async function handleMessage(
   }
 
   logger.info(
-    `[chat] actual tokens used: ${totalTokensUsed(response.messages as never[])}`,
+    `[chat] actual tokens used: ${totalTokensUsed(allMessages as never[])}`,
   );
 
   logger.info(`[chat] reply: ${reply}`);
