@@ -191,16 +191,30 @@ export const addGraphFact = tool(
           evidence,
           source,
         })
+        .onConflictDoNothing()
         .returning();
 
+      const resolvedEdge = edge ?? (await db
+        .select()
+        .from(graphEdges)
+        .where(
+          and(
+            eq(graphEdges.fromNodeId, subjectNode.id),
+            eq(graphEdges.toNodeId, objectNode.id),
+            eq(graphEdges.relation, relation.trim().toLowerCase()),
+          ),
+        )
+        .limit(1)
+        .then((r) => r[0]));
+
       return JSON.stringify({
-        edgeId: edge!.id,
+        edgeId: resolvedEdge!.id,
         subject: {
           id: subjectNode.id,
           name: subjectNode.name,
           kind: subjectNode.kind,
         },
-        relation: edge!.relation,
+        relation: resolvedEdge!.relation,
         object: {
           id: objectNode.id,
           name: objectNode.name,

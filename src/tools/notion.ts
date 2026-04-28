@@ -2,24 +2,13 @@ import { tool } from 'langchain';
 import { z } from 'zod';
 import { config } from '../config.ts';
 import { logger } from '../logger.ts';
-import { db } from '../db/client.ts';
-import { connections } from '../db/schema.ts';
-import { eq } from 'drizzle-orm';
+import { getValidToken } from '../oauth.ts';
 
 const NOTION_API = 'https://api.notion.com/v1';
 
 async function getNotionToken(): Promise<string> {
-  const [conn] = await db
-    .select()
-    .from(connections)
-    .where(eq(connections.name, 'notion'))
-    .limit(1);
-
-  if (conn?.oauthConnected && conn.accessToken) {
-    return conn.accessToken;
-  }
-
-  // Fallback to environment variable
+  const token = await getValidToken('notion');
+  if (token) return token;
   return config.NOTION_TOKEN;
 }
 

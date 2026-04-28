@@ -2,22 +2,11 @@ import { tool } from 'langchain';
 import { z } from 'zod';
 import { config } from '../config.ts';
 import { logger } from '../logger.ts';
-import { db } from '../db/client.ts';
-import { connections } from '../db/schema.ts';
-import { eq } from 'drizzle-orm';
+import { getValidToken } from '../oauth.ts';
 
 async function getGitHubToken(): Promise<string> {
-  const [conn] = await db
-    .select()
-    .from(connections)
-    .where(eq(connections.name, 'github'))
-    .limit(1);
-
-  if (conn?.oauthConnected && conn.accessToken) {
-    return conn.accessToken;
-  }
-
-  // Fallback to environment variable
+  const token = await getValidToken('github');
+  if (token) return token;
   return config.GITHUB_TOKEN;
 }
 

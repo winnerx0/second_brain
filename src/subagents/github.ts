@@ -23,24 +23,14 @@ When helping:
 
 const githubAgent = createAgent({
   model,
-  tools: [
-    getOpenPRs,
-    getAssignedIssues,
-    getRecentPushes,
-    createIssue,
-    closeIssue,
-    deleteIssue,
-  ],
+  tools: [getOpenPRs, getAssignedIssues, getRecentPushes, createIssue, closeIssue, deleteIssue],
 });
 
 export const githubTool = tool(
   async ({ query }) => {
     const response = await githubAgent.invoke({
       messages: [
-        {
-          role: 'system',
-          content: GITHUB_SYSTEM_PROMPT,
-        },
+        { role: 'system', content: GITHUB_SYSTEM_PROMPT },
         { role: 'user', content: query },
       ],
     });

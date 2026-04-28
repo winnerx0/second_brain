@@ -16,7 +16,7 @@ async function getGmailClient() {
   const auth = new google.auth.OAuth2(
     config.GOOGLE_CLIENT_ID,
     config.GOOGLE_CLIENT_SECRET,
-    'http://localhost:3000',
+    'http://localhost:80',
   );
   auth.setCredentials({ refresh_token: refreshToken });
   return google.gmail({ version: 'v1', auth });
