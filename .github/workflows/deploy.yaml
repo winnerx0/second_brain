@@ -60,6 +60,7 @@ jobs:
             REPO="git@github.com:winnerx0/second_brain.git"
             BRANCH="main"
             DEPLOY_DIR="/opt/second_brain"
+            ENV_DIR="/etc/second_brain/.env"
 
             if [ -d "$DEPLOY_DIR/.git" ]; then
               git -C "$DEPLOY_DIR" fetch origin
@@ -69,6 +70,8 @@ jobs:
               git clone --branch "$BRANCH" "$REPO" "$DEPLOY_DIR"
             fi
 
+            ln -sf "$ENV_DIR" "$DEPLOY_DIR/.env" || true
+            
             cd "$DEPLOY_DIR"
             docker compose down --remove-orphans
             docker compose build --no-cache
