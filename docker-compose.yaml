@@ -27,7 +27,7 @@ services:
     container_name: "aira_backend"
     build: "./"
     ports:
-      - "3000:3000"
+      - "3005:3005"
     env_file:
       - .env
     # depends_on:

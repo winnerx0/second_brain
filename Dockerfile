@@ -27,6 +27,6 @@ COPY drizzle ./drizzle
 COPY drizzle.config.ts ./
 # COPY .config/google-docs-mcp /root/.config/google-docs-mcp
 
-EXPOSE 3000
+EXPOSE 3005
 
 CMD ["bun", "start"]

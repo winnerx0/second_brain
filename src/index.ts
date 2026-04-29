@@ -27,6 +27,6 @@ memoryCron.start();
 
 export default {
   fetch: app.fetch.bind(app),
-  port: Number(process.env.PORT ?? 3000),
+  port: Number(process.env.PORT ?? 3005),
   idleTimeout: 0,
 };
