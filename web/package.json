@@ -4,8 +4,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite dev --port 3001",
-    "build": "vinxi build",
-    "start": "vinxi start",
+    "build": "vite build",
+    "start": "vite preview --port 3001",
     "preview": "vite preview --port 3001",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
