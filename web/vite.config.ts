@@ -4,7 +4,7 @@ import { tanstackStart } from '@tanstack/react-start/plugin/vite';
 import { VitePWA } from 'vite-plugin-pwa';
 import tailwindcss from '@tailwindcss/vite';
 
-const isVinxi = Boolean(process.env.VINXI);
+const isVinxi = process.argv.some(arg => arg.includes('vinxi'));
 
 export default defineConfig({
   server: {
