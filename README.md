@@ -1,12 +1,12 @@
 # Second Brain
 
-A daily briefing agent powered by a LangChain planning agent that dynamically delegates to GitHub, Google Calendar, Notion, and memory tools, delivered via Telegram.
+A daily briefing agent powered by a LangChain planning agent that dynamically delegates to GitHub, Google Calendar, Notion, ClickUp, and memory tools, delivered via Telegram.
 
 ## Features
 
 - 🤖 **AI-Powered Agent**: Uses LangChain with dynamic tool selection
-- 🔗 **OAuth Integration**: Secure OAuth authentication for GitHub and Notion
-- 📊 **Multiple Data Sources**: GitHub, Google Calendar, Notion, AniList, and more
+- 🔗 **OAuth Integration**: Secure OAuth authentication for GitHub, Notion, Spotify, and more; API key auth for ClickUp and Todoist
+- 📊 **Multiple Data Sources**: GitHub, Google Calendar, Notion, ClickUp, AniList, and more
 - 💬 **Chat Interface**: Web-based streaming chat with real-time responses
 - 🧠 **Memory System**: Persistent memory with classification and importance scoring
 - 📱 **Telegram Delivery**: Daily briefings delivered to Telegram
@@ -18,8 +18,15 @@ A daily briefing agent powered by a LangChain planning agent that dynamically de
 User/Cron → Hono → Planning Agent (createAgent) → Tools → Response → Telegram
                          │
                          ├── GitHub (open PRs, assigned issues, recent pushes) [OAuth]
-                         ├── Notion (pages, databases, blocks) [OAuth + MCP]
-                         ├── Google Calendar (today's events)
+                         ├── Notion (pages, databases, blocks) [OAuth]
+                         ├── Google Calendar (today's events) [OAuth]
+                         ├── Gmail (read, search, send) [OAuth]
+                         ├── Google Docs (create, read, edit) [OAuth]
+                         ├── ClickUp (tasks, lists, comments) [API key]
+                         ├── AniList (anime/manga tracking) [OAuth]
+                         ├── Spotify (playback, playlists) [OAuth]
+                         ├── Twitter/X (posts, mentions) [OAuth]
+                         ├── Knowledge Graph (entities, relationships)
                          └── Memory (store/recall from Postgres)
 ```
 
@@ -57,14 +64,22 @@ Fill in `.env`:
 
 **OAuth Configuration (Optional but Recommended):**
 
-| Variable                      | Description                                    |
-| ----------------------------- | ---------------------------------------------- |
-| `OAUTH_REDIRECT_BASE_URL`     | OAuth callback base URL (e.g. `http://localhost:3000`) |
-| `APP_URL`                     | Web app URL (e.g. `http://localhost:5173`)    |
-| `GITHUB_OAUTH_CLIENT_ID`      | GitHub OAuth app client ID                     |
-| `GITHUB_OAUTH_CLIENT_SECRET`  | GitHub OAuth app client secret                 |
-| `NOTION_OAUTH_CLIENT_ID`      | Notion OAuth integration client ID             |
-| `NOTION_OAUTH_CLIENT_SECRET`  | Notion OAuth integration client secret         |
+| Variable                        | Description                                            |
+| ------------------------------- | ------------------------------------------------------ |
+| `OAUTH_REDIRECT_BASE_URL`       | OAuth callback base URL (e.g. `http://localhost:3000`) |
+| `APP_URL`                       | Web app URL (e.g. `http://localhost:5173`)             |
+| `GITHUB_OAUTH_CLIENT_ID`        | GitHub OAuth app client ID                             |
+| `GITHUB_OAUTH_CLIENT_SECRET`    | GitHub OAuth app client secret                         |
+| `NOTION_OAUTH_CLIENT_ID`        | Notion OAuth integration client ID                     |
+| `NOTION_OAUTH_CLIENT_SECRET`    | Notion OAuth integration client secret                 |
+| `GOOGLE_OAUTH_CLIENT_ID`        | Google OAuth client ID (Gmail, Calendar, Docs)         |
+| `GOOGLE_OAUTH_CLIENT_SECRET`    | Google OAuth client secret                             |
+| `SPOTIFY_OAUTH_CLIENT_ID`       | Spotify OAuth app client ID                            |
+| `SPOTIFY_OAUTH_CLIENT_SECRET`   | Spotify OAuth app client secret                        |
+| `TWITTER_OAUTH_CLIENT_ID`       | Twitter/X OAuth app client ID                          |
+| `TWITTER_OAUTH_CLIENT_SECRET`   | Twitter/X OAuth app client secret                      |
+| `ANILIST_OAUTH_CLIENT_ID`       | AniList OAuth client ID                                |
+| `ANILIST_OAUTH_CLIENT_SECRET`   | AniList OAuth client secret                            |
 
 **For detailed OAuth setup instructions, see [OAUTH_SETUP.md](./OAUTH_SETUP.md)**
 
@@ -153,34 +168,33 @@ Multiple tables managed by Drizzle ORM:
 bun run db:studio   # open Drizzle Studio
 ```
 
-## OAuth Connections
+## Connections
 
-The agent supports OAuth authentication for enhanced security and user-specific access:
+The agent supports multiple authentication methods managed from the `/connections` page in the web UI.
 
-- **GitHub**: Manage repositories, issues, and PRs with your GitHub account
-- **Notion**: Access your Notion workspace via OAuth (used by MCP)
+**OAuth** (redirect-based):
+GitHub, Notion, Gmail, Google Calendar, Google Docs, Spotify, Twitter/X, AniList
 
-### Quick Start
+**API key** (paste key in UI, no OAuth app needed):
+ClickUp, Todoist
 
-1. Set up OAuth apps (see [OAUTH_SETUP.md](./OAUTH_SETUP.md))
-2. Add OAuth credentials to `.env`
-3. Start the web app and navigate to `/connections`
-4. Click "Connect" for GitHub or Notion
-5. Authorize the application
-
-The agent will automatically use OAuth tokens when available, falling back to environment variable tokens if not connected.
+Navigate to `/connections`, click **Connect**, and follow the prompts. OAuth connections require the corresponding `*_OAUTH_CLIENT_ID` / `*_OAUTH_CLIENT_SECRET` env vars to be set first. API key connections just need the key from the service's settings page.
 
 ## Available Tools
 
 The agent has access to the following tools:
 
 - **GitHub**: `get_open_prs`, `get_assigned_issues`, `get_recent_pushes`, `create_issue`, `close_issue`, `delete_issue`
-- **Notion**: Full workspace access via MCP (search, read, create, update pages, databases, blocks)
+- **Notion**: Search, read, create, and update pages, databases, and blocks
 - **Google Calendar**: View and manage calendar events
-- **Gmail**: Read and send emails
+- **Gmail**: Read, search, and send emails
+- **Google Docs**: Create, read, and edit documents
+- **ClickUp**: Browse workspaces/spaces/lists; get, create, update, delete tasks; search tasks; add comments
+- **Spotify**: Playback control, playlists, listening history
+- **Twitter/X**: Read posts and mentions
+- **AniList**: Track anime and manga
 - **Memory**: Store and recall information with importance scoring
 - **Knowledge Graph**: Build and query a knowledge graph of entities and relationships
-- **AniList**: Track anime and manga
 - **Miscellaneous**: Get current date/time, perform calculations
 
 ## Contributing
