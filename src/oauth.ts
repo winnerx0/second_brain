@@ -87,13 +87,6 @@ export const OAUTH_CONFIGS: Record<string, OAuthConfig> = {
     clientIdEnv: 'ANILIST_OAUTH_CLIENT_ID',
     clientSecretEnv: 'ANILIST_OAUTH_CLIENT_SECRET',
   },
-  clickup: {
-    authUrl: 'https://app.clickup.com/api',
-    tokenUrl: 'https://api.clickup.com/api/v2/oauth/token',
-    scopes: [],
-    clientIdEnv: 'CLICKUP_OAUTH_CLIENT_ID',
-    clientSecretEnv: 'CLICKUP_OAUTH_CLIENT_SECRET',
-  },
   todoist: {
     authUrl: 'https://todoist.com/oauth/authorize',
     tokenUrl: 'https://todoist.com/oauth/access_token',

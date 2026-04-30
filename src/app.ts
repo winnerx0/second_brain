@@ -19,6 +19,8 @@ import {
   getAppUrl,
   OAUTH_CONFIGS,
 } from './oauth.ts';
+
+const API_KEY_CONNECTIONS = new Set(['clickup']);
 // MCP OAuth imports - disabled, using traditional OAuth instead
 // import {
 //   startMcpOAuthFlow,
@@ -245,6 +247,7 @@ app.get('/connections', async (c) => {
         label: connections.label,
         enabled: connections.enabled,
         oauthConnected: connections.oauthConnected,
+        accessToken: connections.accessToken,
         createdAt: connections.createdAt,
         updatedAt: connections.updatedAt,
       })
@@ -253,12 +256,14 @@ app.get('/connections', async (c) => {
 
     const oauthSupported = Object.keys(OAUTH_CONFIGS);
     return c.json({
-      connections: rows.map((r) => ({
+      connections: rows.map(({ accessToken, ...r }) => ({
         ...r,
         oauthSupported: oauthSupported.includes(r.name),
         oauthConfigured: Boolean(
           process.env[OAUTH_CONFIGS[r.name]?.clientIdEnv ?? ''],
         ),
+        apiKeySupported: API_KEY_CONNECTIONS.has(r.name),
+        apiKeyConnected: API_KEY_CONNECTIONS.has(r.name) && Boolean(accessToken),
       })),
     });
   } catch (error) {
@@ -337,6 +342,50 @@ app.post('/connections', async (c) => {
       },
       500,
     );
+  }
+});
+
+/* ─── API key connections ────────────────────────────────────────────────────── */
+
+app.put('/connections/:name/apikey', async (c) => {
+  const name = c.req.param('name');
+  if (!API_KEY_CONNECTIONS.has(name))
+    return c.json({ error: `${name} does not use API key auth` }, 400);
+
+  try {
+    const rawBody = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+    const apiKey = typeof rawBody.apiKey === 'string' ? rawBody.apiKey.trim() : '';
+    if (!apiKey) return c.json({ error: 'apiKey is required' }, 400);
+
+    await db
+      .update(connections)
+      .set({ accessToken: apiKey, oauthConnected: true, enabled: true, updatedAt: new Date() })
+      .where(eq(connections.name, name));
+
+    logger.info(`[connections] ${name} api key saved`);
+    return c.json({ ok: true });
+  } catch (error) {
+    logger.error('[connections.apikey.put]', error);
+    return c.json({ error: error instanceof Error ? error.message : 'Failed to save API key' }, 500);
+  }
+});
+
+app.delete('/connections/:name/apikey', async (c) => {
+  const name = c.req.param('name');
+  if (!API_KEY_CONNECTIONS.has(name))
+    return c.json({ error: `${name} does not use API key auth` }, 400);
+
+  try {
+    await db
+      .update(connections)
+      .set({ accessToken: null, oauthConnected: false, updatedAt: new Date() })
+      .where(eq(connections.name, name));
+
+    logger.info(`[connections] ${name} api key removed`);
+    return c.json({ ok: true });
+  } catch (error) {
+    logger.error('[connections.apikey.delete]', error);
+    return c.json({ error: error instanceof Error ? error.message : 'Failed to remove API key' }, 500);
   }
 });
 

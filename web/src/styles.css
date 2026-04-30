@@ -1614,6 +1614,29 @@ a {
   font-style: italic;
 }
 
+.conn-apikey-form {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.conn-apikey-input {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.72rem;
+  padding: 4px 8px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--fg);
+  outline: none;
+}
+
+.conn-apikey-input:focus {
+  border-color: var(--accent);
+}
+
 /* ── Connection notice ───────────────────────────────────────────────── */
 .conn-notice {
   display: flex;

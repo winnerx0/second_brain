@@ -22,6 +22,8 @@ type Connection = {
   oauthConnected: boolean;
   oauthSupported: boolean;
   oauthConfigured: boolean;
+  apiKeySupported: boolean;
+  apiKeyConnected: boolean;
   createdAt: string;
   updatedAt: string;
 };
@@ -196,13 +198,19 @@ function ConnectionCard({
   conn,
   onToggle,
   onDisconnect,
+  onSaveApiKey,
+  onRemoveApiKey,
 }: {
   conn: Connection;
   onToggle: (id: number, enabled: boolean) => void;
   onDisconnect: (name: string) => Promise<void>;
+  onSaveApiKey: (name: string, key: string) => Promise<void>;
+  onRemoveApiKey: (name: string) => Promise<void>;
 }) {
   const meta = META[conn.name];
   const [loading, setLoading] = useState(false);
+  const [showKeyInput, setShowKeyInput] = useState(false);
+  const [apiKeyDraft, setApiKeyDraft] = useState('');
 
   const handleToggle = (val: boolean) => {
     setLoading(true);
@@ -213,6 +221,21 @@ function ConnectionCard({
   const handleDisconnect = async () => {
     setLoading(true);
     await onDisconnect(conn.name);
+    setLoading(false);
+  };
+
+  const handleSaveApiKey = async () => {
+    if (!apiKeyDraft.trim()) return;
+    setLoading(true);
+    await onSaveApiKey(conn.name, apiKeyDraft.trim());
+    setApiKeyDraft('');
+    setShowKeyInput(false);
+    setLoading(false);
+  };
+
+  const handleRemoveApiKey = async () => {
+    setLoading(true);
+    await onRemoveApiKey(conn.name);
     setLoading(false);
   };
 
@@ -269,14 +292,58 @@ function ConnectionCard({
 
       {/* Actions */}
       <div className="conn-card-actions">
-        {conn.oauthSupported ? (
+        {conn.apiKeySupported ? (
+          conn.apiKeyConnected ? (
+            <button
+              type="button"
+              disabled={loading}
+              onClick={() => { void handleRemoveApiKey(); }}
+              className="conn-btn-disconnect"
+            >
+              Disconnect
+            </button>
+          ) : showKeyInput ? (
+            <div className="conn-apikey-form">
+              <input
+                type="password"
+                className="conn-apikey-input"
+                placeholder="Paste API key…"
+                value={apiKeyDraft}
+                onChange={(e) => setApiKeyDraft(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') void handleSaveApiKey(); }}
+                autoFocus
+              />
+              <button
+                type="button"
+                disabled={loading || !apiKeyDraft.trim()}
+                onClick={() => { void handleSaveApiKey(); }}
+                className="conn-btn-connect"
+              >
+                Save
+              </button>
+              <button
+                type="button"
+                onClick={() => { setShowKeyInput(false); setApiKeyDraft(''); }}
+                className="conn-btn-disconnect"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setShowKeyInput(true)}
+              className="conn-btn-connect"
+            >
+              Connect
+            </button>
+          )
+        ) : conn.oauthSupported ? (
           conn.oauthConnected ? (
             <button
               type="button"
               disabled={loading}
-              onClick={() => {
-                void handleDisconnect();
-              }}
+              onClick={() => { void handleDisconnect(); }}
               className="conn-btn-disconnect"
             >
               Disconnect
@@ -298,9 +365,7 @@ function ConnectionCard({
             </span>
             <Toggle
               checked={conn.enabled}
-              onChange={(v) => {
-                void handleToggle(v);
-              }}
+              onChange={(v) => { void handleToggle(v); }}
               disabled={loading}
             />
           </>
@@ -446,12 +511,42 @@ function ConnectionsPage() {
       if (!res.ok) throw new Error(`Failed to disconnect (${res.status})`);
       setConnList((prev) =>
         prev.map((c) =>
-          c.name === name
-            ? {
-                ...c,
-                oauthConnected: false,
-              }
-            : c,
+          c.name === name ? { ...c, oauthConnected: false } : c,
+        ),
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const handleSaveApiKey = async (name: string, apiKey: string) => {
+    try {
+      const res = await fetch(`${CONNECTIONS_URL}/${name}/apikey`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apiKey }),
+      });
+      if (!res.ok) throw new Error(`Failed to save API key (${res.status})`);
+      setConnList((prev) =>
+        prev.map((c) =>
+          c.name === name ? { ...c, apiKeyConnected: true, oauthConnected: true } : c,
+        ),
+      );
+      setNotice(`${name} connected`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const handleRemoveApiKey = async (name: string) => {
+    try {
+      const res = await fetch(`${CONNECTIONS_URL}/${name}/apikey`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) throw new Error(`Failed to remove API key (${res.status})`);
+      setConnList((prev) =>
+        prev.map((c) =>
+          c.name === name ? { ...c, apiKeyConnected: false, oauthConnected: false } : c,
         ),
       );
     } catch (err) {
@@ -583,6 +678,8 @@ function ConnectionsPage() {
                     void handleToggle(id, enabled);
                   }}
                   onDisconnect={handleDisconnect}
+                  onSaveApiKey={handleSaveApiKey}
+                  onRemoveApiKey={handleRemoveApiKey}
                 />
               ))}
             </div>
