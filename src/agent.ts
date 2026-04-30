@@ -24,6 +24,7 @@ import { docsTool } from './subagents/google-docs.ts';
 import { anilistTool } from './subagents/anilist.ts';
 import { knowledgeGraphTool } from './subagents/knowledge-graph.ts';
 import { notionTool } from './subagents/notion.ts';
+import { clickupTool } from './subagents/clickup.ts';
 import { model } from './shared.ts';
 import { ChatOpenAI } from '@langchain/openai';
 
@@ -60,6 +61,7 @@ const tools = [
   anilistTool,
   knowledgeGraphTool,
   notionTool,
+  clickupTool,
 ];
 
 const mainAgent = createAgent({
