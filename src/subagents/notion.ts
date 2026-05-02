@@ -3,6 +3,7 @@ import z from 'zod';
 import { model } from '../shared';
 import { notionTools } from '../tools/notion';
 import { getCurrentDateTime } from '../tools/miscellaneous';
+import { getFinalText, requireConfirmation } from './utils';
 
 const NOTION_SYSTEM_PROMPT = `You are a Notion Workspace Assistant with full access to the user's Notion workspace via the OAuth API.
 
@@ -12,7 +13,9 @@ How to work correctly:
 - For "that page" or vague references, search first.
 - When creating content, structure it logically using the available blocks.
 - READ database schemas first to understand property names before querying or adding rows.
-- Use get_current_datetime when any date/time context is needed.`;
+- Use get_current_datetime when any date/time context is needed.
+- Ask for confirmation before trashing pages, deleting blocks, or making broad replacements.
+- If a tool returns an Error/Failed result, report that failure instead of treating it as success.`;
 
 const notionAgent = createAgent({
   model,
@@ -21,13 +24,20 @@ const notionAgent = createAgent({
 
 export const notionTool = tool(
   async ({ query }) => {
+    const confirmation = requireConfirmation(
+      query,
+      /\b(delete|trash|remove block|wipe|replace all)\b/i,
+      'delete, trash, wipe, or broadly replace Notion content',
+    );
+    if (confirmation) return confirmation;
+
     const response = await notionAgent.invoke({
       messages: [
         { role: 'system', content: NOTION_SYSTEM_PROMPT },
         { role: 'user', content: query },
       ],
     });
-    return response.messages[response.messages.length - 1]!.text;
+    return getFinalText(response);
   },
   {
     name: 'notion',
