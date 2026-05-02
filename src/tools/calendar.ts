@@ -4,6 +4,8 @@ import { google } from 'googleapis';
 import { config } from '../config.ts';
 import { logger } from '../logger.ts';
 
+const EVENT_MATCH_TOLERANCE_MS = 10 * 60 * 1000;
+
 function loadServiceAccount(): Record<string, string> {
   return JSON.parse(config.GOOGLE_CREDENTIALS);
 }
@@ -20,20 +22,80 @@ function getCalendarClient() {
   return google.calendar({ version: 'v3', auth });
 }
 
+function getLocalDateInUserTimezone(date = new Date()): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: config.USER_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+
+  const get = (type: string) =>
+    parts.find((part) => part.type === type)?.value ?? '';
+  return `${get('year')}-${get('month')}-${get('day')}`;
+}
+
+function getTimeZoneOffsetMs(date: Date, timeZone: string): number {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(date);
+
+  const values = Object.fromEntries(
+    parts
+      .filter((part) => part.type !== 'literal')
+      .map((part) => [part.type, Number(part.value)]),
+  ) as Record<string, number>;
+
+  const year = values.year ?? date.getUTCFullYear();
+  const month = values.month ?? date.getUTCMonth() + 1;
+  const day = values.day ?? date.getUTCDate();
+  const hour = values.hour ?? date.getUTCHours();
+  const minute = values.minute ?? date.getUTCMinutes();
+  const second = values.second ?? date.getUTCSeconds();
+
+  const asUtc = Date.UTC(year, month - 1, day, hour, minute, second);
+
+  return asUtc - date.getTime();
+}
+
+function zonedDateTimeToUtc(date: string, time: string): Date {
+  const [year, month, day] = date.split('-').map(Number);
+  const [hour, minute, second] = time.split(':').map(Number);
+  const initialUtc = new Date(
+    Date.UTC(year!, month! - 1, day!, hour!, minute!, second ?? 0),
+  );
+  const offset = getTimeZoneOffsetMs(initialUtc, config.USER_TIMEZONE);
+  return new Date(initialUtc.getTime() - offset);
+}
+
+function dateRangeToUtcBounds(startDate?: string, endDate?: string) {
+  const start = startDate ?? getLocalDateInUserTimezone();
+  const end = endDate ?? start;
+  return {
+    timeMin: zonedDateTimeToUtc(start, '00:00:00'),
+    timeMax: zonedDateTimeToUtc(end, '23:59:59'),
+  };
+}
+
+function addDays(date: string, days: number): string {
+  const [year, month, day] = date.split('-').map(Number);
+  const utc = new Date(Date.UTC(year!, month! - 1, day! + days));
+  return utc.toISOString().slice(0, 10);
+}
+
 export const getCalendarEvents = tool(
   async ({ startDate, endDate }) => {
     try {
       const calendar = getCalendarClient();
 
-      const now = new Date();
-      const todayUTC = new Date(
-        Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
-      );
-
-      const timeMin = startDate ? new Date(startDate + 'T00:00:00Z') : todayUTC;
-      const timeMax = endDate
-        ? new Date(endDate + 'T23:59:59Z')
-        : new Date(timeMin.getTime() + 24 * 60 * 60 * 1000);
+      const { timeMin, timeMax } = dateRangeToUtcBounds(startDate, endDate);
 
       const response = await calendar.events.list({
         calendarId: config.GOOGLE_CALENDAR_ID,
@@ -60,18 +122,19 @@ export const getCalendarEvents = tool(
   },
   {
     name: 'get_calendar_events',
-    description:
-      'Get Google Calendar events. Defaults to today (UTC) when no dates are provided. Supply startDate and/or endDate (YYYY-MM-DD) to fetch events for any date range.',
+    description: `Get Google Calendar events. Defaults to today in ${config.USER_TIMEZONE} when no dates are provided. Supply startDate and/or endDate (YYYY-MM-DD) to fetch events for any date range.`,
     schema: z.object({
       startDate: z
         .string()
         .optional()
-        .describe('Start date in YYYY-MM-DD format (UTC). Defaults to today.'),
+        .describe(
+          `Start date in YYYY-MM-DD format (${config.USER_TIMEZONE}). Defaults to today.`,
+        ),
       endDate: z
         .string()
         .optional()
         .describe(
-          'End date in YYYY-MM-DD format (UTC). Defaults to startDate if omitted.',
+          `End date in YYYY-MM-DD format (${config.USER_TIMEZONE}). Defaults to startDate if omitted.`,
         ),
     }),
   },
@@ -93,9 +156,9 @@ export const createCalendarEvent = tool(
           ...(description ? { description } : {}),
           start: {
             dateTime: start,
-            timeZone: 'UTC',
+            timeZone: config.USER_TIMEZONE,
           },
-          end: { dateTime: end, timeZone: 'UTC' },
+          end: { dateTime: end, timeZone: config.USER_TIMEZONE },
           ...(attendees?.length
             ? {
                 attendees: attendees.map((email) => ({
@@ -115,19 +178,18 @@ export const createCalendarEvent = tool(
   },
   {
     name: 'create_calendar_event',
-    description:
-      'Create a new event on Google Calendar. Start and end must be ISO 8601 UTC datetime strings (e.g. "2026-04-03T14:00:00Z"). Attendees are optional email addresses.',
+    description: `Create a new event on Google Calendar. Start and end must be ISO 8601 datetime strings, preferably with timezone offsets. The default timezone is ${config.USER_TIMEZONE}. Attendees are optional email addresses.`,
     schema: z.object({
       summary: z.string().describe('Event title'),
       start: z
         .string()
         .describe(
-          'Start datetime in ISO 8601 UTC format (e.g. "2026-04-03T14:00:00Z")',
+          'Start datetime in ISO 8601 format, preferably with timezone offset',
         ),
       end: z
         .string()
         .describe(
-          'End datetime in ISO 8601 UTC format (e.g. "2026-04-03T15:00:00Z")',
+          'End datetime in ISO 8601 format, preferably with timezone offset',
         ),
       description: z.string().optional().describe('Event description or notes'),
       attendees: z
@@ -148,7 +210,7 @@ export const createAllDayCalendarEvent = tool(
           summary,
           ...(description ? { description } : {}),
           start: { date },
-          end: { date: endDate ?? date },
+          end: { date: endDate ?? addDays(date, 1) },
           ...(attendees?.length
             ? {
                 attendees: attendees.map((email) => ({
@@ -226,6 +288,7 @@ async function findEventByStart(
     }
   }
 
+  if (closestDiff > EVENT_MATCH_TOLERANCE_MS) return null;
   if (!closest.id) return null;
   return { id: closest.id, summary: closest.summary ?? 'Untitled' };
 }
@@ -252,11 +315,11 @@ export const editCalendarEvent = tool(
           ...(description ? { description } : {}),
           start: {
             dateTime: newStart,
-            timeZone: 'UTC',
+            timeZone: config.USER_TIMEZONE,
           },
           end: {
             dateTime: newEnd,
-            timeZone: 'UTC',
+            timeZone: config.USER_TIMEZONE,
           },
           ...(attendees?.length
             ? {
@@ -278,24 +341,14 @@ export const editCalendarEvent = tool(
   {
     name: 'edit_calendar_event',
     description:
-      'Edit an existing Google Calendar event found by its current start datetime. Use ISO 8601 UTC datetimes.',
+      'Edit an existing Google Calendar event found by its current start datetime. The current start time must match an event within 10 minutes.',
     schema: z.object({
       startDateTime: z
         .string()
-        .describe(
-          'Current start datetime of the event to edit (ISO 8601 UTC, e.g. "2026-04-03T14:00:00Z")',
-        ),
+        .describe('Current start datetime of the event to edit as ISO 8601'),
       summary: z.string().describe('New event title'),
-      newStart: z
-        .string()
-        .describe(
-          'New start datetime (ISO 8601 UTC, e.g. "2026-04-03T14:00:00Z")',
-        ),
-      newEnd: z
-        .string()
-        .describe(
-          'New end datetime (ISO 8601 UTC, e.g. "2026-04-03T15:00:00Z")',
-        ),
+      newStart: z.string().describe('New start datetime as ISO 8601'),
+      newEnd: z.string().describe('New end datetime as ISO 8601'),
       description: z.string().optional().describe('New event description'),
       attendees: z
         .array(z.string())
@@ -329,13 +382,12 @@ export const deleteCalendarEvent = tool(
   },
   {
     name: 'delete_calendar_event',
-    description: 'Delete a Google Calendar event found by its start datetime. Use ISO 8601 UTC datetimes.',
+    description:
+      'Delete a Google Calendar event found by its start datetime. The start time must match an event within 10 minutes.',
     schema: z.object({
       startDateTime: z
         .string()
-        .describe(
-          'Start datetime of the event to delete (ISO 8601 UTC, e.g. "2026-04-03T14:00:00Z")',
-        ),
+        .describe('Start datetime of the event to delete as ISO 8601'),
     }),
   },
 );
@@ -346,4 +398,4 @@ export const calendarTools = [
   createAllDayCalendarEvent,
   editCalendarEvent,
   deleteCalendarEvent,
-];
+] as const;
