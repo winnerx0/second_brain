@@ -28,6 +28,7 @@
     "@tanstack/react-router": "latest",
     "@tanstack/react-start": "latest",
     "dotenv": "^17.4.1",
+    "drizzle-kit": "latest",
     "drizzle-orm": "latest",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.5",
@@ -35,14 +36,14 @@
     "hono": "latest",
     "js-tiktoken": "^1.0.21",
     "langchain": "latest",
+    "nitro": "^3.0.260429-beta",
     "openai": "^6.34.0",
     "pg": "^8.20.0",
     "prettier": "^3.8.3",
     "react": "latest",
     "react-dom": "latest",
     "winston": "^3.19.0",
-    "zod": "latest",
-    "drizzle-kit": "latest"
+    "zod": "latest"
   },
   "devDependencies": {
     "@types/bun": "latest",

@@ -3,15 +3,20 @@ import react from '@vitejs/plugin-react';
 import { tanstackStart } from '@tanstack/react-start/plugin/vite';
 import { VitePWA } from 'vite-plugin-pwa';
 import tailwindcss from '@tailwindcss/vite';
+import { nitro } from 'nitro/vite';
 
 const isVinxi = process.argv.some(arg => arg.includes('vinxi'));
 
 export default defineConfig({
   server: {
     port: 3001,
+    fs: {
+      allow: ['..'],
+    },
   },
   plugins: [
     tailwindcss(),
+    nitro(),
     tanstackStart(),
     react(),
     !isVinxi && VitePWA({
