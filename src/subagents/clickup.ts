@@ -1,9 +1,9 @@
 import { createAgent, tool } from 'langchain';
 import z from 'zod';
-import { model } from '../shared.js';
-import { clickupTools } from '../tools/clickup.js';
-import { getCurrentDateTime } from '../tools/miscellaneous.js';
-import { getFinalText, requireConfirmation } from './utils.js';
+import { model } from '../shared.ts';
+import { clickupTools } from '../tools/clickup.ts';
+import { getCurrentDateTime } from '../tools/miscellaneous.ts';
+import { getFinalText, requireConfirmation } from './utils.ts';
 
 const CLICKUP_SYSTEM_PROMPT = `You are a ClickUp Assistant with full access to the user's ClickUp workspace.
 

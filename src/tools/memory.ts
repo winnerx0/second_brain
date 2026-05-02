@@ -1,11 +1,11 @@
 import { tool } from 'langchain';
 import { z } from 'zod';
 import { and, desc, eq, ilike, inArray, lt, ne, or, sql } from 'drizzle-orm';
-import { db } from '../db/client.js';
-import { logger } from '../logger.js';
+import { db } from '../db/client.ts';
+import { logger } from '../logger.ts';
 import { OpenAI } from 'openai';
-import { config } from '../config.js';
-import { memories, memoryCleanupRuns } from '../db/schema.js';
+import { config } from '../config.ts';
+import { memories, memoryCleanupRuns } from '../db/schema.ts';
 import { ChatOpenRouter } from '@langchain/openrouter';
 
 const embeddingClient = new OpenAI({ apiKey: config.OPENAI_API_KEY });

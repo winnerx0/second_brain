@@ -1,8 +1,8 @@
 import { tool } from 'langchain';
 import { z } from 'zod';
-import { config } from '../config.js';
-import { logger } from '../logger.js';
-import { getValidToken } from '../oauth.js';
+import { config } from '../config.ts';
+import { logger } from '../logger.ts';
+import { getValidToken } from '../oauth.ts';
 
 const ANILIST_URL = 'https://graphql.anilist.co';
 

@@ -1,12 +1,12 @@
 import crypto from 'node:crypto';
-import { db } from '../db/client.js';
-import { connections } from '../db/schema.js';
+import { db } from '../db/client.ts';
+import { connections } from '../db/schema.ts';
 import { eq } from 'drizzle-orm';
-import { logger } from '../logger.js';
-import type { OAuthClientProvider } from '@modelcontextprotocol/sdk/client/auth.js';
-import type { OAuthClientMetadata } from '@modelcontextprotocol/sdk/shared/auth.js';
-import { auth, discoverOAuthServerInfo } from '@modelcontextprotocol/sdk/client/auth.js';
-import { reinitializeMcpServer } from './mcp.js';
+import { logger } from '../logger.ts';
+import type { OAuthClientProvider } from '@modelcontextprotocol/sdk/client/auth.ts';
+import type { OAuthClientMetadata } from '@modelcontextprotocol/sdk/shared/auth.ts';
+import { auth, discoverOAuthServerInfo } from '@modelcontextprotocol/sdk/client/auth.ts';
+import { reinitializeMcpServer } from './mcp.ts';
 
 // Types for OAuth tokens and client info
 export type OAuthTokens = {

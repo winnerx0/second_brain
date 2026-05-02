@@ -1,7 +1,7 @@
 import { tool } from 'langchain';
 import { z } from 'zod';
-import { logger } from '../logger.js';
-import { getValidToken } from '../oauth.js';
+import { logger } from '../logger.ts';
+import { getValidToken } from '../oauth.ts';
 
 const SPOTIFY_API_URL = 'https://api.spotify.com/v1';
 

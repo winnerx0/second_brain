@@ -1,9 +1,9 @@
 import { tool } from 'langchain';
 import { z } from 'zod';
 import { google } from 'googleapis';
-import { config } from '../config.js';
-import { logger } from '../logger.js';
-import { getDbRefreshToken, getValidToken } from '../oauth.js';
+import { config } from '../config.ts';
+import { logger } from '../logger.ts';
+import { getDbRefreshToken, getValidToken } from '../oauth.ts';
 
 type GoogleAuthCredential =
   | { accessToken: string }

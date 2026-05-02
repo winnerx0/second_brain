@@ -1,8 +1,8 @@
 import { createAgent, tool } from 'langchain';
 import z from 'zod';
-import { model } from '../shared.js';
-import { knowledgeGraphTools } from '../tools/knowledge-graph.js';
-import { getFinalText } from './utils.js';
+import { model } from '../shared.ts';
+import { knowledgeGraphTools } from '../tools/knowledge-graph.ts';
+import { getFinalText } from './utils.ts';
 
 const KNOWLEDGE_GRAPH_SYSTEM_PROMPT = `You are a Knowledge Graph Assistant.
 

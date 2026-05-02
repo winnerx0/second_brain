@@ -1,8 +1,8 @@
 import { createAgent, tool } from 'langchain';
 import z from 'zod';
-import { model } from '../shared.js';
-import { spotifyTools } from '../tools/spotify.js';
-import { getFinalText } from './utils.js';
+import { model } from '../shared.ts';
+import { spotifyTools } from '../tools/spotify.ts';
+import { getFinalText } from './utils.ts';
 
 const SPOTIFY_SYSTEM_PROMPT = `You are a Spotify Assistant with access to the user's Spotify account.
 

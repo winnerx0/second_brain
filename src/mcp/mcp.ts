@@ -1,8 +1,8 @@
 import { MultiServerMCPClient } from '@langchain/mcp-adapters';
-import { logger } from '../logger.js';
-import type { OAuthClientProvider } from '@modelcontextprotocol/sdk/client/auth.js';
-import type { OAuthClientMetadata } from '@modelcontextprotocol/sdk/shared/auth.js';
-import { DatabaseOAuthProvider } from './oauth.js';
+import { logger } from '../logger.ts';
+import type { OAuthClientProvider } from '@modelcontextprotocol/sdk/client/auth.ts';
+import type { OAuthClientMetadata } from '@modelcontextprotocol/sdk/shared/auth.ts';
+import { DatabaseOAuthProvider } from './oauth.ts';
 
 const redirectUrl = process.env.OAUTH_REDIRECT_BASE_URL
   ? `${process.env.OAUTH_REDIRECT_BASE_URL.replace(/\/$/, '')}/oauth/callback`

@@ -1,5 +1,5 @@
 import { ChatOpenRouter } from '@langchain/openrouter';
-import { config } from './config.js';
+import { config } from './config.ts';
 import { ChatOpenAI } from '@langchain/openai';
 
 // export const model = new ChatOpenAI({
