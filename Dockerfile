@@ -23,6 +23,7 @@ WORKDIR /app
 COPY --from=build /app/dist ./dist
 COPY --from=install /app/node_modules ./node_modules
 COPY package.json bun.lock tsconfig.json ./
+COPY src/db ./src/db
 COPY drizzle ./drizzle
 COPY drizzle.config.ts ./
 # COPY .config/google-docs-mcp /root/.config/google-docs-mcp
