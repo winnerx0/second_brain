@@ -1,8 +1,8 @@
 import { tool } from 'langchain';
 import { z } from 'zod';
 import { google } from 'googleapis';
-import { config } from '../config.ts';
-import { logger } from '../logger.ts';
+import { config } from '../config.js';
+import { logger } from '../logger.js';
 
 const EVENT_MATCH_TOLERANCE_MS = 10 * 60 * 1000;
 

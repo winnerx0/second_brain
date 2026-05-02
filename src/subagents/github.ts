@@ -1,6 +1,6 @@
 import { createAgent, tool } from 'langchain';
 import z from 'zod';
-import { model } from '../shared.ts';
+import { model } from '../shared.js';
 import {
   getOpenPRs,
   getAssignedIssues,
@@ -8,8 +8,8 @@ import {
   createIssue,
   closeIssue,
   deleteIssue,
-} from '../tools/github.ts';
-import { getFinalText, requireConfirmation } from './utils.ts';
+} from '../tools/github.js';
+import { getFinalText, requireConfirmation } from './utils.js';
 
 const GITHUB_SYSTEM_PROMPT = `You are a GitHub Assistant with access to the user's GitHub account.
 

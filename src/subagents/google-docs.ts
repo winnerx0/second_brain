@@ -1,8 +1,8 @@
 import { createAgent, tool } from 'langchain';
 import z from 'zod';
-import { model } from '../shared.ts';
-import { googleDocTools } from '../tools/google-docs.ts';
-import { getFinalText, requireConfirmation } from './utils.ts';
+import { model } from '../shared.js';
+import { googleDocTools } from '../tools/google-docs.js';
+import { getFinalText, requireConfirmation } from './utils.js';
 
 const DOCS_SYSTEM_PROMPT = `You are a Document Assistant with access to Google Docs.
 

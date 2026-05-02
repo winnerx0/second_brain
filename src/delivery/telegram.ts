@@ -1,4 +1,4 @@
-import { config } from '../config.ts';
+import { config } from '../config.js';
 
 const TELEGRAM_API = `https://api.telegram.org/bot${config.TELEGRAM_BOT_TOKEN}`;
 const MAX_LENGTH = 4096;

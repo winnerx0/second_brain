@@ -1,9 +1,9 @@
 import { tool } from 'langchain';
 import { z } from 'zod';
 import { and, eq, ilike, inArray, or, sql } from 'drizzle-orm';
-import { db } from '../db/client.ts';
-import { graphEdges, graphNodes } from '../db/schema.ts';
-import { logger } from '../logger.ts';
+import { db } from '../db/client.js';
+import { graphEdges, graphNodes } from '../db/schema.js';
+import { logger } from '../logger.js';
 
 type NodeKind =
   | 'person'

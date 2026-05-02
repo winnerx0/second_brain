@@ -1,8 +1,8 @@
 import crypto from 'node:crypto';
-import { db } from './db/client.ts';
-import { connections } from './db/schema.ts';
+import { db } from './db/client.js';
+import { connections } from './db/schema.js';
 import { eq } from 'drizzle-orm';
-import { logger } from './logger.ts';
+import { logger } from './logger.js';
 
 type OAuthConfig = {
   authUrl: string;

@@ -1,7 +1,7 @@
 import { tool } from 'langchain';
 import { z } from 'zod';
-import { logger } from '../logger.ts';
-import { getValidToken } from '../oauth.ts';
+import { logger } from '../logger.js';
+import { getValidToken } from '../oauth.js';
 
 const TWITTER_API_URL = 'https://api.twitter.com/2';
 const USER_FIELDS =
