@@ -5,8 +5,6 @@ import { VitePWA } from 'vite-plugin-pwa';
 import tailwindcss from '@tailwindcss/vite';
 import { nitro } from 'nitro/vite';
 
-const isVinxi = process.argv.some(arg => arg.includes('vinxi'));
-
 export default defineConfig({
   server: {
     port: 3001,
@@ -14,12 +12,17 @@ export default defineConfig({
       allow: ['..'],
     },
   },
+
   plugins: [
     tailwindcss(),
-    nitro(),
+
     tanstackStart(),
+
+    nitro(),
+
     react(),
-    !isVinxi && VitePWA({
+
+    VitePWA({
       registerType: 'autoUpdate',
       injectRegister: 'script',
       includeAssets: ['icon.svg'],

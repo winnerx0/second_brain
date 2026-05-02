@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "vite dev --port 3001",
     "build": "vite build",
-    "start": "vite preview --port 3001",
+    "start": "node .output/server/index.mjs",
     "preview": "vite preview --port 3001",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
