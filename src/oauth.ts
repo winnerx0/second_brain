@@ -75,7 +75,7 @@ export const OAUTH_CONFIGS: Record<string, OAuthConfig> = {
   twitter: {
     authUrl: 'https://twitter.com/i/oauth2/authorize',
     tokenUrl: 'https://api.twitter.com/2/oauth2/token',
-    scopes: ['tweet.read', 'users.read', 'offline.access'],
+    scopes: ['tweet.read', 'tweet.write', 'users.read', 'offline.access'],
     clientIdEnv: 'TWITTER_OAUTH_CLIENT_ID',
     clientSecretEnv: 'TWITTER_OAUTH_CLIENT_SECRET',
     pkce: true,

@@ -25,6 +25,8 @@ import { anilistTool } from './subagents/anilist.ts';
 import { knowledgeGraphTool } from './subagents/knowledge-graph.ts';
 import { notionTool } from './subagents/notion.ts';
 import { clickupTool } from './subagents/clickup.ts';
+import { spotifyTool } from './subagents/spotify.ts';
+import { twitterTool } from './subagents/twitter.ts';
 import { model } from './shared.ts';
 import { ChatOpenAI } from '@langchain/openai';
 
@@ -62,6 +64,8 @@ const tools = [
   knowledgeGraphTool,
   notionTool,
   clickupTool,
+  spotifyTool,
+  twitterTool,
 ];
 
 const mainAgent = createAgent({
@@ -247,6 +251,8 @@ const CHAT_SYSTEM = new SystemMessage(
     - notion    → pages, databases, notes
     - docs      → Google Docs
     - anilist   → anime / manga lookups and authenticated list/rating updates
+    - spotify   → music search, playback, devices, playlists, recent listening
+    - twitter   → Twitter/X profile, timelines, mentions, search, and posts
     - gmail     → emails (read, search, send, reply, archive)
     - knowledge_graph → entities, relationships, and graph context
   - You can fan out multiple agents in parallel when steps are independent.
