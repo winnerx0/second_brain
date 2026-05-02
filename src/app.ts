@@ -554,7 +554,10 @@ app.post('/chat/stream', async (c) => {
 
 function authorizeCron(c: Context) {
   const secret = process.env.CRON_SECRET;
-  if (!secret) return true;
+  if (!secret) {
+    logger.error('[cron.authorize] CRON_SECRET is not set');
+    return false;
+  }
   return c.req.header('authorization') === `Bearer ${secret}`;
 }
 
