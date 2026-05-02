@@ -25,6 +25,7 @@ const envSchema = z.object({
     .default('https://openrouter.ai/api/v1'),
   OPENROUTER_API_KEY: z.string().min(1),
   GEMINI_API_KEY: z.string().min(1),
+  USER_TIMEZONE: z.string().min(1).default('UTC'),
   // Gmail
   GMAIL_REFRESH_TOKEN: z.string().optional(),
 });
