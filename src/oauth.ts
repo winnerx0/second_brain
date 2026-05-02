@@ -57,7 +57,6 @@ export const OAUTH_CONFIGS: Record<string, OAuthConfig> = {
     clientIdEnv: 'NOTION_OAUTH_CLIENT_ID',
     clientSecretEnv: 'NOTION_OAUTH_CLIENT_SECRET',
     basicAuth: true,
-    // Note: Notion now uses traditional OAuth flow, not MCP OAuth
   },
   spotify: {
     authUrl: 'https://accounts.spotify.com/authorize',
