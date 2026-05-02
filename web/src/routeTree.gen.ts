@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as MemoriesRouteImport } from './routes/memories'
 import { Route as ConnectionsRouteImport } from './routes/connections'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as MemoriesGraphRouteImport } from './routes/memories_.graph'
 
 const MemoriesRoute = MemoriesRouteImport.update({
   id: '/memories',
@@ -28,35 +29,44 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MemoriesGraphRoute = MemoriesGraphRouteImport.update({
+  id: '/memories_/graph',
+  path: '/memories/graph',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/connections': typeof ConnectionsRoute
   '/memories': typeof MemoriesRoute
+  '/memories/graph': typeof MemoriesGraphRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/connections': typeof ConnectionsRoute
   '/memories': typeof MemoriesRoute
+  '/memories/graph': typeof MemoriesGraphRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/connections': typeof ConnectionsRoute
   '/memories': typeof MemoriesRoute
+  '/memories_/graph': typeof MemoriesGraphRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/connections' | '/memories'
+  fullPaths: '/' | '/connections' | '/memories' | '/memories/graph'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/connections' | '/memories'
-  id: '__root__' | '/' | '/connections' | '/memories'
+  to: '/' | '/connections' | '/memories' | '/memories/graph'
+  id: '__root__' | '/' | '/connections' | '/memories' | '/memories_/graph'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ConnectionsRoute: typeof ConnectionsRoute
   MemoriesRoute: typeof MemoriesRoute
+  MemoriesGraphRoute: typeof MemoriesGraphRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -82,6 +92,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/memories_/graph': {
+      id: '/memories_/graph'
+      path: '/memories/graph'
+      fullPath: '/memories/graph'
+      preLoaderRoute: typeof MemoriesGraphRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -89,6 +106,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ConnectionsRoute: ConnectionsRoute,
   MemoriesRoute: MemoriesRoute,
+  MemoriesGraphRoute: MemoriesGraphRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

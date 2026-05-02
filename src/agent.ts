@@ -9,7 +9,7 @@ import {
 import type { AIMessageChunk } from '@langchain/core/messages';
 import { getEncoding } from 'js-tiktoken';
 import { config } from './config.js';
-import { storeMemory, recallMemories, deleteMemory } from './tools/memory.js';
+import { storeMemory, recallMemories, deleteMemory, editMemory } from './tools/memory.js';
 import { db } from './db/client.js';
 import { agentRuns, chatHistory, chatSessions } from './db/schema.js';
 import { desc, eq, isNull } from 'drizzle-orm';
@@ -56,6 +56,7 @@ const tools = [
   storeMemory,
   recallMemories,
   deleteMemory,
+  editMemory,
   githubTool,
   calendarTool,
   gmailTool,

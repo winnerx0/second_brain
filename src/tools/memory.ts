@@ -178,6 +178,13 @@ async function embed(input: string): Promise<number[]> {
   return res.data[0]!.embedding;
 }
 
+// Cosine similarity thresholds (1 - pgvector cosine distance).
+// Strict cutoff for destructive ops: deleting/editing the wrong row is silent
+// and unrecoverable, so require a confident match.
+const DESTRUCTIVE_SIMILARITY_THRESHOLD = 0.8;
+// Looser cutoff for read-side recall: better to return nothing than garbage.
+const RECALL_SIMILARITY_THRESHOLD = 0.7;
+
 function buildQueryTerms(query: string): string[] {
   return Array.from(
     new Set(
@@ -1082,6 +1089,9 @@ export const recallMemories = tool(
 
       const queryTerms = buildQueryTerms(query);
 
+      const distanceExpr = sql<number>`vector <=> ${JSON.stringify(queryEmbedding)}::vector`;
+      const maxDistance = 1 - RECALL_SIMILARITY_THRESHOLD;
+
       const lexicalMatches =
         queryTerms.length > 0
           ? await db
@@ -1094,22 +1104,24 @@ export const recallMemories = tool(
                   ),
                 ),
               )
-              .orderBy(
-                sql`vector <=> ${JSON.stringify(queryEmbedding)}::vector`,
-              )
+              .orderBy(distanceExpr)
               .limit(5)
           : [];
+
+      const semanticMatches = await db
+        .select({
+          row: memories,
+          distance: distanceExpr.as('distance'),
+        })
+        .from(memories)
+        .where(sql`${distanceExpr} <= ${maxDistance}`)
+        .orderBy(distanceExpr)
+        .limit(5);
 
       const result =
         lexicalMatches.length > 0
           ? lexicalMatches
-          : await db
-              .select()
-              .from(memories)
-              .orderBy(
-                sql`vector <=> ${JSON.stringify(queryEmbedding)}::vector`,
-              )
-              .limit(5);
+          : semanticMatches.map((r) => r.row);
 
       const now = new Date();
 
@@ -1170,18 +1182,28 @@ export const deleteMemory = tool(
       }
 
       const qEmbedding = await embed(text);
+      const distanceExpr = sql<number>`vector <=> ${JSON.stringify(qEmbedding)}::vector`;
       const [candidate] = await db
-        .select()
+        .select({
+          id: memories.id,
+          content: memories.content,
+          distance: distanceExpr.as('distance'),
+        })
         .from(memories)
-        .orderBy(sql`vector <=> ${JSON.stringify(qEmbedding)}::vector`)
+        .orderBy(distanceExpr)
         .limit(1);
 
       if (!candidate) {
         return 'No memory found to delete';
       }
 
+      const similarity = 1 - Number(candidate.distance);
+      if (similarity < DESTRUCTIVE_SIMILARITY_THRESHOLD) {
+        return `No confident match for "${text}" (best similarity ${similarity.toFixed(2)} < ${DESTRUCTIVE_SIMILARITY_THRESHOLD}). Refusing to delete.`;
+      }
+
       await db.delete(memories).where(eq(memories.id, candidate.id));
-      return `Deleted memory id=${candidate.id}`;
+      return `Deleted memory id=${candidate.id} (similarity ${similarity.toFixed(2)})`;
     } catch (error) {
       logger.error('[memory]', error);
       return `Error deleting memory: ${error instanceof Error ? error.message : String(error)}`;
@@ -1205,6 +1227,116 @@ export const deleteMemory = tool(
         .string()
         .optional()
         .describe('Legacy alias for query; kept for backward compatibility'),
+    }),
+  },
+);
+
+export const editMemory = tool(
+  async ({ id, query, content, classification }) => {
+    try {
+      if (!content && !classification) {
+        return 'Error editing memory: provide content and/or classification to update';
+      }
+
+      let target: { id: number; content: string; classification: Classification } | null = null;
+
+      if (id) {
+        const [row] = await db
+          .select({
+            id: memories.id,
+            content: memories.content,
+            classification: memories.classification,
+          })
+          .from(memories)
+          .where(eq(memories.id, id))
+          .limit(1);
+        if (!row) {
+          return `No memory found with id=${id}`;
+        }
+        target = { id: row.id, content: row.content, classification: row.classification as Classification };
+      } else {
+        if (!query) {
+          return 'Error editing memory: provide id or query';
+        }
+        const qEmbedding = await embed(query);
+        const distanceExpr = sql<number>`vector <=> ${JSON.stringify(qEmbedding)}::vector`;
+        const [candidate] = await db
+          .select({
+            id: memories.id,
+            content: memories.content,
+            classification: memories.classification,
+            distance: distanceExpr.as('distance'),
+          })
+          .from(memories)
+          .orderBy(distanceExpr)
+          .limit(1);
+
+        if (!candidate) {
+          return 'No memory found to edit';
+        }
+
+        const similarity = 1 - Number(candidate.distance);
+        if (similarity < DESTRUCTIVE_SIMILARITY_THRESHOLD) {
+          return `No confident match for "${query}" (best similarity ${similarity.toFixed(2)} < ${DESTRUCTIVE_SIMILARITY_THRESHOLD}). Refusing to edit.`;
+        }
+
+        target = {
+          id: candidate.id,
+          content: candidate.content,
+          classification: candidate.classification as Classification,
+        };
+      }
+
+      const nextContent = content ?? target.content;
+      const nextClassification: Classification = classification ?? target.classification;
+      const nextImportance = importanceForClassification(nextClassification);
+      const nextTier = determineTier(nextClassification);
+      const now = new Date();
+      const updates: Record<string, unknown> = {
+        classification: nextClassification,
+        importance: nextImportance,
+        tier: nextTier,
+        expiresAt: computeExpiresAt(nextTier, now),
+        updatedAt: now,
+      };
+
+      if (content) {
+        const newEmbedding = await embed(content);
+        updates.content = content;
+        updates.vector = sql`${JSON.stringify(newEmbedding)}::vector`;
+      }
+
+      await db.update(memories).set(updates).where(eq(memories.id, target.id));
+
+      return `Edited memory id=${target.id} (class=${nextClassification}, tier=${nextTier})`;
+    } catch (error) {
+      logger.error('[memory]', error);
+      return `Error editing memory: ${error instanceof Error ? error.message : String(error)}`;
+    }
+  },
+  {
+    name: 'edit_memory',
+    description:
+      'Edit a memory by id or by semantic match. Updates content (re-embeds) and/or classification. Refuses to edit when no confident match is found.',
+    schema: z.object({
+      id: z
+        .number()
+        .int()
+        .min(1)
+        .optional()
+        .describe('Specific memory id to edit'),
+      query: z
+        .string()
+        .optional()
+        .describe('Semantic text to locate the memory to edit (used when id is not provided)'),
+      content: z
+        .string()
+        .optional()
+        .describe('New content for the memory; triggers a re-embed when provided'),
+      classification: z
+        .enum(classifications)
+        .optional()
+        .describe('New classification; recomputes tier and importance'),
     }),
   },
 );
