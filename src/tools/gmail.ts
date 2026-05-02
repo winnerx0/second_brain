@@ -422,4 +422,4 @@ export const gmailTools = [
   listLabels,
   applyLabel,
   getThreadEmails,
-];
+] as const;
