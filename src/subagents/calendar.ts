@@ -3,6 +3,7 @@ import z from 'zod';
 import { model } from '../shared';
 import { calendarTools } from '../tools/calendar';
 import { getCurrentDateTime } from '../tools/miscellaneous';
+import { getFinalText, requireConfirmation } from './utils';
 
 const CALENDAR_SYSTEM_PROMPT = `You are a Calendar Assistant with access to the user's Google Calendar.
 
@@ -13,9 +14,10 @@ You can:
 
 When helping:
 - Always use get_calendar_events to check existing events before creating or editing
-- Dates and times must be in ISO 8601 UTC format for timed events, YYYY-MM-DD for all-day
-- Treat any time the user gives as UTC unless they explicitly specify a different timezone
-- For destructive operations (delete, edit), find the correct event then execute immediately — no confirmation needed
+- Use the user's configured timezone unless the user explicitly specifies another timezone
+- Dates and times passed to tools must be ISO 8601 strings with timezone offsets for timed events, YYYY-MM-DD for all-day
+- For destructive operations (delete, edit), first identify the exact event; ask for confirmation before editing or deleting
+- If a tool returns an Error/Failed result, report that failure instead of treating it as success
 - Return concise summaries of what was done or what was found`;
 
 const calendarAgent = createAgent({
@@ -25,13 +27,20 @@ const calendarAgent = createAgent({
 
 export const calendarTool = tool(
   async ({ query }) => {
+    const confirmation = requireConfirmation(
+      query,
+      /\b(delete|remove|cancel|edit|reschedule|move|change)\b/i,
+      'change a calendar event',
+    );
+    if (confirmation) return confirmation;
+
     const response = await calendarAgent.invoke({
       messages: [
         { role: 'system', content: CALENDAR_SYSTEM_PROMPT },
         { role: 'user', content: query },
       ],
     });
-    return response.messages[response.messages.length - 1]!.text;
+    return getFinalText(response);
   },
   {
     name: 'calendar',
