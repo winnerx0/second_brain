@@ -1,9 +1,9 @@
 import { createAgent, tool } from 'langchain';
 import z from 'zod';
-import { model } from '../shared';
-import { notionTools } from '../tools/notion';
-import { getCurrentDateTime } from '../tools/miscellaneous';
-import { getFinalText, requireConfirmation } from './utils';
+import { model } from '../shared.js';
+import { notionTools } from '../tools/notion.js';
+import { getCurrentDateTime } from '../tools/miscellaneous.js';
+import { getFinalText, requireConfirmation } from './utils.js';
 
 const NOTION_SYSTEM_PROMPT = `You are a Notion Workspace Assistant with full access to the user's Notion workspace via the OAuth API.
 

@@ -1,9 +1,9 @@
 import { createAgent, tool } from 'langchain';
 import z from 'zod';
-import { model } from '../shared';
-import { gmailTools } from '../tools/gmail';
-import { getCurrentDateTime } from '../tools/miscellaneous';
-import { getFinalText, requireConfirmation } from './utils';
+import { model } from '../shared.js';
+import { gmailTools } from '../tools/gmail.js';
+import { getCurrentDateTime } from '../tools/miscellaneous.js';
+import { getFinalText, requireConfirmation } from './utils.js';
 
 const GMAIL_SYSTEM_PROMPT = `You are an Email Assistant with access to the user's Gmail inbox.
 

@@ -1,8 +1,8 @@
 import { createAgent, tool } from 'langchain';
 import z from 'zod';
-import { model } from '../shared';
-import { addListEntry, anilistTools } from '../tools/anilist';
-import { getFinalText } from './utils';
+import { model } from '../shared.js';
+import { addListEntry, anilistTools } from '../tools/anilist.js';
+import { getFinalText } from './utils.js';
 
 const STATUS_VALUES = [
   'CURRENT',

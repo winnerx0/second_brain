@@ -9,7 +9,7 @@ import {
 import type { AIMessageChunk } from '@langchain/core/messages';
 import { getEncoding } from 'js-tiktoken';
 import { config } from './config.js';
-import { storeMemory, recallMemories, deleteMemory } from './tools/memory';
+import { storeMemory, recallMemories, deleteMemory } from './tools/memory.js';
 import { db } from './db/client.js';
 import { agentRuns, chatHistory, chatSessions } from './db/schema.js';
 import { desc, eq, isNull } from 'drizzle-orm';

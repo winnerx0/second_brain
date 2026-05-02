@@ -1,9 +1,9 @@
 import { createAgent, tool } from 'langchain';
 import z from 'zod';
-import { model } from '../shared';
-import { calendarTools } from '../tools/calendar';
-import { getCurrentDateTime } from '../tools/miscellaneous';
-import { getFinalText, requireConfirmation } from './utils';
+import { model } from '../shared.js';
+import { calendarTools } from '../tools/calendar.js';
+import { getCurrentDateTime } from '../tools/miscellaneous.js';
+import { getFinalText, requireConfirmation } from './utils.js';
 
 const CALENDAR_SYSTEM_PROMPT = `You are a Calendar Assistant with access to the user's Google Calendar.
 
