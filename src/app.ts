@@ -20,6 +20,7 @@ import {
   getAppUrl,
   OAUTH_CONFIGS,
 } from './oauth.js';
+import { config } from './config.js';
 
 const API_KEY_CONNECTIONS = new Set(['clickup']);
 // MCP OAuth imports - disabled, using traditional OAuth instead
@@ -76,7 +77,7 @@ function formatSseEvent(event: AgentStreamEvent): string {
   return `event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`;
 }
 
-app.use('*', cors({ origin: '*' }));
+app.use('*', cors({ origin: [config.APP_URL] }));
 
 app.get('/health', (c) => {
   return c.json({ status: 'ok', timestamp: Date.now() });
