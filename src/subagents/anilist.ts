@@ -2,6 +2,7 @@ import { createAgent, tool } from 'langchain';
 import z from 'zod';
 import { model } from '../shared';
 import { addListEntry, anilistTools } from '../tools/anilist';
+import { getFinalText } from './utils';
 
 const STATUS_VALUES = [
   'CURRENT',
@@ -34,7 +35,9 @@ function extractDirectRatingUpdate(query: string): {
 
   const upper = query.toUpperCase();
   const status = STATUS_VALUES.find((v) => upper.includes(v));
-  const progressMatch = query.match(/(?:progress|watched|read)\s*(?:to|=)?\s*(\d+)/i);
+  const progressMatch = query.match(
+    /(?:progress|watched|read)\s*(?:to|=)?\s*(\d+)/i,
+  );
   const progress = progressMatch ? Number(progressMatch[1]) : undefined;
 
   return { mediaId, score, status, progress };
@@ -51,7 +54,8 @@ When helping users:
 - Respect spoiler boundaries — never reveal plot twists or major developments
 - Keep responses focused on what was asked (synopsis, recommendations, current status)
 - If multiple matches exist, present the most popular/relevant one with a brief note
-- When the query is vague, ask one clarifying question before proceeding`;
+- When the query is vague, ask one clarifying question before proceeding
+- If a tool returns an Error/Failed result, report that failure instead of treating it as success`;
 
 const anilistAgent = createAgent({ model, tools: anilistTools });
 
@@ -74,7 +78,7 @@ export const anilistTool = tool(
         { role: 'user', content: query },
       ],
     });
-    return response.messages[response.messages.length - 1]!.text;
+    return getFinalText(response);
   },
   {
     name: 'anilist',
