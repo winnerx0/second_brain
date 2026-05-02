@@ -2,6 +2,7 @@ import { createAgent, tool } from 'langchain';
 import z from 'zod';
 import { model } from '../shared';
 import { knowledgeGraphTools } from '../tools/knowledge-graph';
+import { getFinalText } from './utils';
 
 const KNOWLEDGE_GRAPH_SYSTEM_PROMPT = `You are a Knowledge Graph Assistant.
 
@@ -20,6 +21,7 @@ Operating rules:
 - Keep relation labels short, snake_case, and directional (depends_on, decided_in, mentions, blocked_by).
 - Use evidence/source whenever the user provides it.
 - For ambiguous entity references, search first.
+- If a tool returns an Error/Failed result, report that failure instead of treating it as success.
 - Return concise summaries, and when useful include a machine-readable JSON block.`;
 
 const knowledgeGraphAgent = createAgent({
@@ -35,7 +37,7 @@ export const knowledgeGraphTool = tool(
         { role: 'user', content: query },
       ],
     });
-    return response.messages[response.messages.length - 1]!.text;
+    return getFinalText(response);
   },
   {
     name: 'knowledge_graph',
