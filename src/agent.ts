@@ -83,8 +83,8 @@ const mainAgent = createAgent({
 export type AgentStreamEvent =
   | { type: 'status'; message: string }
   | { type: 'assistant_delta'; delta: string }
-  | { type: 'tool_start'; tool: string; input: string }
-  | { type: 'tool_end'; tool: string; output: string }
+  | { type: 'tool_start'; tool: string; input?: string }
+  | { type: 'tool_end'; tool: string; output?: string }
   | { type: 'error'; message: string }
   | { type: 'final'; text: string };
 
@@ -111,6 +111,9 @@ function emitEvent(
   return onEvent?.(event);
 }
 
+function debugToolPayloadsEnabled(): boolean {
+  return process.env.AGENT_DEBUG_TOOL_PAYLOADS === 'true';
+}
 
 function shouldAutoStoreUserMemory(text: string): boolean {
   const value = text.trim().toLowerCase();
@@ -228,8 +231,9 @@ const CHAT_SYSTEM = new SystemMessage(
   - You remember context. If he mentioned something earlier, you connect it
     naturally without making a big deal of it.
   - You don't offer menus. You act, then tell him what you did.
-  - When something is ambiguous, state your assumption and go. Never ask
-    for confirmation before acting — just do it and report back.
+  - When something is ambiguous and low risk, state your assumption and go.
+    Ask for confirmation before sending messages, deleting/trashing content,
+    overwriting content, or making broad/bulk changes.
   - Never mention tools, agents, APIs, or how you work internally. Just give
     him the result.
 
@@ -270,11 +274,16 @@ const CHAT_SYSTEM = new SystemMessage(
 
   Ground rules:
   - Always use get_current_datetime before anything involving dates or time.
-  - For calendar actions, interpret times as UTC by default and do not ask
-    for a timezone unless the user explicitly gives a non-UTC timezone.
+  - For calendar actions, interpret times in ${config.USER_TIMEZONE} unless
+    the user explicitly gives another timezone.
   - Always use real data from agents/tools. Never guess numbers, dates, or details.
+  - If a tool or specialist returns an error/failure string, treat that as a
+    failed operation, do not describe it as completed, and tell ${env.MASTER}
+    what failed.
   - Resolve vague references like "that doc" or "the thing from earlier"
-    from recent context or memory before asking.`,
+    from recent context or memory before asking.
+  - Read-only tool calls can run immediately. Reversible low-risk writes can
+    run when the target is unambiguous. High-risk actions require confirmation.`,
 );
 
 export async function handleMessage(
@@ -302,12 +311,13 @@ export async function handleMessage(
     .map((r) => {
       const data = JSON.parse(r.content);
       if (r.role === 'human') return new HumanMessage(data.content);
-      if (r.role === 'tool') return new ToolMessage({
-        content: data.content,
-        tool_call_id: data.tool_call_id,
-        name: data.name,
-      });
-  
+      if (r.role === 'tool')
+        return new ToolMessage({
+          content: data.content,
+          tool_call_id: data.tool_call_id,
+          name: data.name,
+        });
+
       const toolCalls = Array.isArray(data.tool_calls) ? data.tool_calls : [];
       return new AIMessage({
         content: data.content,
@@ -315,7 +325,7 @@ export async function handleMessage(
       });
     })
     .filter(Boolean) as (HumanMessage | AIMessage | ToolMessage)[];
-  
+
   // Drop orphaned ToolMessages that have no preceding AI message with tool_calls
   const history: (HumanMessage | AIMessage | ToolMessage)[] = [];
   for (const msg of rawHistory) {
@@ -343,10 +353,11 @@ export async function handleMessage(
   const toolRunNames = new Map<string, string>();
   let latestMessages: typeof inputMessages | null = null;
 
-  const eventStream = mainAgent.streamEvents(
-    { messages: inputMessages },
-    { recursionLimit: 25, signal: options.signal, version: 'v2' } as never,
-  );
+  const eventStream = mainAgent.streamEvents({ messages: inputMessages }, {
+    recursionLimit: 25,
+    signal: options.signal,
+    version: 'v2',
+  } as never);
 
   for await (const event of eventStream) {
     if (event.event === 'on_chat_model_stream' && options.onEvent) {
@@ -368,7 +379,10 @@ export async function handleMessage(
                 .join('')
             : '';
       if (token) {
-        await emitEvent(options.onEvent, { type: 'assistant_delta', delta: token });
+        await emitEvent(options.onEvent, {
+          type: 'assistant_delta',
+          delta: token,
+        });
       }
     } else if (event.event === 'on_tool_start' && options.onEvent) {
       const name = String(event.name ?? 'tool');
@@ -376,18 +390,25 @@ export async function handleMessage(
       await emitEvent(options.onEvent, {
         type: 'tool_start',
         tool: name,
-        input: safeStringify(event.data?.input),
+        ...(debugToolPayloadsEnabled()
+          ? { input: safeStringify(event.data?.input) }
+          : {}),
       });
     } else if (event.event === 'on_tool_end' && options.onEvent) {
-      const name = toolRunNames.get(event.run_id) ?? String(event.name ?? 'tool');
+      const name =
+        toolRunNames.get(event.run_id) ?? String(event.name ?? 'tool');
       toolRunNames.delete(event.run_id);
       await emitEvent(options.onEvent, {
         type: 'tool_end',
         tool: name,
-        output: safeStringify(event.data?.output),
+        ...(debugToolPayloadsEnabled()
+          ? { output: safeStringify(event.data?.output) }
+          : {}),
       });
     } else if (event.event === 'on_chain_end') {
-      const out = event.data?.output as { messages?: typeof inputMessages } | undefined;
+      const out = event.data?.output as
+        | { messages?: typeof inputMessages }
+        | undefined;
       if (Array.isArray(out?.messages) && out.messages.length > 0) {
         latestMessages = out.messages;
       }
