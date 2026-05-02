@@ -28,6 +28,7 @@ const envSchema = z.object({
   USER_TIMEZONE: z.string().min(1).default('UTC'),
   // Gmail
   GMAIL_REFRESH_TOKEN: z.string().optional(),
+  OAUTH_REDIRECT_BASE_URL: z.string().min(1).default('http://localhost:80'),
 });
 
 export const config = envSchema.parse(env);
