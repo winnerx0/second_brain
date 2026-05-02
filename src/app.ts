@@ -1,6 +1,7 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { cors } from 'hono/cors';
 import { runBriefing, handleMessage, type AgentStreamEvent } from './agent.js';
+import { runMemoryLifecycleReview } from './tools/memory.js';
 import { sendTelegramMessage } from './delivery/telegram.js';
 import { logger } from './logger.js';
 import { db } from './db/client.js';
@@ -67,9 +68,9 @@ async function seedConnections() {
     );
   }
 }
-void seedConnections();
+await seedConnections();
 
-const app = new Hono();
+const app = new Hono({});
 
 function formatSseEvent(event: AgentStreamEvent): string {
   return `event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`;
@@ -551,12 +552,14 @@ app.post('/chat/stream', async (c) => {
   });
 });
 
-app.post('/cron/briefing', async (c) => {
-  const authHeader = c.req.header('authorization');
+function authorizeCron(c: Context) {
   const secret = process.env.CRON_SECRET;
-  if (secret && authHeader !== `Bearer ${secret}`) {
-    return c.json({ error: 'Unauthorized' }, 401);
-  }
+  if (!secret) return true;
+  return c.req.header('authorization') === `Bearer ${secret}`;
+}
+
+app.post('/cron/briefing', async (c) => {
+  if (!authorizeCron(c)) return c.json({ error: 'Unauthorized' }, 401);
 
   try {
     logger.info('Running briefing via cron endpoint');
@@ -565,9 +568,23 @@ app.post('/cron/briefing', async (c) => {
   } catch (error) {
     logger.error('[cron.briefing]', error);
     return c.json(
-      {
-        error: error instanceof Error ? error.message : 'Cron job failed',
-      },
+      { error: error instanceof Error ? error.message : 'Cron job failed' },
+      500,
+    );
+  }
+});
+
+app.post('/cron/memory', async (c) => {
+  if (!authorizeCron(c)) return c.json({ error: 'Unauthorized' }, 401);
+
+  try {
+    logger.info('Running memory lifecycle review via cron endpoint');
+    await runMemoryLifecycleReview();
+    return c.json({ success: true });
+  } catch (error) {
+    logger.error('[cron.memory]', error);
+    return c.json(
+      { error: error instanceof Error ? error.message : 'Cron job failed' },
       500,
     );
   }

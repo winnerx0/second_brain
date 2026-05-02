@@ -27,7 +27,6 @@
     "@modelcontextprotocol/client": "^2.0.0-alpha.2",
     "@tanstack/react-router": "latest",
     "@tanstack/react-start": "latest",
-    "cron": "^4.4.0",
     "dotenv": "^17.4.1",
     "drizzle-orm": "latest",
     "eslint-config-prettier": "^10.1.8",
