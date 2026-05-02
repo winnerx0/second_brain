@@ -1,8 +1,8 @@
 import { CronJob } from 'cron';
-import { logger } from './logger.ts';
-import { runMemoryLifecycleReview } from './tools/memory.ts';
-import { runBriefing } from './agent.ts';
-import app from './app.ts';
+import { logger } from './logger.js';
+import { runMemoryLifecycleReview } from './tools/memory.js';
+import { runBriefing } from './agent.js';
+import app from './app.js';
 
 const cron = new CronJob('4 9 * * *', async () => {
   try {

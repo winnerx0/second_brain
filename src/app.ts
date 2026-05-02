@@ -1,16 +1,16 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import { runBriefing, handleMessage, type AgentStreamEvent } from './agent.ts';
-import { sendTelegramMessage } from './delivery/telegram.ts';
-import { logger } from './logger.ts';
-import { db } from './db/client.ts';
+import { runBriefing, handleMessage, type AgentStreamEvent } from './agent.js';
+import { sendTelegramMessage } from './delivery/telegram.js';
+import { logger } from './logger.js';
+import { db } from './db/client.js';
 import {
   chatHistory,
   chatSessions,
   memories,
   memoryCleanupRuns,
   connections,
-} from './db/schema.ts';
+} from './db/schema.js';
 import { asc, desc, eq } from 'drizzle-orm';
 import {
   buildAuthUrl,
@@ -18,7 +18,7 @@ import {
   disconnectOAuth,
   getAppUrl,
   OAUTH_CONFIGS,
-} from './oauth.ts';
+} from './oauth.js';
 
 const API_KEY_CONNECTIONS = new Set(['clickup']);
 // MCP OAuth imports - disabled, using traditional OAuth instead
@@ -26,7 +26,7 @@ const API_KEY_CONNECTIONS = new Set(['clickup']);
 //   startMcpOAuthFlow,
 //   completeMcpOAuthFlow,
 //   usesMcpOAuth,
-// } from './mcp/oauth.ts';
+// } from './mcp/oauth.js';
 
 /* ─── Built-in connections seed ─────────────────────────────────────────────── */
 const BUILT_IN_CONNECTIONS = [

@@ -1,9 +1,9 @@
 import { tool } from 'langchain';
 import { z } from 'zod';
 import { google } from 'googleapis';
-import { config } from '../config.ts';
-import { logger } from '../logger.ts';
-import { getDbRefreshToken } from '../oauth.ts';
+import { config } from '../config.js';
+import { logger } from '../logger.js';
+import { getDbRefreshToken } from '../oauth.js';
 
 async function getGmailClient() {
   const dbRefreshToken = await getDbRefreshToken('gmail');
