@@ -2,6 +2,7 @@ import { createAgent, tool } from 'langchain';
 import z from 'zod';
 import { model } from '../shared';
 import { googleDocTools } from '../tools/google-docs';
+import { getFinalText, requireConfirmation } from './utils';
 
 const DOCS_SYSTEM_PROMPT = `You are a Document Assistant with access to Google Docs.
 
@@ -11,10 +12,11 @@ When helping users:
 - Summarize document contents concisely when asked
 - Create new docs with clear titles and structured content
 - Update existing docs by appending or modifying specific sections
-- To DELETE a document entirely, use trashDocument — it moves the file to Google Trash (recoverable within 30 days)
-- For delete/trash/wipe, execute immediately — no confirmation needed, just report what was done
+- To DELETE a document entirely, use trashDocument — it moves the file to Google Trash
+- For delete/trash/wipe/replace, identify the document and ask for confirmation before acting
 - When creating documents, ensure proper formatting (headings, lists, paragraphs)
-- If the user refers to "the doc" or "my notes" without being specific, search recent documents first`;
+- If the user refers to "the doc" or "my notes" without being specific, search recent documents first
+- If a tool returns an Error/Failed result, report that failure instead of treating it as success`;
 
 const docsAgent = createAgent({
   model,
@@ -23,13 +25,20 @@ const docsAgent = createAgent({
 
 export const docsTool = tool(
   async ({ query }) => {
+    const confirmation = requireConfirmation(
+      query,
+      /\b(delete|trash|wipe|replace|remove all)\b/i,
+      'delete, trash, wipe, or replace document content',
+    );
+    if (confirmation) return confirmation;
+
     const response = await docsAgent.invoke({
       messages: [
         { role: 'system', content: DOCS_SYSTEM_PROMPT },
         { role: 'user', content: query },
       ],
     });
-    return response.messages[response.messages.length - 1]!.text;
+    return getFinalText(response);
   },
   {
     name: 'docs',
