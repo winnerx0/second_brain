@@ -36,7 +36,6 @@
     "hono": "latest",
     "js-tiktoken": "^1.0.21",
     "langchain": "latest",
-    "nitro": "^3.0.260429-beta",
     "openai": "^6.34.0",
     "pg": "^8.20.0",
     "prettier": "^3.8.3",
