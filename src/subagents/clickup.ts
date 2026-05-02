@@ -3,6 +3,7 @@ import z from 'zod';
 import { model } from '../shared';
 import { clickupTools } from '../tools/clickup';
 import { getCurrentDateTime } from '../tools/miscellaneous';
+import { getFinalText, requireConfirmation } from './utils';
 
 const CLICKUP_SYSTEM_PROMPT = `You are a ClickUp Assistant with full access to the user's ClickUp workspace.
 
@@ -13,7 +14,9 @@ How to work correctly:
 - Use get_current_datetime when any date/time context is needed (e.g. "due today", "overdue").
 - Priority values: 1=urgent, 2=high, 3=normal, 4=low.
 - Due dates must be ISO 8601 strings (e.g. "2026-05-10T00:00:00Z").
-- Status names must exactly match existing statuses in the list — read them from task results if unsure.`;
+- Status names must exactly match existing statuses in the list — read them from task results if unsure.
+- Ask for confirmation before deleting tasks or making broad bulk updates.
+- If a tool returns an Error/Failed result, report that failure instead of treating it as success.`;
 
 const clickupAgent = createAgent({
   model,
@@ -22,13 +25,20 @@ const clickupAgent = createAgent({
 
 export const clickupTool = tool(
   async ({ query }) => {
+    const confirmation = requireConfirmation(
+      query,
+      /\b(delete|remove|bulk|all tasks|everything)\b/i,
+      'delete tasks or make a broad bulk ClickUp change',
+    );
+    if (confirmation) return confirmation;
+
     const response = await clickupAgent.invoke({
       messages: [
         { role: 'system', content: CLICKUP_SYSTEM_PROMPT },
         { role: 'user', content: query },
       ],
     });
-    return response.messages[response.messages.length - 1]!.text;
+    return getFinalText(response);
   },
   {
     name: 'clickup',
