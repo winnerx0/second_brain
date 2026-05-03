@@ -1,14 +1,12 @@
 import { Hono, type Context } from 'hono';
 import { cors } from 'hono/cors';
 import { runBriefing, handleMessage, type AgentStreamEvent } from './agent.js';
-import { runMemoryLifecycleReview } from './tools/memory.js';
 import { logger } from './logger.js';
 import { db } from './db/client.js';
 import {
   chatHistory,
   chatSessions,
   memories,
-  memoryCleanupRuns,
   connections,
 } from './db/schema.js';
 import { asc, desc, eq } from 'drizzle-orm';
@@ -91,7 +89,16 @@ app.get('/sessions', async (c) => {
 
     return c.json({ sessions });
   } catch (error) {
-    logger.error('[sessions.list]', error);
+    const cause = error instanceof Error ? (error as { cause?: unknown }).cause : undefined;
+    const causeText =
+      cause instanceof Error
+        ? `\nCaused by: ${cause.stack ?? cause.message}`
+        : cause !== undefined
+          ? `\nCaused by: ${typeof cause === 'string' ? cause : JSON.stringify(cause)}`
+          : '';
+    logger.error(
+      `[sessions.list] ${error instanceof Error ? error.stack ?? error.message : String(error)}${causeText}`,
+    );
     return c.json(
       {
         error:
@@ -191,40 +198,21 @@ app.get('/sessions/:id/history', async (c) => {
 
 app.get('/memories', async (c) => {
   try {
-    const [rows, cleanupRuns] = await Promise.all([
-      db.select().from(memories).orderBy(desc(memories.updatedAt)),
-      db
-        .select()
-        .from(memoryCleanupRuns)
-        .orderBy(desc(memoryCleanupRuns.ranAt))
-        .limit(25),
-    ]);
+    const rows = await db
+      .select({
+        id: memories.id,
+        key: memories.key,
+        value: memories.value,
+        classification: memories.classification,
+        tier: memories.tier,
+        importance: memories.importance,
+        createdAt: memories.createdAt,
+        updatedAt: memories.updatedAt,
+      })
+      .from(memories)
+      .orderBy(desc(memories.updatedAt));
 
-    return c.json({
-      memories: rows.map((row) => ({
-        id: row.id,
-        content: row.content,
-        classification: row.classification,
-        tier: row.tier,
-        importance: row.importance,
-        accessCount: row.accessCount,
-        createdAt: row.createdAt,
-        lastAccessedAt: row.lastAccessedAt,
-        expiresAt: row.expiresAt,
-        promotedAt: row.promotedAt,
-        debateHistory: row.debateHistory,
-        metadata: row.metadata,
-        updatedAt: row.updatedAt,
-      })),
-      cleanupRuns: cleanupRuns.map((run) => ({
-        id: run.id,
-        ranAt: run.ranAt,
-        reviewedRows: run.reviewedRows,
-        mergedRows: run.mergedRows,
-        deletedRows: run.deletedRows,
-        promotedRows: run.promotedRows,
-      })),
-    });
+    return c.json({ memories: rows });
   } catch (error) {
     logger.error('[memories]', error);
     return c.json(
@@ -232,6 +220,56 @@ app.get('/memories', async (c) => {
         error:
           error instanceof Error ? error.message : 'Failed to fetch memories',
       },
+      500,
+    );
+  }
+});
+
+app.patch('/memories/:id', async (c) => {
+  const id = Number(c.req.param('id'));
+  if (!Number.isInteger(id) || id <= 0) {
+    return c.json({ error: 'Invalid memory id' }, 400);
+  }
+
+  try {
+    const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+    const value = typeof body.value === 'string' ? body.value.trim() : '';
+    if (!value) return c.json({ error: 'value is required' }, 400);
+
+    const [updated] = await db
+      .update(memories)
+      .set({ value, updatedAt: new Date() })
+      .where(eq(memories.id, id))
+      .returning();
+
+    if (!updated) return c.json({ error: 'Memory not found' }, 404);
+    return c.json({ memory: updated });
+  } catch (error) {
+    logger.error('[memories.patch]', error);
+    return c.json(
+      { error: error instanceof Error ? error.message : 'Failed to update memory' },
+      500,
+    );
+  }
+});
+
+app.delete('/memories/:id', async (c) => {
+  const id = Number(c.req.param('id'));
+  if (!Number.isInteger(id) || id <= 0) {
+    return c.json({ error: 'Invalid memory id' }, 400);
+  }
+
+  try {
+    const result = await db
+      .delete(memories)
+      .where(eq(memories.id, id))
+      .returning({ id: memories.id });
+    if (result.length === 0) return c.json({ error: 'Memory not found' }, 404);
+    return c.json({ success: true });
+  } catch (error) {
+    logger.error('[memories.delete]', error);
+    return c.json(
+      { error: error instanceof Error ? error.message : 'Failed to delete memory' },
       500,
     );
   }
@@ -569,22 +607,6 @@ app.post('/cron/briefing', async (c) => {
     return c.json({ success: true });
   } catch (error) {
     logger.error('[cron.briefing]', error);
-    return c.json(
-      { error: error instanceof Error ? error.message : 'Cron job failed' },
-      500,
-    );
-  }
-});
-
-app.post('/cron/memory', async (c) => {
-  if (!authorizeCron(c)) return c.json({ error: 'Unauthorized' }, 401);
-
-  try {
-    logger.info('Running memory lifecycle review via cron endpoint');
-    await runMemoryLifecycleReview();
-    return c.json({ success: true });
-  } catch (error) {
-    logger.error('[cron.memory]', error);
     return c.json(
       { error: error instanceof Error ? error.message : 'Cron job failed' },
       500,

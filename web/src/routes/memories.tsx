@@ -4,37 +4,22 @@ import { AppSidebar, SidebarTrigger } from '../components/app-sidebar';
 
 type MemoryRecord = {
   id: number;
-  content: string;
+  key: string;
+  value: string;
   classification: string;
   tier: string;
   importance: number;
-  accessCount: number;
   createdAt: string;
-  lastAccessedAt: string;
-  expiresAt: string | null;
-  promotedAt: string | null;
-  debateHistory: unknown;
-  metadata: unknown;
   updatedAt: string;
-};
-
-type CleanupRun = {
-  id: number;
-  ranAt: string;
-  reviewedRows: number;
-  mergedRows: number;
-  deletedRows: number;
-  promotedRows: number;
 };
 
 type MemoryResponse = {
   memories: MemoryRecord[];
-  cleanupRuns: CleanupRun[];
 };
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000';
 const MEMORIES_URL = `${API_BASE.replace(/\/$/, '')}/memories`;
-const PAGE_SIZE = 8;
+const PAGE_SIZE = 12;
 
 const CATEGORY_ORDER = [
   'identity',
@@ -51,17 +36,6 @@ type Category = 'all' | (typeof CATEGORY_ORDER)[number];
 export const Route = createFileRoute('/memories')({
   component: MemoriesRoute,
 });
-
-function safeDate(value: string | null): string {
-  if (!value) return '-';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString();
-}
-
-function pretty(value: unknown): string {
-  return JSON.stringify(value, null, 2);
-}
 
 function categoryLabel(value: string): string {
   return value
@@ -84,60 +58,42 @@ function tierColor(tier: string): string {
 
 function MemoriesRoute() {
   const [memories, setMemories] = useState<MemoryRecord[]>([]);
-  const [cleanupRuns, setCleanupRuns] = useState<CleanupRun[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<Category>('all');
   const [currentPage, setCurrentPage] = useState(1);
-  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editValue, setEditValue] = useState('');
+  const [busyId, setBusyId] = useState<number | null>(null);
+
+  const load = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await fetch(MEMORIES_URL);
+      if (!response.ok) throw new Error(`Unable to load memories (${response.status})`);
+      const data = (await response.json()) as MemoryResponse;
+      setMemories(data.memories ?? []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    let active = true;
-
-    const load = async () => {
-      setIsLoading(true);
-      setError(null);
-
-      try {
-        const response = await fetch(MEMORIES_URL);
-        if (!response.ok) {
-          throw new Error(`Unable to load memories (${response.status})`);
-        }
-
-        const data = (await response.json()) as MemoryResponse;
-        if (active) {
-          setMemories(data.memories ?? []);
-          setCleanupRuns(data.cleanupRuns ?? []);
-        }
-      } catch (err) {
-        if (active) {
-          setError(err instanceof Error ? err.message : String(err));
-        }
-      } finally {
-        if (active) {
-          setIsLoading(false);
-        }
-      }
-    };
-
     void load();
-
-    return () => {
-      active = false;
-    };
   }, []);
 
-  const summary = useMemo(() => {
-    return {
-      total: memories.length,
-      shortTerm: memories.filter((m) => m.tier === 'short_term').length,
-      longTerm: memories.filter((m) => m.tier === 'long_term').length,
-      lifelong: memories.filter((m) => m.tier === 'lifelong').length,
-    };
-  }, [memories]);
+  const summary = useMemo(() => ({
+    total: memories.length,
+    shortTerm: memories.filter((m) => m.tier === 'short_term').length,
+    longTerm: memories.filter((m) => m.tier === 'long_term').length,
+    lifelong: memories.filter((m) => m.tier === 'lifelong').length,
+  }), [memories]);
 
   const categoryCounts = useMemo(() => {
-    const base = {
+    const base: Record<Category, number> = {
       all: memories.length,
       identity: 0,
       relationships: 0,
@@ -147,33 +103,19 @@ function MemoriesRoute() {
       knowledge: 0,
       unclassified: 0,
     };
-
-    for (const memory of memories) {
-      if (memory.classification in base) {
-        const key = memory.classification as keyof typeof base;
-        if (key !== 'all') {
-          base[key] += 1;
-        }
-      }
+    for (const m of memories) {
+      const k = m.classification as Category;
+      if (k !== 'all' && k in base) base[k] += 1;
     }
-
     return base;
   }, [memories]);
 
   const filteredMemories = useMemo(() => {
-    if (selectedCategory === 'all') {
-      return memories;
-    }
-
-    return memories.filter(
-      (memory) => memory.classification === selectedCategory,
-    );
+    if (selectedCategory === 'all') return memories;
+    return memories.filter((m) => m.classification === selectedCategory);
   }, [memories, selectedCategory]);
 
-  const totalPages = Math.max(
-    1,
-    Math.ceil(filteredMemories.length / PAGE_SIZE),
-  );
+  const totalPages = Math.max(1, Math.ceil(filteredMemories.length / PAGE_SIZE));
 
   const paginatedMemories = useMemo(() => {
     const start = (currentPage - 1) * PAGE_SIZE;
@@ -185,16 +127,59 @@ function MemoriesRoute() {
   }, [selectedCategory]);
 
   useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(totalPages);
-    }
+    if (currentPage > totalPages) setCurrentPage(totalPages);
   }, [currentPage, totalPages]);
 
-  const pageStart =
-    filteredMemories.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
+  const pageStart = filteredMemories.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
   const pageEnd = Math.min(currentPage * PAGE_SIZE, filteredMemories.length);
 
   const categoryTabs: Category[] = ['all', ...CATEGORY_ORDER];
+
+  const startEdit = (memory: MemoryRecord) => {
+    setEditingId(memory.id);
+    setEditValue(memory.value);
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditValue('');
+  };
+
+  const saveEdit = async (memory: MemoryRecord) => {
+    if (!editValue.trim() || editValue === memory.value) {
+      cancelEdit();
+      return;
+    }
+    setBusyId(memory.id);
+    try {
+      const res = await fetch(`${MEMORIES_URL}/${memory.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ value: editValue.trim() }),
+      });
+      if (!res.ok) throw new Error(`Update failed (${res.status})`);
+      await load();
+      cancelEdit();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const deleteMemory = async (memory: MemoryRecord) => {
+    if (!confirm(`Delete memory "${memory.key}"?`)) return;
+    setBusyId(memory.id);
+    try {
+      const res = await fetch(`${MEMORIES_URL}/${memory.id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error(`Delete failed (${res.status})`);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   return (
     <div className="app-shell">
@@ -210,7 +195,6 @@ function MemoriesRoute() {
         </div>
 
         <main className="memories-page">
-          {/* Stats grid */}
           <div className="memories-top-grid">
             <div className="memories-stat-card">
               <div className="memories-stat-number">{summary.total}</div>
@@ -230,15 +214,10 @@ function MemoriesRoute() {
             </div>
           </div>
 
-          {/* Category tabs */}
-          <section
-            className="memory-category-tabs"
-            aria-label="Memory categories"
-          >
+          <section className="memory-category-tabs" aria-label="Memory categories">
             {categoryTabs.map((category) => {
               const active = selectedCategory === category;
               const count = categoryCounts[category];
-
               return (
                 <button
                   key={category}
@@ -246,18 +225,14 @@ function MemoriesRoute() {
                   className={`memory-category-tab${active ? ' active' : ''}`}
                   onClick={() => setSelectedCategory(category)}
                 >
-                  <span>
-                    {category === 'all' ? 'All' : categoryLabel(category)}
-                  </span>
+                  <span>{category === 'all' ? 'All' : categoryLabel(category)}</span>
                   <span className="memory-category-count">{count}</span>
                 </button>
               );
             })}
           </section>
 
-          {isLoading ? (
-            <div className="memories-empty">Loading memories...</div>
-          ) : null}
+          {isLoading ? <div className="memories-empty">Loading memories...</div> : null}
           {error ? <div className="memories-error">{error}</div> : null}
 
           {!isLoading && !error && filteredMemories.length === 0 ? (
@@ -275,62 +250,28 @@ function MemoriesRoute() {
                     type="button"
                     className="memories-pagination-btn"
                     disabled={currentPage === 1}
-                    onClick={() =>
-                      setCurrentPage((prev) => Math.max(1, prev - 1))
-                    }
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                   >
-                    <svg
-                      width="10"
-                      height="10"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.5"
-                      strokeLinecap="round"
-                    >
-                      <path d="M15 18l-6-6 6-6" />
-                    </svg>
                     Prev
                   </button>
                   <button
                     type="button"
                     className="memories-pagination-btn"
                     disabled={currentPage === totalPages}
-                    onClick={() =>
-                      setCurrentPage((prev) => Math.min(totalPages, prev + 1))
-                    }
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                   >
                     Next
-                    <svg
-                      width="10"
-                      height="10"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.5"
-                      strokeLinecap="round"
-                    >
-                      <path d="M9 18l6-6-6-6" />
-                    </svg>
                   </button>
                 </div>
               </div>
 
               <div className="memory-grid">
                 {paginatedMemories.map((memory) => (
-                  <article
-                    key={memory.id}
-                    className="memory-card"
-                    onClick={() =>
-                      setExpandedId(expandedId === memory.id ? null : memory.id)
-                    }
-                  >
+                  <article key={memory.id} className="memory-card">
                     <header className="memory-card-header">
                       <div className="memory-card-title-row">
-                        <span className="memory-chip accent">#{memory.id}</span>
-                        <span className="memory-chip">
-                          {categoryLabel(memory.classification)}
-                        </span>
+                        <span className="memory-chip accent">{memory.key}</span>
+                        <span className="memory-chip">{categoryLabel(memory.classification)}</span>
                         <span
                           className="memory-chip"
                           style={{
@@ -341,130 +282,62 @@ function MemoriesRoute() {
                           {memory.tier.replace(/_/g, ' ')}
                         </span>
                       </div>
-                      <div className="memory-card-meta">
-                        <span className="memory-chip">
-                          ★ {memory.importance.toFixed(2)}
-                        </span>
-                        <span className="memory-chip">
-                          ↻ {memory.accessCount}
-                        </span>
-                      </div>
                     </header>
 
-                    <div className="memory-content">{memory.content}</div>
-
-                    {expandedId === memory.id && (
-                      <div className="memory-expanded">
-                        <div className="memory-details-grid">
-                          <div className="memory-detail">
-                            <span className="memory-detail-label">Created</span>
-                            <span className="memory-detail-value">
-                              {safeDate(memory.createdAt)}
-                            </span>
-                          </div>
-                          <div className="memory-detail">
-                            <span className="memory-detail-label">
-                              Last Accessed
-                            </span>
-                            <span className="memory-detail-value">
-                              {safeDate(memory.lastAccessedAt)}
-                            </span>
-                          </div>
-                          <div className="memory-detail">
-                            <span className="memory-detail-label">Expires</span>
-                            <span className="memory-detail-value">
-                              {safeDate(memory.expiresAt)}
-                            </span>
-                          </div>
-                          <div className="memory-detail">
-                            <span className="memory-detail-label">
-                              Promoted
-                            </span>
-                            <span className="memory-detail-value">
-                              {safeDate(memory.promotedAt)}
-                            </span>
-                          </div>
-                          <div className="memory-detail">
-                            <span className="memory-detail-label">Updated</span>
-                            <span className="memory-detail-value">
-                              {safeDate(memory.updatedAt)}
-                            </span>
-                          </div>
+                    {editingId === memory.id ? (
+                      <div className="memory-edit">
+                        <textarea
+                          value={editValue}
+                          onChange={(e) => setEditValue(e.target.value)}
+                          rows={3}
+                          className="memory-edit-textarea"
+                        />
+                        <div className="memory-edit-actions">
+                          <button
+                            type="button"
+                            className="memories-pagination-btn"
+                            disabled={busyId === memory.id}
+                            onClick={() => saveEdit(memory)}
+                          >
+                            Save
+                          </button>
+                          <button
+                            type="button"
+                            className="memories-pagination-btn"
+                            onClick={cancelEdit}
+                          >
+                            Cancel
+                          </button>
                         </div>
-
-                        {memory.metadata &&
-                        Object.keys(memory.metadata as Record<string, unknown>)
-                          .length > 0 ? (
-                          <div className="memory-section">
-                            <h3>Metadata</h3>
-                            <pre className="memory-pre">
-                              {pretty(memory.metadata)}
-                            </pre>
-                          </div>
-                        ) : null}
-
-                        {memory.debateHistory &&
-                        (Array.isArray(memory.debateHistory)
-                          ? (memory.debateHistory as unknown[]).length > 0
-                          : true) ? (
-                          <div className="memory-section">
-                            <h3>Debate History</h3>
-                            <pre className="memory-pre">
-                              {pretty(memory.debateHistory)}
-                            </pre>
-                          </div>
-                        ) : null}
                       </div>
+                    ) : (
+                      <>
+                        <div className="memory-content">{memory.value}</div>
+                        <div className="memory-edit-actions">
+                          <button
+                            type="button"
+                            className="memories-pagination-btn"
+                            disabled={busyId === memory.id}
+                            onClick={() => startEdit(memory)}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            className="memories-pagination-btn"
+                            disabled={busyId === memory.id}
+                            onClick={() => deleteMemory(memory)}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </>
                     )}
                   </article>
                 ))}
               </div>
             </>
           ) : null}
-
-          {/* Cleanup section */}
-          {cleanupRuns.length > 0 && (
-            <section className="memory-cleanup-section">
-              <h2 className="memory-section-title">
-                <svg
-                  width="12"
-                  height="12"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                >
-                  <path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-                </svg>
-                Memory Cleanup Log
-              </h2>
-              <div className="cleanup-table-wrap">
-                <table className="cleanup-table">
-                  <thead>
-                    <tr>
-                      <th>Last Clean Up</th>
-                      <th>Reviewed</th>
-                      <th>Merged</th>
-                      <th>Deleted</th>
-                      <th>Promoted</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {cleanupRuns.map((run) => (
-                      <tr key={run.id}>
-                        <td>{safeDate(run.ranAt)}</td>
-                        <td>{run.reviewedRows}</td>
-                        <td>{run.mergedRows}</td>
-                        <td>{run.deletedRows}</td>
-                        <td>{run.promotedRows}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </section>
-          )}
         </main>
       </div>
     </div>

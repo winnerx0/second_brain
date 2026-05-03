@@ -48,30 +48,16 @@ export const taskHistory = pgTable('task_history', {
 
 export const memories = pgTable('memories', {
   id: serial('id').primaryKey(),
-  content: text('content').notNull(),
+  key: text('key').notNull().unique(),
+  value: text('value').notNull(),
   classification: memoryClassificationEnum('classification')
     .notNull()
     .default('unclassified'),
   tier: memoryTierEnum('tier').notNull().default('short_term'),
   importance: real('importance').notNull().default(0.2),
-  accessCount: integer('access_count').notNull().default(0),
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-  lastAccessedAt: timestamp('last_accessed_at').notNull().defaultNow(),
-  expiresAt: timestamp('expires_at'),
-  promotedAt: timestamp('promoted_at'),
-  debateHistory: jsonb('debate_history').notNull().default('[]'),
-  metadata: jsonb('metadata').notNull().default('{}'),
   vector: vector('vector', { dimensions: 1536 }).notNull(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
-});
-
-export const memoryCleanupRuns = pgTable('memory_cleanup_runs', {
-  id: serial('id').primaryKey(),
-  ranAt: timestamp('ran_at').notNull().defaultNow(),
-  reviewedRows: integer('reviewed_rows').notNull().default(0),
-  mergedRows: integer('merged_rows').notNull().default(0),
-  deletedRows: integer('deleted_rows').notNull().default(0),
-  promotedRows: integer('promoted_rows').notNull().default(0),
 });
 
 export const chatSessions = pgTable('chat_sessions', {

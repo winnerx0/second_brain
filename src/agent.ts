@@ -9,7 +9,7 @@ import {
 import type { AIMessageChunk } from '@langchain/core/messages';
 import { getEncoding } from 'js-tiktoken';
 import { config } from './config.js';
-import { storeMemory, recallMemories, deleteMemory, editMemory } from './tools/memory.js';
+import { setMemoryKey, deleteMemoryKey, recallMemories } from './tools/memory.js';
 import { db } from './db/client.js';
 import { agentRuns, chatHistory, chatSessions } from './db/schema.js';
 import { desc, eq, isNull } from 'drizzle-orm';
@@ -53,10 +53,9 @@ function totalTokensUsed(
 
 const tools = [
   getCurrentDateTime,
-  storeMemory,
+  setMemoryKey,
+  deleteMemoryKey,
   recallMemories,
-  deleteMemory,
-  editMemory,
   githubTool,
   calendarTool,
   gmailTool,
@@ -114,60 +113,6 @@ function emitEvent(
 
 function debugToolPayloadsEnabled(): boolean {
   return process.env.AGENT_DEBUG_TOOL_PAYLOADS === 'true';
-}
-
-function shouldAutoStoreUserMemory(text: string): boolean {
-  const value = text.trim().toLowerCase();
-  if (!value) return false;
-
-  if (value.endsWith('?')) return false;
-
-  if (/^(hi|hello|hey|thanks|thank you|ok|okay|cool|nice|yo)\b/.test(value)) {
-    return false;
-  }
-
-  if (/\b(forget|delete memory|don't remember|do not remember)\b/.test(value)) {
-    return false;
-  }
-
-  if (/\b(i want you to|can you|could you|would you|please)\b/.test(value)) {
-    return false;
-  }
-
-  const hasFirstPerson = /\b(i|i'm|im|my|me|mine)\b/.test(value);
-  if (!hasFirstPerson) return false;
-
-  return /\b(i want to|i want|i like|i love|i dislike|i hate|i prefer|my favorite|i usually|i always|i never|i tend to|i am|i'm)\b/.test(
-    value,
-  );
-}
-
-function didCallStoreMemory(
-  messages: Array<{ content?: unknown; tool_calls?: unknown }>,
-): boolean {
-  for (const message of messages) {
-    const content = message.content;
-    if (Array.isArray(content)) {
-      const foundInContent = content.some((part) => {
-        if (!part || typeof part !== 'object') return false;
-        const maybePart = part as { name?: unknown };
-        return maybePart.name === 'store_memory';
-      });
-      if (foundInContent) return true;
-    }
-
-    const calls = message.tool_calls;
-    if (Array.isArray(calls)) {
-      const foundInCalls = calls.some((call) => {
-        if (!call || typeof call !== 'object') return false;
-        const maybeCall = call as { name?: unknown };
-        return maybeCall.name === 'store_memory';
-      });
-      if (foundInCalls) return true;
-    }
-  }
-
-  return false;
 }
 
 const BRIEFING_SYSTEM_PROMPT = `You are a personal productivity assistant. Gather all available data using your tools, then produce a concise morning briefing. Use these sections:
@@ -267,11 +212,20 @@ const CHAT_SYSTEM = new SystemMessage(
     schedule a follow-up"), call all relevant agents and stitch the results.
 
   Memory:
-  - Always check recallMemories before saying you don't know something
-    personal about ${env.MASTER}.
-  - Store new stable facts or preferences with storeMemory without
-    being asked.
-  - Delete with deleteMemory only when explicitly told to forget.
+  - Memories are stored as key/value entries. Always pick a stable, descriptive,
+    dot-separated key (e.g. "user.name", "user.full_name", "preferences.coffee").
+  - Store each fact under EXACTLY ONE canonical key. Never write the same value
+    under multiple keys (e.g. don't store a name under both "user.name" and
+    "user.full_name") — pick one and stick with it across turns.
+  - For a name update, the canonical key is "user.name". Only use a separate
+    key if the user explicitly distinguishes (e.g. "my legal name is X but
+    call me Y" → "user.legal_name" + "user.name").
+  - Before storing, recall_memories with the new fact to see if a related key
+    already exists; if it does, reuse that exact key so the value overwrites.
+  - Always check recall_memories before saying you don't know something personal
+    about ${env.MASTER}.
+  - Use delete_memory_key only when explicitly told to forget; you must know the
+    exact key (recall first if unsure).
 
   Ground rules:
   - Always use get_current_datetime before anything involving dates or time.
@@ -475,27 +429,6 @@ export async function handleMessage(
         tool_calls: [],
       }),
     });
-  }
-
-  const modelAlreadyStoredMemory = didCallStoreMemory(
-    newMessages as Array<{
-      content?: unknown;
-      tool_calls?: unknown;
-    }>,
-  );
-
-  if (!modelAlreadyStoredMemory && shouldAutoStoreUserMemory(text)) {
-    try {
-      const autoStoreResult = await storeMemory.invoke({
-        value: text,
-        query: text,
-      });
-      logger.info(`[memory.auto] ${String(autoStoreResult)}`);
-    } catch (error) {
-      logger.warn(
-        `[memory.auto] failed: ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
   }
 
   if (messages.length > 0) {
