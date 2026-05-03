@@ -1183,6 +1183,35 @@ export const deleteMemory = tool(
 
       const qEmbedding = await embed(text);
       const distanceExpr = sql<number>`vector <=> ${JSON.stringify(qEmbedding)}::vector`;
+
+      const queryTerms = buildQueryTerms(text);
+      const lexicalCandidates =
+        queryTerms.length > 0
+          ? await db
+              .select({
+                id: memories.id,
+                content: memories.content,
+                distance: distanceExpr.as('distance'),
+              })
+              .from(memories)
+              .where(
+                or(
+                  ...queryTerms.map((term) =>
+                    ilike(memories.content, `%${term}%`),
+                  ),
+                ),
+              )
+              .orderBy(distanceExpr)
+              .limit(1)
+          : [];
+
+      if (lexicalCandidates.length > 0) {
+        const candidate = lexicalCandidates[0]!;
+        await db.delete(memories).where(eq(memories.id, candidate.id));
+        const similarity = 1 - Number(candidate.distance);
+        return `Deleted memory id=${candidate.id} (lexical match, similarity ${similarity.toFixed(2)})`;
+      }
+
       const [candidate] = await db
         .select({
           id: memories.id,
@@ -1260,23 +1289,53 @@ export const editMemory = tool(
         }
         const qEmbedding = await embed(query);
         const distanceExpr = sql<number>`vector <=> ${JSON.stringify(qEmbedding)}::vector`;
-        const [candidate] = await db
-          .select({
-            id: memories.id,
-            content: memories.content,
-            classification: memories.classification,
-            distance: distanceExpr.as('distance'),
-          })
-          .from(memories)
-          .orderBy(distanceExpr)
-          .limit(1);
+
+        const queryTerms = buildQueryTerms(query);
+        const lexicalCandidates =
+          queryTerms.length > 0
+            ? await db
+                .select({
+                  id: memories.id,
+                  content: memories.content,
+                  classification: memories.classification,
+                  distance: distanceExpr.as('distance'),
+                })
+                .from(memories)
+                .where(
+                  or(
+                    ...queryTerms.map((term) =>
+                      ilike(memories.content, `%${term}%`),
+                    ),
+                  ),
+                )
+                .orderBy(distanceExpr)
+                .limit(1)
+            : [];
+
+        let candidate:
+          | { id: number; content: string; classification: string; distance: unknown }
+          | undefined = lexicalCandidates[0];
+        let viaLexical = candidate !== undefined;
+
+        if (!candidate) {
+          [candidate] = await db
+            .select({
+              id: memories.id,
+              content: memories.content,
+              classification: memories.classification,
+              distance: distanceExpr.as('distance'),
+            })
+            .from(memories)
+            .orderBy(distanceExpr)
+            .limit(1);
+        }
 
         if (!candidate) {
           return 'No memory found to edit';
         }
 
         const similarity = 1 - Number(candidate.distance);
-        if (similarity < DESTRUCTIVE_SIMILARITY_THRESHOLD) {
+        if (!viaLexical && similarity < DESTRUCTIVE_SIMILARITY_THRESHOLD) {
           return `No confident match for "${query}" (best similarity ${similarity.toFixed(2)} < ${DESTRUCTIVE_SIMILARITY_THRESHOLD}). Refusing to edit.`;
         }
 

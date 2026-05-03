@@ -91,7 +91,16 @@ app.get('/sessions', async (c) => {
 
     return c.json({ sessions });
   } catch (error) {
-    logger.error('[sessions.list]', error);
+    const cause = error instanceof Error ? (error as { cause?: unknown }).cause : undefined;
+    const causeText =
+      cause instanceof Error
+        ? `\nCaused by: ${cause.stack ?? cause.message}`
+        : cause !== undefined
+          ? `\nCaused by: ${typeof cause === 'string' ? cause : JSON.stringify(cause)}`
+          : '';
+    logger.error(
+      `[sessions.list] ${error instanceof Error ? error.stack ?? error.message : String(error)}${causeText}`,
+    );
     return c.json(
       {
         error:
