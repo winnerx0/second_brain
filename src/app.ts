@@ -11,7 +11,7 @@ import {
   memoryCleanupRuns,
   connections,
 } from './db/schema.js';
-import { asc, desc, eq, sql } from 'drizzle-orm';
+import { asc, desc, eq } from 'drizzle-orm';
 import {
   buildAuthUrl,
   handleCallback,
@@ -231,86 +231,6 @@ app.get('/memories', async (c) => {
       {
         error:
           error instanceof Error ? error.message : 'Failed to fetch memories',
-      },
-      500,
-    );
-  }
-});
-
-app.get('/memories/graph', async (c) => {
-  try {
-    const thresholdParam = Number(c.req.query('threshold'));
-    const topKParam = Number(c.req.query('topK'));
-    const threshold =
-      Number.isFinite(thresholdParam) && thresholdParam >= 0 && thresholdParam <= 1
-        ? thresholdParam
-        : 0.75;
-    const topK =
-      Number.isFinite(topKParam) && topKParam >= 1 && topKParam <= 50
-        ? Math.floor(topKParam)
-        : 5;
-
-    const nodes = await db
-      .select({
-        id: memories.id,
-        content: memories.content,
-        classification: memories.classification,
-        tier: memories.tier,
-        importance: memories.importance,
-        accessCount: memories.accessCount,
-      })
-      .from(memories);
-
-    const edgeRows = await db.execute<{
-      source: number;
-      target: number;
-      similarity: number;
-    }>(sql`
-      SELECT a.id AS source,
-             b.id AS target,
-             1 - (a.vector <=> b.vector) AS similarity
-      FROM memories a
-      JOIN memories b ON a.id < b.id
-      WHERE 1 - (a.vector <=> b.vector) >= ${threshold}
-      ORDER BY similarity DESC
-    `);
-
-    const rawEdges = (edgeRows as unknown as { rows?: Array<{ source: number; target: number; similarity: number }> })
-      .rows ?? (edgeRows as unknown as Array<{ source: number; target: number; similarity: number }>);
-
-    const neighborCount = new Map<number, number>();
-    const links: Array<{ source: number; target: number; similarity: number }> = [];
-    for (const row of rawEdges) {
-      const source = Number(row.source);
-      const target = Number(row.target);
-      const similarity = Number(row.similarity);
-      const sCount = neighborCount.get(source) ?? 0;
-      const tCount = neighborCount.get(target) ?? 0;
-      if (sCount >= topK || tCount >= topK) continue;
-      neighborCount.set(source, sCount + 1);
-      neighborCount.set(target, tCount + 1);
-      links.push({ source, target, similarity });
-    }
-
-    return c.json({
-      nodes: nodes.map((n) => ({
-        id: n.id,
-        content: n.content.length > 200 ? `${n.content.slice(0, 200)}…` : n.content,
-        classification: n.classification,
-        tier: n.tier,
-        importance: n.importance,
-        accessCount: n.accessCount,
-      })),
-      links,
-      threshold,
-      topK,
-    });
-  } catch (error) {
-    logger.error('[memories.graph]', error);
-    return c.json(
-      {
-        error:
-          error instanceof Error ? error.message : 'Failed to build memory graph',
       },
       500,
     );
