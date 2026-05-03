@@ -16,7 +16,6 @@
     "nitro": "^3.0.260429-beta",
     "react": "latest",
     "react-dom": "latest",
-    "react-force-graph-2d": "^1.29.1",
     "react-icons": "^5.6.0",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",

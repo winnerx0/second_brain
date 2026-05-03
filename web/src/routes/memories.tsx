@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from '@tanstack/react-router';
+import { createFileRoute } from '@tanstack/react-router';
 import { useEffect, useMemo, useState } from 'react';
 import { AppSidebar, SidebarTrigger } from '../components/app-sidebar';
 
@@ -206,16 +206,7 @@ function MemoriesRoute() {
             <SidebarTrigger />
             <span className="chat-header-title">Memory Store</span>
           </div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <Link
-              to="/memories/graph"
-              className="chat-header-badge"
-              style={{ textDecoration: 'none' }}
-            >
-              Graph view →
-            </Link>
-            <span className="chat-header-badge">{summary.total} total</span>
-          </div>
+          <span className="chat-header-badge">{summary.total} total</span>
         </div>
 
         <main className="memories-page">
