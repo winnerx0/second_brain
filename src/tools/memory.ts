@@ -142,6 +142,14 @@ const memoryFactSplitSchema = z.object({
   facts: z.array(z.string()).min(1).max(10),
 });
 
+const updateDecisionSchema = z.object({
+  decision: z.enum(['insert', 'update']),
+  target_id: z.number().int().nullable(),
+  reasoning: z.string(),
+});
+
+type UpdateDecision = z.infer<typeof updateDecisionSchema>;
+
 // Importance is not part of the debate output — it is always derived from
 // classification and never changes after the memory is created.
 const debateOutputSchema = z.object({
@@ -276,6 +284,92 @@ async function classifyWhenAmbiguous(content: string): Promise<{
   );
 
   return { classification, reasoning };
+}
+
+// Cosine-distance ceiling for "candidate to potentially update". Anything
+// further than this is almost certainly an unrelated fact and not worth
+// asking the model about.
+const UPDATE_CANDIDATE_MAX_DISTANCE = 0.45;
+
+async function findUpdateCandidates(
+  fact: string,
+  classification: Classification,
+  limit = 3,
+): Promise<MemoryRow[]> {
+  const embedding = await embed(fact);
+  const distanceExpr = sql<number>`vector <=> ${JSON.stringify(embedding)}::vector`;
+  const rows = await db
+    .select()
+    .from(memories)
+    .where(
+      and(
+        eq(memories.classification, classification),
+        sql`${distanceExpr} <= ${UPDATE_CANDIDATE_MAX_DISTANCE}`,
+      ),
+    )
+    .orderBy(distanceExpr)
+    .limit(limit);
+
+  return rows;
+}
+
+async function decideUpdateOrInsert(
+  fact: string,
+  candidates: MemoryRow[],
+): Promise<UpdateDecision> {
+  if (candidates.length === 0) {
+    return { decision: 'insert', target_id: null, reasoning: 'no candidates' };
+  }
+
+  try {
+    const structured = debateModel.withStructuredOutput(updateDecisionSchema);
+    const result = await structured.invoke([
+      [
+        'system',
+        [
+          'Decide whether a new memory fact UPDATES one of the existing memories or is INDEPENDENT.',
+          'UPDATE means the new fact replaces or supersedes information in an existing memory about the same subject/attribute (e.g. name change, address change, job change).',
+          'INSERT means the new fact is genuinely new information that does not contradict or supersede any candidate.',
+          'If UPDATE, return the id of the candidate to replace as target_id.',
+          'If INSERT, return target_id = null.',
+          'Be conservative: prefer INSERT unless the new fact clearly supersedes an existing one.',
+        ].join('\n'),
+      ],
+      [
+        'human',
+        [
+          `New fact: ${fact}`,
+          '',
+          'Existing candidates:',
+          JSON.stringify(
+            candidates.map((c) => ({ id: c.id, content: c.content })),
+            null,
+            2,
+          ),
+        ].join('\n'),
+      ],
+    ]);
+
+    const parsed = updateDecisionSchema.safeParse(result);
+    if (!parsed.success) {
+      return { decision: 'insert', target_id: null, reasoning: 'invalid model output' };
+    }
+
+    if (parsed.data.decision === 'update') {
+      const targetId = parsed.data.target_id;
+      const valid = candidates.some((c) => c.id === targetId);
+      if (!valid) {
+        return { decision: 'insert', target_id: null, reasoning: 'target_id not in candidates' };
+      }
+    }
+
+    return parsed.data;
+  } catch (error) {
+    logger.warn(
+      `[memory] update decision failed: ${error instanceof Error ? error.message : String(error)}`,
+    );
+    return { decision: 'insert', target_id: null, reasoning: 'decision error' };
+  }
 }
 
 function extractTextFromModelOutput(output: unknown): string {
@@ -1008,6 +1102,44 @@ export const storeMemory = tool(
         const expiresAt = computeExpiresAt(tier, now);
         const embedding = await embed(query || fact);
 
+        // Before inserting, see if this fact is actually an update to an
+        // existing memory of the same classification. If so, replace in
+        // place instead of accumulating duplicate/contradictory rows.
+        const candidates = await findUpdateCandidates(fact, finalClassification);
+        const updateDecision = await decideUpdateOrInsert(fact, candidates);
+
+        if (updateDecision.decision === 'update' && updateDecision.target_id !== null) {
+          const targetId = updateDecision.target_id;
+          const target = candidates.find((c) => c.id === targetId);
+          if (target) {
+            history.push({
+              type: 'update_in_place',
+              at: now.toISOString(),
+              replaced_content: target.content,
+              reasoning: updateDecision.reasoning,
+            });
+
+            await db
+              .update(memories)
+              .set({
+                content: fact,
+                classification: finalClassification,
+                tier,
+                importance: finalImportance,
+                expiresAt,
+                vector: sql`${JSON.stringify(embedding)}::vector`,
+                debateHistory: [...asDebateHistory(target.debateHistory), ...history],
+                updatedAt: now,
+              })
+              .where(eq(memories.id, target.id));
+
+            insertedSummaries.push(
+              `id=${target.id} (updated), class=${finalClassification}, tier=${tier}, importance=${finalImportance.toFixed(2)}`,
+            );
+            continue;
+          }
+        }
+
         const [inserted] = await db
           .insert(memories)
           .values({
@@ -1346,7 +1478,6 @@ export const editMemory = tool(
         };
       }
 
-      const nextContent = content ?? target.content;
       const nextClassification: Classification = classification ?? target.classification;
       const nextImportance = importanceForClassification(nextClassification);
       const nextTier = determineTier(nextClassification);
