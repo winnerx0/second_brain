@@ -328,6 +328,45 @@ export const appendMarkdown = tool(
   },
 );
 
+export const createDocument = tool(
+  async ({ title, content }) => {
+    try {
+      const docs = await getDocsClient();
+      const created = await docs.documents.create({
+        requestBody: { title },
+      });
+      const documentId = created.data.documentId!;
+
+      if (content && content.length > 0) {
+        await batchUpdate(documentId, [
+          { insertText: { location: { index: 1 }, text: content } },
+        ]);
+      }
+
+      return JSON.stringify({
+        documentId,
+        title: created.data.title,
+        url: `https://docs.google.com/document/d/${documentId}/edit`,
+      });
+    } catch (error) {
+      logger.error('[google-docs] createDocument', error);
+      return `Error creating document: ${error instanceof Error ? error.message : String(error)}`;
+    }
+  },
+  {
+    name: 'createDocument',
+    description:
+      'Create a new Google Doc with the given title and optional initial content.',
+    schema: z.object({
+      title: z.string().describe('Title of the new document'),
+      content: z
+        .string()
+        .optional()
+        .describe('Optional initial text content for the document'),
+    }),
+  },
+);
+
 export const trashDocument = tool(
   async ({ documentId }) => {
     try {
@@ -355,6 +394,7 @@ export const trashDocument = tool(
 export const googleDocTools = [
   searchDocuments,
   readDocument,
+  createDocument,
   appendText,
   insertText,
   findAndReplace,

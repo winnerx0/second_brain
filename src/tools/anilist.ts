@@ -61,18 +61,24 @@ async function getAuthenticatedAniListUserName(): Promise<string> {
 /* ─── Search ──────────────────────────────────────────────────────────────── */
 
 export const searchAnime = tool(
-  async ({ query, perPage }) => {
+  async ({ query, perPage, year, season, genre }) => {
     try {
       const data = await gql<{ Page: { media: unknown[] } }>(
-        `query($search: String, $perPage: Int) {
+        `query($search: String, $perPage: Int, $seasonYear: Int, $season: MediaSeason, $genre: String) {
           Page(perPage: $perPage) {
-            media(search: $search, type: ANIME, sort: POPULARITY_DESC) {
-              id title { romaji english } status episodes averageScore genres
+            media(search: $search, type: ANIME, sort: POPULARITY_DESC, seasonYear: $seasonYear, season: $season, genre: $genre) {
+              id title { romaji english } status episodes averageScore genres season seasonYear
               description(asHtml: false) startDate { year }
             }
           }
         }`,
-        { search: query, perPage: perPage ?? 5 },
+        {
+          search: query ?? null,
+          perPage: perPage ?? 5,
+          seasonYear: year ?? null,
+          season: season ?? null,
+          genre: genre ?? null,
+        },
       );
       return JSON.stringify(data.Page.media);
     } catch (error) {
@@ -82,27 +88,43 @@ export const searchAnime = tool(
   },
   {
     name: 'search_anime',
-    description: 'Search for anime on AniList by title or keyword.',
+    description:
+      'Search for anime on AniList by title/keyword, optionally filtered by year, season, and genre.',
     schema: z.object({
-      query: z.string().describe('Search query'),
+      query: z.string().optional().describe('Search query'),
       perPage: z.number().optional().describe('Number of results (default 5)'),
+      year: z.number().optional().describe('Season year, e.g. 2024'),
+      season: z
+        .enum(['WINTER', 'SPRING', 'SUMMER', 'FALL'])
+        .optional()
+        .describe('Release season'),
+      genre: z
+        .string()
+        .optional()
+        .describe('Genre filter, e.g. "Action", "Romance"'),
     }),
   },
 );
 
 export const searchManga = tool(
-  async ({ query, perPage }) => {
+  async ({ query, perPage, year, genre }) => {
     try {
       const data = await gql<{ Page: { media: unknown[] } }>(
-        `query($search: String, $perPage: Int) {
+        `query($search: String, $perPage: Int, $startGreater: FuzzyDateInt, $startLesser: FuzzyDateInt, $genre: String) {
           Page(perPage: $perPage) {
-            media(search: $search, type: MANGA, sort: POPULARITY_DESC) {
+            media(search: $search, type: MANGA, sort: POPULARITY_DESC, startDate_greater: $startGreater, startDate_lesser: $startLesser, genre: $genre) {
               id title { romaji english } status chapters volumes averageScore genres
               description(asHtml: false) startDate { year }
             }
           }
         }`,
-        { search: query, perPage: perPage ?? 5 },
+        {
+          search: query ?? null,
+          perPage: perPage ?? 5,
+          startGreater: year ? Number(`${year}0000`) : null,
+          startLesser: year ? Number(`${year}1232`) : null,
+          genre: genre ?? null,
+        },
       );
       return JSON.stringify(data.Page.media);
     } catch (error) {
@@ -112,10 +134,16 @@ export const searchManga = tool(
   },
   {
     name: 'search_manga',
-    description: 'Search for manga on AniList by title or keyword.',
+    description:
+      'Search for manga on AniList by title/keyword, optionally filtered by year and genre.',
     schema: z.object({
-      query: z.string().describe('Search query'),
+      query: z.string().optional().describe('Search query'),
       perPage: z.number().optional().describe('Number of results (default 5)'),
+      year: z.number().optional().describe('Start year, e.g. 2020'),
+      genre: z
+        .string()
+        .optional()
+        .describe('Genre filter, e.g. "Action", "Romance"'),
     }),
   },
 );
