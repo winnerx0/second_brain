@@ -2,7 +2,7 @@ import { createAgent, tool } from 'langchain';
 import z from 'zod';
 import { model } from '../shared.js';
 import { twitterTools } from '../tools/twitter.js';
-import { getFinalText, requireConfirmation } from './utils.js';
+import { requireConfirmation, streamSubAgent } from './utils.js';
 
 const TWITTER_SYSTEM_PROMPT = `You are a Twitter/X Assistant with access to the user's Twitter/X account.
 
@@ -31,13 +31,14 @@ export const twitterTool = tool(
     );
     if (confirmation) return confirmation;
 
-    const response = await twitterAgent.invoke({
-      messages: [
+    return streamSubAgent(
+      twitterAgent,
+      [
         { role: 'system', content: TWITTER_SYSTEM_PROMPT },
         { role: 'user', content: query },
       ],
-    });
-    return getFinalText(response);
+      'twitter',
+    );
   },
   {
     name: 'twitter',

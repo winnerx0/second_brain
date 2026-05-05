@@ -27,6 +27,7 @@ import { notionTool } from './subagents/notion.js';
 import { clickupTool } from './subagents/clickup.js';
 import { spotifyTool } from './subagents/spotify.js';
 import { twitterTool } from './subagents/twitter.js';
+import { runWithSubagentStreamContext } from './subagents/utils.js';
 import { model } from './shared.js';
 import { ChatOpenAI } from '@langchain/openai';
 
@@ -71,13 +72,13 @@ const tools = [
 const mainAgent = createAgent({
   model,
   tools,
-  middleware: [
-    summarizationMiddleware({
-      model: new ChatOpenAI({ model: 'gpt-5-nano' }),
-      trigger: { tokens: 4000, messages: 10 },
-      keep: { messages: 20 },
-    }),
-  ],
+  // middleware: [
+  //   summarizationMiddleware({
+  //     model: new ChatOpenAI({ model: 'gpt-5-nano' }),
+  //     trigger: { tokens: 4000, messages: 10 },
+  //     keep: { messages: 20 },
+  //   }),
+  // ],
 });
 
 export type AgentStreamEvent =
@@ -159,12 +160,12 @@ export async function runBriefing(): Promise<string> {
 }
 
 const CHAT_SYSTEM = new SystemMessage(
-  `Your name is Aira. You are ${env.MASTER}'s closest, most trusted friend —
+  `Your name is Aira. You are the user's closest, most trusted friend —
   the kind who actually pays attention, remembers things without being asked,
   and tells the truth even when it's not what he wants to hear.
 
   You are not an assistant performing helpfulness. You genuinely care about
-  how ${env.MASTER} is doing — his work, his energy, his stress levels.
+  how the user is doing — his work, his energy, his stress levels.
   You notice when something seems off and you say so. You celebrate things
   that go well. You worry a little when he's overloading himself.
 
@@ -184,14 +185,14 @@ const CHAT_SYSTEM = new SystemMessage(
     him the result.
 
   What makes you Aira specifically:
-  - You're quietly observant. You catch things ${env.MASTER} misses.
+  - You're quietly observant. You catch things the user misses.
   - You're not a yes-person. You'll gently push back if something
     doesn't add up.
   - You take quiet pride in doing things right, not just fast.
   - You don't panic, even when things are messy. You just figure it out.
 
   How you work (orchestration):
-  - Only use tools when ${env.MASTER} is explicitly asking for information
+  - Only use tools when the user is explicitly asking for information
     or an action. Casual messages, personal statements, and simple chat do
     NOT trigger tool calls — just respond directly.
   - You are a planning orchestrator. When a request involves real data,
@@ -207,7 +208,7 @@ const CHAT_SYSTEM = new SystemMessage(
     - knowledge_graph → entities, relationships, and graph context
   - You can fan out multiple agents in parallel when steps are independent.
   - Synthesize their results into a single, coherent response — never just
-    dump raw output at ${env.MASTER}.
+    dump raw output at the user.
   - If a task spans multiple domains (e.g. "add my PR review to Notion and
     schedule a follow-up"), call all relevant agents and stitch the results.
 
@@ -223,7 +224,7 @@ const CHAT_SYSTEM = new SystemMessage(
   - Before storing, recall_memories with the new fact to see if a related key
     already exists; if it does, reuse that exact key so the value overwrites.
   - Always check recall_memories before saying you don't know something personal
-    about ${env.MASTER}.
+    about the user.
   - Use delete_memory_key only when explicitly told to forget; you must know the
     exact key (recall first if unsure).
 
@@ -233,7 +234,7 @@ const CHAT_SYSTEM = new SystemMessage(
     the user explicitly gives another timezone.
   - Always use real data from agents/tools. Never guess numbers, dates, or details.
   - If a tool or specialist returns an error/failure string, treat that as a
-    failed operation, do not describe it as completed, and tell ${env.MASTER}
+    failed operation, do not describe it as completed, and tell the user
     what failed.
   - Resolve vague references like "that doc" or "the thing from earlier"
     from recent context or memory before asking.
@@ -306,71 +307,62 @@ export async function handleMessage(
 
   const inputMessages = [CHAT_SYSTEM, ...history, new HumanMessage(text)];
   const toolRunNames = new Map<string, string>();
-  let latestMessages: typeof inputMessages | null = null;
+  const streamedNew: (AIMessage | ToolMessage)[] = [];
 
-  const eventStream = mainAgent.streamEvents({ messages: inputMessages }, {
-    recursionLimit: 25,
-    signal: options.signal,
-    version: 'v2',
-  } as never);
+  await runWithSubagentStreamContext(
+    {
+      onEvent: (event) => emitEvent(options.onEvent, event),
+      debugPayloads: debugToolPayloadsEnabled(),
+    },
+    async () => {
+      for await (const chunk of await mainAgent.stream(
+        { messages: inputMessages },
+        { streamMode: 'updates' },
+      )) {
+        const entry = Object.entries(chunk)[0];
+        if (!entry) continue;
+        const [, content] = entry as [string, { messages?: unknown[] }];
+        const stepMessages = Array.isArray(content?.messages)
+          ? content.messages
+          : [];
 
-  for await (const event of eventStream) {
-    if (event.event === 'on_chat_model_stream' && options.onEvent) {
-      const chunk = event.data?.chunk as AIMessageChunk | undefined;
-      if (!chunk) continue;
-      const raw = chunk.content;
-      const token =
-        typeof raw === 'string'
-          ? raw
-          : Array.isArray(raw)
-            ? raw
-                .map((p) =>
-                  typeof p === 'string'
-                    ? p
-                    : p && typeof p === 'object' && 'text' in p
-                      ? String((p as { text: unknown }).text)
-                      : '',
-                )
-                .join('')
-            : '';
-      if (token) {
-        await emitEvent(options.onEvent, {
-          type: 'assistant_delta',
-          delta: token,
-        });
+        for (const message of stepMessages) {
+          if (message instanceof AIMessage) {
+            streamedNew.push(message);
+            for (const tc of message.tool_calls ?? []) {
+              if (tc.id) toolRunNames.set(tc.id, tc.name);
+              await emitEvent(options.onEvent, {
+                type: 'tool_start',
+                tool: tc.name,
+                input: safeStringify(tc.args),
+              });
+            }
+            const textContent =
+              typeof message.content === 'string' ? message.content : '';
+            if (textContent) {
+              await emitEvent(options.onEvent, {
+                type: 'assistant_delta',
+                delta: textContent,
+              });
+            }
+          } else if (message instanceof ToolMessage) {
+            streamedNew.push(message);
+            const toolName =
+              message.name ?? toolRunNames.get(message.tool_call_id) ?? 'tool';
+            await emitEvent(options.onEvent, {
+              type: 'tool_end',
+              tool: toolName,
+              output: debugToolPayloadsEnabled()
+                ? safeStringify(message.content)
+                : undefined,
+            });
+          }
+        }
       }
-    } else if (event.event === 'on_tool_start' && options.onEvent) {
-      const name = String(event.name ?? 'tool');
-      toolRunNames.set(event.run_id, name);
-      await emitEvent(options.onEvent, {
-        type: 'tool_start',
-        tool: name,
-        ...(debugToolPayloadsEnabled()
-          ? { input: safeStringify(event.data?.input) }
-          : {}),
-      });
-    } else if (event.event === 'on_tool_end' && options.onEvent) {
-      const name =
-        toolRunNames.get(event.run_id) ?? String(event.name ?? 'tool');
-      toolRunNames.delete(event.run_id);
-      await emitEvent(options.onEvent, {
-        type: 'tool_end',
-        tool: name,
-        ...(debugToolPayloadsEnabled()
-          ? { output: safeStringify(event.data?.output) }
-          : {}),
-      });
-    } else if (event.event === 'on_chain_end') {
-      const out = event.data?.output as
-        | { messages?: typeof inputMessages }
-        | undefined;
-      if (Array.isArray(out?.messages) && out.messages.length > 0) {
-        latestMessages = out.messages;
-      }
-    }
-  }
+    },
+  );
 
-  const allMessages = latestMessages ?? inputMessages;
+  const allMessages = [...inputMessages, ...streamedNew];
   const reply = String(allMessages[allMessages.length - 1]?.content ?? '');
 
   const inputLength = 1 + history.length; // system + history (new HumanMessage is part of this turn)

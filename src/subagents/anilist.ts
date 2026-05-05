@@ -2,7 +2,7 @@ import { createAgent, tool } from 'langchain';
 import z from 'zod';
 import { model } from '../shared.js';
 import { addListEntry, anilistTools } from '../tools/anilist.js';
-import { getFinalText } from './utils.js';
+import { streamSubAgent } from './utils.js';
 
 const STATUS_VALUES = [
   'CURRENT',
@@ -72,13 +72,14 @@ export const anilistTool = tool(
       return `Updated your AniList entry (mediaId ${directUpdate.mediaId}) to ${directUpdate.score}/10.${directUpdate.status ? ` Status: ${directUpdate.status}.` : ''}\n${typeof result === 'string' ? result : JSON.stringify(result)}`;
     }
 
-    const response = await anilistAgent.invoke({
-      messages: [
+    return streamSubAgent(
+      anilistAgent,
+      [
         { role: 'system', content: ANILIST_SYSTEM_PROMPT },
         { role: 'user', content: query },
       ],
-    });
-    return getFinalText(response);
+      'anilist',
+    );
   },
   {
     name: 'anilist',

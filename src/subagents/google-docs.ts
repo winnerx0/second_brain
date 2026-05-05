@@ -2,7 +2,7 @@ import { createAgent, tool } from 'langchain';
 import z from 'zod';
 import { model } from '../shared.js';
 import { googleDocTools } from '../tools/google-docs.js';
-import { getFinalText, requireConfirmation } from './utils.js';
+import { requireConfirmation, streamSubAgent } from './utils.js';
 
 const DOCS_SYSTEM_PROMPT = `You are a Document Assistant with access to Google Docs.
 
@@ -32,13 +32,14 @@ export const docsTool = tool(
     );
     if (confirmation) return confirmation;
 
-    const response = await docsAgent.invoke({
-      messages: [
+    return streamSubAgent(
+      docsAgent,
+      [
         { role: 'system', content: DOCS_SYSTEM_PROMPT },
         { role: 'user', content: query },
       ],
-    });
-    return getFinalText(response);
+      'docs',
+    );
   },
   {
     name: 'docs',

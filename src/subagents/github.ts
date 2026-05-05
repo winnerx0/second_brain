@@ -9,7 +9,7 @@ import {
   closeIssue,
   deleteIssue,
 } from '../tools/github.js';
-import { getFinalText, requireConfirmation } from './utils.js';
+import { requireConfirmation, streamSubAgent } from './utils.js';
 
 const GITHUB_SYSTEM_PROMPT = `You are a GitHub Assistant with access to the user's GitHub account.
 
@@ -44,13 +44,14 @@ export const githubTool = tool(
     );
     if (confirmation) return confirmation;
 
-    const response = await githubAgent.invoke({
-      messages: [
+    return streamSubAgent(
+      githubAgent,
+      [
         { role: 'system', content: GITHUB_SYSTEM_PROMPT },
         { role: 'user', content: query },
       ],
-    });
-    return getFinalText(response);
+      'github',
+    );
   },
   {
     name: 'github',

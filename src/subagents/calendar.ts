@@ -3,7 +3,7 @@ import z from 'zod';
 import { model } from '../shared.js';
 import { calendarTools } from '../tools/calendar.js';
 import { getCurrentDateTime } from '../tools/miscellaneous.js';
-import { getFinalText, requireConfirmation } from './utils.js';
+import { requireConfirmation, streamSubAgent } from './utils.js';
 
 const CALENDAR_SYSTEM_PROMPT = `You are a Calendar Assistant with access to the user's Google Calendar.
 
@@ -34,13 +34,14 @@ export const calendarTool = tool(
     );
     if (confirmation) return confirmation;
 
-    const response = await calendarAgent.invoke({
-      messages: [
+    return streamSubAgent(
+      calendarAgent,
+      [
         { role: 'system', content: CALENDAR_SYSTEM_PROMPT },
         { role: 'user', content: query },
       ],
-    });
-    return getFinalText(response);
+      'calendar',
+    );
   },
   {
     name: 'calendar',

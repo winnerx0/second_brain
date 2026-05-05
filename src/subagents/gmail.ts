@@ -3,7 +3,7 @@ import z from 'zod';
 import { model } from '../shared.js';
 import { gmailTools } from '../tools/gmail.js';
 import { getCurrentDateTime } from '../tools/miscellaneous.js';
-import { getFinalText, requireConfirmation } from './utils.js';
+import { requireConfirmation, streamSubAgent } from './utils.js';
 
 const GMAIL_SYSTEM_PROMPT = `You are an Email Assistant with access to the user's Gmail inbox.
 
@@ -35,13 +35,14 @@ export const gmailTool = tool(
     );
     if (confirmation) return confirmation;
 
-    const response = await gmailAgent.invoke({
-      messages: [
+    return streamSubAgent(
+      gmailAgent,
+      [
         { role: 'system', content: GMAIL_SYSTEM_PROMPT },
         { role: 'user', content: query },
       ],
-    });
-    return getFinalText(response);
+      'gmail',
+    );
   },
   {
     name: 'gmail',

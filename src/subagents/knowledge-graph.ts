@@ -2,7 +2,7 @@ import { createAgent, tool } from 'langchain';
 import z from 'zod';
 import { model } from '../shared.js';
 import { knowledgeGraphTools } from '../tools/knowledge-graph.js';
-import { getFinalText } from './utils.js';
+import { streamSubAgent } from './utils.js';
 
 const KNOWLEDGE_GRAPH_SYSTEM_PROMPT = `You are a Knowledge Graph Assistant.
 
@@ -31,13 +31,14 @@ const knowledgeGraphAgent = createAgent({
 
 export const knowledgeGraphTool = tool(
   async ({ query }) => {
-    const response = await knowledgeGraphAgent.invoke({
-      messages: [
+    return streamSubAgent(
+      knowledgeGraphAgent,
+      [
         { role: 'system', content: KNOWLEDGE_GRAPH_SYSTEM_PROMPT },
         { role: 'user', content: query },
       ],
-    });
-    return getFinalText(response);
+      'knowledge_graph',
+    );
   },
   {
     name: 'knowledge_graph',

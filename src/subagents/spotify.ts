@@ -2,7 +2,7 @@ import { createAgent, tool } from 'langchain';
 import z from 'zod';
 import { model } from '../shared.js';
 import { spotifyTools } from '../tools/spotify.js';
-import { getFinalText } from './utils.js';
+import { streamSubAgent } from './utils.js';
 
 const SPOTIFY_SYSTEM_PROMPT = `You are a Spotify Assistant with access to the user's Spotify account.
 
@@ -22,13 +22,14 @@ const spotifyAgent = createAgent({ model, tools: spotifyTools });
 
 export const spotifyTool = tool(
   async ({ query }) => {
-    const response = await spotifyAgent.invoke({
-      messages: [
+    return streamSubAgent(
+      spotifyAgent,
+      [
         { role: 'system', content: SPOTIFY_SYSTEM_PROMPT },
         { role: 'user', content: query },
       ],
-    });
-    return getFinalText(response);
+      'spotify',
+    );
   },
   {
     name: 'spotify',

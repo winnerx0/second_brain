@@ -3,7 +3,7 @@ import z from 'zod';
 import { model } from '../shared.js';
 import { notionTools } from '../tools/notion.js';
 import { getCurrentDateTime } from '../tools/miscellaneous.js';
-import { getFinalText, requireConfirmation } from './utils.js';
+import { requireConfirmation, streamSubAgent } from './utils.js';
 
 const NOTION_SYSTEM_PROMPT = `You are a Notion Workspace Assistant with full access to the user's Notion workspace via the OAuth API.
 
@@ -31,13 +31,14 @@ export const notionTool = tool(
     );
     if (confirmation) return confirmation;
 
-    const response = await notionAgent.invoke({
-      messages: [
+    return streamSubAgent(
+      notionAgent,
+      [
         { role: 'system', content: NOTION_SYSTEM_PROMPT },
         { role: 'user', content: query },
       ],
-    });
-    return getFinalText(response);
+      'notion',
+    );
   },
   {
     name: 'notion',

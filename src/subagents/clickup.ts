@@ -3,7 +3,7 @@ import z from 'zod';
 import { model } from '../shared.js';
 import { clickupTools } from '../tools/clickup.js';
 import { getCurrentDateTime } from '../tools/miscellaneous.js';
-import { getFinalText, requireConfirmation } from './utils.js';
+import { requireConfirmation, streamSubAgent } from './utils.js';
 
 const CLICKUP_SYSTEM_PROMPT = `You are a ClickUp Assistant with full access to the user's ClickUp workspace.
 
@@ -32,13 +32,14 @@ export const clickupTool = tool(
     );
     if (confirmation) return confirmation;
 
-    const response = await clickupAgent.invoke({
-      messages: [
+    return streamSubAgent(
+      clickupAgent,
+      [
         { role: 'system', content: CLICKUP_SYSTEM_PROMPT },
         { role: 'user', content: query },
       ],
-    });
-    return getFinalText(response);
+      'clickup',
+    );
   },
   {
     name: 'clickup',
