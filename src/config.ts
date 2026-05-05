@@ -3,7 +3,6 @@ import { z } from 'zod';
 const env = process.env;
 
 const envSchema = z.object({
-  MASTER: z.string().min(1),
   OPENAI_API_KEY: z.string().min(1),
   EMBEDDING_MODEL: z.string().min(1).default('text-embedding-3-small'),
   GITHUB_TOKEN: z.string().min(1),
