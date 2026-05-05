@@ -122,7 +122,7 @@ FOCUS FOR TODAY
 TODAY'S SCHEDULE
 OPEN GITHUB ITEMS
 WATCH OUT
-PERSONAL NOTE (Give a concise note for ${config.MASTER} concerning the day's schedule and upcoming events)
+PERSONAL NOTE (Give a concise note for the user concerning the day's schedule and upcoming events)
 
 Keep under 400 words. Format for Telegram markdown.`;
 
