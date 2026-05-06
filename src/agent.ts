@@ -128,6 +128,88 @@ PERSONAL NOTE (Give a concise note for the user concerning the day's schedule an
 
 Keep under 400 words. Format for Telegram markdown.`;
 
+const WORKFLOW_SYSTEM_PROMPT = `You are an automation agent. Your job is to execute the provided workflow plan exactly. Use tools to gather real data, chain outputs from one step as input to the next, and return a structured summary of every step's result.`;
+
+export async function runWorkflow(
+  workflowId: number,
+  plan: string,
+  options: HandleMessageOptions = {},
+): Promise<string> {
+  logger.info(`[workflow] starting workflow ${workflowId}`);
+
+  const inputMessages = [
+    new SystemMessage(WORKFLOW_SYSTEM_PROMPT),
+    new HumanMessage(plan),
+  ];
+  const toolRunNames = new Map<string, string>();
+  const streamedNew: (AIMessage | ToolMessage)[] = [];
+
+  await emitEvent(options.onEvent, {
+    type: 'status',
+    message: 'Executing workflow...',
+  });
+
+  await runWithSubagentStreamContext(
+    {
+      onEvent: (event) => emitEvent(options.onEvent, event),
+      debugPayloads: debugToolPayloadsEnabled(),
+    },
+    async () => {
+      for await (const chunk of await mainAgent.stream(
+        { messages: inputMessages },
+        { streamMode: 'updates' },
+      )) {
+        const entry = Object.entries(chunk)[0];
+        if (!entry) continue;
+        const [, content] = entry as [string, { messages?: unknown[] }];
+        const stepMessages = Array.isArray(content?.messages)
+          ? content.messages
+          : [];
+
+        for (const message of stepMessages) {
+          if (message instanceof AIMessage) {
+            streamedNew.push(message);
+            for (const tc of message.tool_calls ?? []) {
+              if (tc.id) toolRunNames.set(tc.id, tc.name);
+              await emitEvent(options.onEvent, {
+                type: 'tool_start',
+                tool: tc.name,
+                input: safeStringify(tc.args),
+              });
+            }
+            const textContent =
+              typeof message.content === 'string' ? message.content : '';
+            if (textContent) {
+              await emitEvent(options.onEvent, {
+                type: 'assistant_delta',
+                delta: textContent,
+              });
+            }
+          } else if (message instanceof ToolMessage) {
+            streamedNew.push(message);
+            const toolName =
+              message.name ?? toolRunNames.get(message.tool_call_id) ?? 'tool';
+            await emitEvent(options.onEvent, {
+              type: 'tool_end',
+              tool: toolName,
+              output: debugToolPayloadsEnabled()
+                ? safeStringify(message.content)
+                : undefined,
+            });
+          }
+        }
+      }
+    },
+  );
+
+  const reply = String(streamedNew[streamedNew.length - 1]?.content ?? '');
+
+  logger.info(`[workflow] completed workflow ${workflowId}`);
+  await emitEvent(options.onEvent, { type: 'final', text: reply });
+
+  return reply;
+}
+
 export async function runBriefing(): Promise<string> {
   const input = BRIEFING_SYSTEM_PROMPT + 'Generate my daily briefing now.';
   logger.info(`[briefing] estimated input tokens: ${countTokens(input)}`);

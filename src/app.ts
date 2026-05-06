@@ -1,6 +1,6 @@
 import { Hono, type Context } from 'hono';
 import { cors } from 'hono/cors';
-import { runBriefing, handleMessage, type AgentStreamEvent } from './agent.js';
+import { runBriefing, handleMessage, runWorkflow, type AgentStreamEvent } from './agent.js';
 import { logger } from './logger.js';
 import { db } from './db/client.js';
 import {
@@ -8,6 +8,8 @@ import {
   chatSessions,
   memories,
   connections,
+  workflows,
+  workflowRuns,
 } from './db/schema.js';
 import { asc, desc, eq } from 'drizzle-orm';
 import {
@@ -615,6 +617,153 @@ app.post('/cron/briefing', async (c) => {
       { error: error instanceof Error ? error.message : 'Cron job failed' },
       500,
     );
+  }
+});
+
+/* ─── Workflows ──────────────────────────────────────────────────────────── */
+
+app.get('/workflows', async (c) => {
+  try {
+    const wfs = await db.select().from(workflows).orderBy(desc(workflows.updatedAt));
+    return c.json({ workflows: wfs });
+  } catch (error) {
+    logger.error('[workflows.list]', error);
+    return c.json({ error: 'Failed to list workflows' }, 500);
+  }
+});
+
+app.post('/workflows', async (c) => {
+  try {
+    const body = await c.req.json() as { name: string; description?: string; plan: string };
+    if (!body.name || !body.plan) return c.json({ error: 'Missing name or plan' }, 400);
+
+    const [inserted] = await db
+      .insert(workflows)
+      .values({
+        name: body.name,
+        description: body.description || '',
+        plan: body.plan,
+      })
+      .returning();
+
+    return c.json(inserted, 201);
+  } catch (error) {
+    logger.error('[workflows.create]', error);
+    return c.json({ error: 'Failed to create workflow' }, 500);
+  }
+});
+
+app.patch('/workflows/:id', async (c) => {
+  try {
+    const id = parseInt(c.req.param('id'), 10);
+    const body = await c.req.json() as { name?: string; description?: string; plan?: string; enabled?: boolean };
+
+    const [updated] = await db
+      .update(workflows)
+      .set({
+        ...body,
+        updatedAt: new Date(),
+      })
+      .where(eq(workflows.id, id))
+      .returning();
+
+    return c.json(updated);
+  } catch (error) {
+    logger.error('[workflows.update]', error);
+    return c.json({ error: 'Failed to update workflow' }, 500);
+  }
+});
+
+app.delete('/workflows/:id', async (c) => {
+  try {
+    const id = parseInt(c.req.param('id'), 10);
+    await db.delete(workflows).where(eq(workflows.id, id));
+    return c.json({ success: true });
+  } catch (error) {
+    logger.error('[workflows.delete]', error);
+    return c.json({ error: 'Failed to delete workflow' }, 500);
+  }
+});
+
+app.get('/workflows/:id/runs', async (c) => {
+  try {
+    const id = parseInt(c.req.param('id'), 10);
+    const runs = await db
+      .select()
+      .from(workflowRuns)
+      .where(eq(workflowRuns.workflowId, id))
+      .orderBy(desc(workflowRuns.ranAt))
+      .limit(20);
+
+    return c.json({ runs });
+  } catch (error) {
+    logger.error('[workflows.runs.list]', error);
+    return c.json({ error: 'Failed to list runs' }, 500);
+  }
+});
+
+app.post('/workflows/:id/run', async (c) => {
+  try {
+    const id = parseInt(c.req.param('id'), 10);
+    const [wf] = await db
+      .select()
+      .from(workflows)
+      .where(eq(workflows.id, id));
+
+    if (!wf) return c.json({ error: 'Workflow not found' }, 404);
+
+    const [run] = await db
+      .insert(workflowRuns)
+      .values({ workflowId: id, status: 'running' })
+      .returning();
+
+    if (!run) return c.json({ error: 'Failed to create run' }, 500);
+
+    const chunks: string[] = [];
+    let output = '';
+
+    try {
+      output = await runWorkflow(id, wf.plan, {
+        onEvent: (event) => {
+          chunks.push(
+            `event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`,
+          );
+        },
+      });
+
+      await db
+        .update(workflowRuns)
+        .set({ status: 'completed', output })
+        .where(eq(workflowRuns.id, run.id));
+
+      await db
+        .update(workflows)
+        .set({ lastRunAt: new Date() })
+        .where(eq(workflows.id, id));
+
+      chunks.push('event: done\ndata: null\n\n');
+    } catch (error) {
+      logger.error('[workflows.run]', error);
+      await db
+        .update(workflowRuns)
+        .set({ status: 'failed' })
+        .where(eq(workflowRuns.id, run.id));
+
+      chunks.push(
+        `event: error\ndata: ${JSON.stringify({ message: error instanceof Error ? error.message : 'Run failed' })}\n\n`,
+      );
+    }
+
+    return new Response(chunks.join(''), {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+      },
+    });
+  } catch (error) {
+    logger.error('[workflows.run]', error);
+    return c.json({ error: 'Failed to run workflow' }, 500);
   }
 });
 

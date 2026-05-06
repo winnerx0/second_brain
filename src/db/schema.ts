@@ -109,3 +109,22 @@ export const connections = pgTable('connections', {
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
+
+export const workflows = pgTable('workflows', {
+  id: serial('id').primaryKey(),
+  name: text('name').notNull(),
+  description: text('description').notNull().default(''),
+  plan: text('plan').notNull(),
+  enabled: boolean('enabled').notNull().default(true),
+  lastRunAt: timestamp('last_run_at'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+export const workflowRuns = pgTable('workflow_runs', {
+  id: serial('id').primaryKey(),
+  workflowId: integer('workflow_id').notNull().references(() => workflows.id, { onDelete: 'cascade' }),
+  status: text('status').notNull().default('running'),
+  output: text('output'),
+  ranAt: timestamp('ran_at').notNull().defaultNow(),
+});

@@ -15,6 +15,13 @@
       "when": 1778000000000,
       "tag": "0001_memories_keyed",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1778093967642,
+      "tag": "0002_charming_omega_flight",
+      "breakpoints": true
     }
   ]
 }
