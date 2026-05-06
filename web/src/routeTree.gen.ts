@@ -13,6 +13,8 @@ import { Route as WorkflowsRouteImport } from './routes/workflows'
 import { Route as MemoriesRouteImport } from './routes/memories'
 import { Route as ConnectionsRouteImport } from './routes/connections'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as WorkflowsIndexRouteImport } from './routes/workflows.index'
+import { Route as WorkflowsWorkflowIdRouteImport } from './routes/workflows.$workflowId'
 
 const WorkflowsRoute = WorkflowsRouteImport.update({
   id: '/workflows',
@@ -34,39 +36,72 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const WorkflowsIndexRoute = WorkflowsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => WorkflowsRoute,
+} as any)
+const WorkflowsWorkflowIdRoute = WorkflowsWorkflowIdRouteImport.update({
+  id: '/$workflowId',
+  path: '/$workflowId',
+  getParentRoute: () => WorkflowsRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/connections': typeof ConnectionsRoute
   '/memories': typeof MemoriesRoute
-  '/workflows': typeof WorkflowsRoute
+  '/workflows': typeof WorkflowsRouteWithChildren
+  '/workflows/$workflowId': typeof WorkflowsWorkflowIdRoute
+  '/workflows/': typeof WorkflowsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/connections': typeof ConnectionsRoute
   '/memories': typeof MemoriesRoute
-  '/workflows': typeof WorkflowsRoute
+  '/workflows/$workflowId': typeof WorkflowsWorkflowIdRoute
+  '/workflows': typeof WorkflowsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/connections': typeof ConnectionsRoute
   '/memories': typeof MemoriesRoute
-  '/workflows': typeof WorkflowsRoute
+  '/workflows': typeof WorkflowsRouteWithChildren
+  '/workflows/$workflowId': typeof WorkflowsWorkflowIdRoute
+  '/workflows/': typeof WorkflowsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/connections' | '/memories' | '/workflows'
+  fullPaths:
+    | '/'
+    | '/connections'
+    | '/memories'
+    | '/workflows'
+    | '/workflows/$workflowId'
+    | '/workflows/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/connections' | '/memories' | '/workflows'
-  id: '__root__' | '/' | '/connections' | '/memories' | '/workflows'
+  to:
+    | '/'
+    | '/connections'
+    | '/memories'
+    | '/workflows/$workflowId'
+    | '/workflows'
+  id:
+    | '__root__'
+    | '/'
+    | '/connections'
+    | '/memories'
+    | '/workflows'
+    | '/workflows/$workflowId'
+    | '/workflows/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ConnectionsRoute: typeof ConnectionsRoute
   MemoriesRoute: typeof MemoriesRoute
-  WorkflowsRoute: typeof WorkflowsRoute
+  WorkflowsRoute: typeof WorkflowsRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
@@ -99,14 +134,42 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/workflows/': {
+      id: '/workflows/'
+      path: '/'
+      fullPath: '/workflows/'
+      preLoaderRoute: typeof WorkflowsIndexRouteImport
+      parentRoute: typeof WorkflowsRoute
+    }
+    '/workflows/$workflowId': {
+      id: '/workflows/$workflowId'
+      path: '/$workflowId'
+      fullPath: '/workflows/$workflowId'
+      preLoaderRoute: typeof WorkflowsWorkflowIdRouteImport
+      parentRoute: typeof WorkflowsRoute
+    }
   }
 }
+
+interface WorkflowsRouteChildren {
+  WorkflowsWorkflowIdRoute: typeof WorkflowsWorkflowIdRoute
+  WorkflowsIndexRoute: typeof WorkflowsIndexRoute
+}
+
+const WorkflowsRouteChildren: WorkflowsRouteChildren = {
+  WorkflowsWorkflowIdRoute: WorkflowsWorkflowIdRoute,
+  WorkflowsIndexRoute: WorkflowsIndexRoute,
+}
+
+const WorkflowsRouteWithChildren = WorkflowsRoute._addFileChildren(
+  WorkflowsRouteChildren,
+)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ConnectionsRoute: ConnectionsRoute,
   MemoriesRoute: MemoriesRoute,
-  WorkflowsRoute: WorkflowsRoute,
+  WorkflowsRoute: WorkflowsRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
