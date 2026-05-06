@@ -125,7 +125,7 @@ export const createLinkedInPost = tool(
         return 'Error: personId is required. Fetch your profile first to get your person ID.';
       }
 
-      const data = await linkedInFetch('/v2/ugcPosts', {
+      const data = await linkedInFetch('/ugcPosts', {
         method: 'POST',
         body: {
           author: `urn:li:person:${personId}`,
@@ -246,7 +246,7 @@ export const publishLinkedInDraft = tool(
         return 'Error: personId is required. Fetch your profile first to get your person ID.';
       }
 
-      const data = await linkedInFetch('/v2/ugcPosts', {
+      const data = await linkedInFetch('/ugcPosts', {
         method: 'POST',
         body: {
           author: `urn:li:person:${personId}`,
