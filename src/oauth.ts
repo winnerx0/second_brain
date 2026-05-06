@@ -93,6 +93,13 @@ export const OAUTH_CONFIGS: Record<string, OAuthConfig> = {
     clientIdEnv: 'TODOIST_OAUTH_CLIENT_ID',
     clientSecretEnv: 'TODOIST_OAUTH_CLIENT_SECRET',
   },
+  linkedin: {
+    authUrl: 'https://www.linkedin.com/oauth/v2/authorization',
+    tokenUrl: 'https://www.linkedin.com/oauth/v2/accessToken',
+    scopes: ['openid', 'profile', 'w_member_social'],
+    clientIdEnv: 'LINKEDIN_OAUTH_CLIENT_ID',
+    clientSecretEnv: 'LINKEDIN_OAUTH_CLIENT_SECRET',
+  },
 };
 
 type StateEntry = {
