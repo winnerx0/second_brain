@@ -632,6 +632,18 @@ app.get('/workflows', async (c) => {
   }
 });
 
+app.get('/workflows/:id', async (c) => {
+  try {
+    const id = parseInt(c.req.param('id'), 10);
+    const [wf] = await db.select().from(workflows).where(eq(workflows.id, id));
+    if (!wf) return c.json({ error: 'Workflow not found' }, 404);
+    return c.json(wf);
+  } catch (error) {
+    logger.error('[workflows.get]', error);
+    return c.json({ error: 'Failed to load workflow' }, 500);
+  }
+});
+
 app.post('/workflows', async (c) => {
   try {
     const body = await c.req.json() as { name: string; description?: string; plan: string };
