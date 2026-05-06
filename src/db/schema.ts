@@ -128,3 +128,12 @@ export const workflowRuns = pgTable('workflow_runs', {
   output: text('output'),
   ranAt: timestamp('ran_at').notNull().defaultNow(),
 });
+
+export const linkedinDrafts = pgTable('linkedin_drafts', {
+  id: serial('id').primaryKey(),
+  text: text('text').notNull(),
+  visibility: text('visibility').notNull().default('PUBLIC'),
+  publishedAt: timestamp('published_at'),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});

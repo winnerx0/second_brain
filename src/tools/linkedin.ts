@@ -2,6 +2,9 @@ import { tool } from 'langchain';
 import { z } from 'zod';
 import { logger } from '../logger.js';
 import { getValidToken } from '../oauth.js';
+import { db } from '../db/client.js';
+import { linkedinDrafts } from '../db/schema.js';
+import { eq, desc, isNull } from 'drizzle-orm';
 
 const LINKEDIN_API_URL = 'https://api.linkedin.com/v2';
 
@@ -160,8 +163,158 @@ export const createLinkedInPost = tool(
   },
 );
 
+export const createLinkedInDraft = tool(
+  async ({ text, visibility }) => {
+    try {
+      const draftResults = await db
+        .insert(linkedinDrafts)
+        .values({
+          text,
+          visibility: visibility ?? 'PUBLIC',
+        })
+        .returning();
+
+      const draft = draftResults[0];
+      if (!draft) {
+        return 'Error: Failed to create draft';
+      }
+
+      return JSON.stringify({
+        id: draft.id,
+        text: draft.text,
+        visibility: draft.visibility,
+        createdAt: draft.createdAt,
+      });
+    } catch (error) {
+      logger.error('[linkedin] createLinkedInDraft', error);
+      return `Error creating draft: ${error instanceof Error ? error.message : String(error)}`;
+    }
+  },
+  {
+    name: 'linkedin_create_draft',
+    description: 'Save a LinkedIn post as a draft (not published yet).',
+    schema: z.object({
+      text: z.string().min(1).describe('Draft post text'),
+      visibility: z
+        .enum(['PUBLIC', 'CONNECTIONS'])
+        .optional()
+        .describe('Visibility level when published'),
+    }),
+  },
+);
+
+export const listLinkedInDrafts = tool(
+  async () => {
+    try {
+      const drafts = await db
+        .select()
+        .from(linkedinDrafts)
+        .where(isNull(linkedinDrafts.publishedAt))
+        .orderBy(desc(linkedinDrafts.createdAt));
+
+      return JSON.stringify(drafts);
+    } catch (error) {
+      logger.error('[linkedin] listLinkedInDrafts', error);
+      return `Error listing drafts: ${error instanceof Error ? error.message : String(error)}`;
+    }
+  },
+  {
+    name: 'linkedin_list_drafts',
+    description: 'List all saved LinkedIn post drafts (unpublished).',
+    schema: z.object({}),
+  },
+);
+
+export const publishLinkedInDraft = tool(
+  async ({ draftId, personId }) => {
+    try {
+      const draftResults = await db
+        .select()
+        .from(linkedinDrafts)
+        .where(eq(linkedinDrafts.id, draftId));
+
+      const draft = draftResults[0];
+      if (!draft) {
+        return `Error: Draft with ID ${draftId} not found.`;
+      }
+
+      if (draft.publishedAt !== null) {
+        return `Error: Draft ${draftId} has already been published.`;
+      }
+
+      if (!personId) {
+        return 'Error: personId is required. Fetch your profile first to get your person ID.';
+      }
+
+      const data = await linkedInFetch('/v2/ugcPosts', {
+        method: 'POST',
+        body: {
+          author: `urn:li:person:${personId}`,
+          lifecycleState: 'PUBLISHED',
+          specificContent: {
+            'com.linkedin.ugc.ShareContent': {
+              shareCommentary: {
+                text: draft.text,
+              },
+              shareMediaCategory: 'NONE',
+            },
+          },
+          visibility: {
+            'com.linkedin.ugc.MemberNetworkVisibility': draft.visibility,
+          },
+        },
+      });
+
+      // Mark draft as published
+      await db
+        .update(linkedinDrafts)
+        .set({ publishedAt: new Date() })
+        .where(eq(linkedinDrafts.id, draft.id));
+
+      return JSON.stringify({
+        message: 'Draft published successfully',
+        linkedinResponse: data,
+      });
+    } catch (error) {
+      logger.error('[linkedin] publishLinkedInDraft', error);
+      return `Error publishing draft: ${error instanceof Error ? error.message : String(error)}`;
+    }
+  },
+  {
+    name: 'linkedin_publish_draft',
+    description: 'Publish a saved LinkedIn draft to your profile.',
+    schema: z.object({
+      draftId: z.number().describe('ID of the draft to publish'),
+      personId: z.string().describe('LinkedIn person ID (from profile/userinfo)'),
+    }),
+  },
+);
+
+export const deleteLinkedInDraft = tool(
+  async ({ draftId }) => {
+    try {
+      await db.delete(linkedinDrafts).where(eq(linkedinDrafts.id, draftId));
+      return JSON.stringify({ message: `Draft ${draftId} deleted` });
+    } catch (error) {
+      logger.error('[linkedin] deleteLinkedInDraft', error);
+      return `Error deleting draft: ${error instanceof Error ? error.message : String(error)}`;
+    }
+  },
+  {
+    name: 'linkedin_delete_draft',
+    description: 'Delete a saved LinkedIn draft.',
+    schema: z.object({
+      draftId: z.number().describe('ID of the draft to delete'),
+    }),
+  },
+);
+
 export const linkedinTools = [
   getLinkedInProfile,
   getLinkedInPosts,
   createLinkedInPost,
+  createLinkedInDraft,
+  listLinkedInDrafts,
+  publishLinkedInDraft,
+  deleteLinkedInDraft,
 ];
