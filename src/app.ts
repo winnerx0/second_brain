@@ -18,7 +18,7 @@ import {
   OAUTH_CONFIGS,
 } from './oauth.js';
 import { config } from './config.js';
-
+import {kiviaHonoMiddleware} from "@kivia/sdk"
 const API_KEY_CONNECTIONS = new Set(['clickup']);
 // MCP OAuth imports - disabled, using traditional OAuth instead
 // import {
@@ -75,6 +75,10 @@ function formatSseEvent(event: AgentStreamEvent): string {
 }
 
 app.use('*', cors({ origin: [config.APP_URL] }));
+
+const kivia = kiviaHonoMiddleware({apiKey: config.KIVIA_API_KEY})
+
+app.use(kivia)
 
 app.get('/health', (c) => {
   return c.json({ status: 'ok', timestamp: Date.now() });

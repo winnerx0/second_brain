@@ -5,7 +5,7 @@
     "": {
       "name": "second-brain",
       "dependencies": {
-        "@kivia/sdk": "^0.1.3",
+        "@kivia/sdk": "^0.1.5",
         "@langchain/community": "^1.1.27",
         "@langchain/google-genai": "^2.1.26",
         "@langchain/langgraph": "^1.2.8",
@@ -204,7 +204,7 @@
 
     "@jridgewell/trace-mapping": ["@jridgewell/trace-mapping@0.3.31", "", { "dependencies": { "@jridgewell/resolve-uri": "^3.1.0", "@jridgewell/sourcemap-codec": "^1.4.14" } }, "sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw=="],
 
-    "@kivia/sdk": ["@kivia/sdk@0.1.3", "", {}, "sha512-ocjn+DyBNdoJkGUnHf4CUIEBYB9Yrz4qgVyPUDpamQNoAnVQn75jY7ypsfJwZ9Apt+71giykQmSdCCPrMzLV0A=="],
+    "@kivia/sdk": ["@kivia/sdk@0.1.5", "", {}, "sha512-8ETYW7pBXU6LqOiw0NbPGyzvsPHsVDh9Jjjh0rUDXUdvAinpfkm8jCYQAw7CL5Tk0yBbKJbBOo6N6vkrYQZ06Q=="],
 
     "@langchain/classic": ["@langchain/classic@1.0.27", "", { "dependencies": { "@langchain/openai": "1.4.1", "@langchain/textsplitters": "1.0.1", "handlebars": "^4.7.9", "js-yaml": "^4.1.1", "jsonpointer": "^5.0.1", "openapi-types": "^12.1.3", "uuid": "^10.0.0", "yaml": "^2.8.3", "zod": "^3.25.76 || ^4" }, "optionalDependencies": { "langsmith": ">=0.4.0 <1.0.0" }, "peerDependencies": { "@langchain/core": "^1.0.0", "cheerio": "*", "peggy": "^5.1.0", "typeorm": "*" }, "optionalPeers": ["cheerio", "peggy", "typeorm"] }, "sha512-dMq8rgt3cy/QoHrB6HIKobievyW00DfuZcASG0aMy47Pf5TQq3vZM2tLT1kkCBe2yJnncQwqmAzxoEgFLJZrcw=="],
 
