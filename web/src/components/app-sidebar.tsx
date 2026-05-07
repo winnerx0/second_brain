@@ -1,6 +1,7 @@
 import { Link } from '@tanstack/react-router';
 import { type ReactNode } from 'react';
 import { useSidebar } from '../contexts/sidebar-context';
+import { ThemeToggle } from './theme-toggle';
 
 function BrainIcon() {
   return (
@@ -155,6 +156,7 @@ export function AppSidebar({ children, onNewChat }: AppSidebarProps) {
             <span className="sidebar-brand-name">Aira</span>
           </div>
           <div className="sidebar-header-actions">
+            <ThemeToggle className="sidebar-new-btn" />
             {onNewChat && (
               <button
                 type="button"

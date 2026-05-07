@@ -16,10 +16,10 @@ type ToolStatus = 'pending' | 'running' | 'done' | 'error';
 type FlowNode = { id: string; label: string; kind: 'trigger' | 'tool'; status: ToolStatus };
 
 const STATUS_STYLES: Record<ToolStatus, { color: string; bg: string; border: string; label: string }> = {
-  pending: { color: '#9ca3af', bg: '#ffffff', border: '#e5e7eb', label: 'Idle' },
-  running: { color: '#f97316', bg: '#fff7ed', border: '#fdba74', label: 'Pending' },
-  done: { color: '#16a34a', bg: '#f0fdf4', border: '#86efac', label: 'Passed' },
-  error: { color: '#dc2626', bg: '#fef2f2', border: '#fca5a5', label: 'Failed' },
+  pending: { color: 'var(--fg-muted)', bg: 'var(--surface)', border: 'var(--border)', label: 'Idle' },
+  running: { color: 'var(--accent)', bg: 'var(--accent-dim)', border: 'var(--accent-border)', label: 'Pending' },
+  done: { color: 'var(--green)', bg: 'var(--green-bg)', border: 'var(--green-border)', label: 'Passed' },
+  error: { color: 'var(--danger)', bg: 'var(--danger-bg)', border: 'var(--danger-border)', label: 'Failed' },
 };
 
 const NODE_W = 220;
@@ -456,8 +456,9 @@ function WorkflowDetailPage() {
               <div
                 style={{
                   fontSize: 12,
-                  background: '#fee2e2',
-                  color: '#991b1b',
+                  background: 'var(--danger-bg)',
+                  color: 'var(--danger)',
+                  border: '1px solid var(--danger-border)',
                   padding: 10,
                   borderRadius: 6,
                 }}

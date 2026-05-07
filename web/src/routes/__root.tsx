@@ -10,7 +10,10 @@ import {
 
 import '../styles.css';
 import { SidebarProvider } from '../contexts/sidebar-context';
+import { ThemeProvider } from '../contexts/theme-context';
 import { PwaPrompt } from '../components/pwa-prompt';
+
+const THEME_INIT_SCRIPT = `(function(){try{var s=localStorage.getItem('aira:theme');var t=(s==='dark'||s==='light')?s:(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();`;
 
 export const Route = createRootRoute({
   head: () => ({
@@ -67,9 +70,11 @@ export const Route = createRootRoute({
 function RootComponent() {
   return (
     <RootDocument>
-      <SidebarProvider>
-        <Outlet />
-      </SidebarProvider>
+      <ThemeProvider>
+        <SidebarProvider>
+          <Outlet />
+        </SidebarProvider>
+      </ThemeProvider>
     </RootDocument>
   );
 }
@@ -79,6 +84,10 @@ function RootDocument({ children }: Readonly<{ children: ReactNode }>) {
     <html lang="en">
       <head>
         <HeadContent />
+        <script
+          // eslint-disable-next-line react/no-danger
+          dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }}
+        />
       </head>
       <body>
         {children}

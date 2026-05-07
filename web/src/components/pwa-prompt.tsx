@@ -63,8 +63,8 @@ export function PwaPrompt() {
       {showUpdate && (
         <div
           style={{
-            background: '#1a1a1a',
-            color: 'white',
+            background: 'var(--fg)',
+            color: 'var(--bg)',
             borderRadius: '0.75rem',
             padding: '0.75rem 1rem',
             display: 'flex',
@@ -79,7 +79,7 @@ export function PwaPrompt() {
             <Button
               variant="ghost"
               onClick={() => setNeedRefresh(false)}
-              style={{ color: 'white' }}
+              style={{ color: 'var(--bg)' }}
             >
               Later
             </Button>
@@ -91,8 +91,8 @@ export function PwaPrompt() {
       {showInstall && (
         <div
           style={{
-            background: '#1a1a1a',
-            color: 'white',
+            background: 'var(--fg)',
+            color: 'var(--bg)',
             borderRadius: '0.75rem',
             padding: '0.75rem 1rem',
             display: 'flex',
@@ -107,7 +107,7 @@ export function PwaPrompt() {
             <Button
               variant="ghost"
               onClick={() => setInstallDismissed(true)}
-              style={{ color: 'white' }}
+              style={{ color: 'var(--bg)' }}
             >
               Not now
             </Button>
