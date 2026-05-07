@@ -29,6 +29,7 @@ const envSchema = z.object({
   GMAIL_REFRESH_TOKEN: z.string().optional(),
   OAUTH_REDIRECT_BASE_URL: z.string().min(1).default('http://localhost:80'),
   APP_URL: z.string().min(1).default('http://localhost:3001'),
+  XAI_API_KEY: z.string().min(1),
 });
 
 export const config = envSchema.parse(env);
