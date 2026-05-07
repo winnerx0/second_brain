@@ -1214,7 +1214,15 @@ function Chat() {
                             isStreaming={isCurrentlyStreaming}
                           />
                         ) : (
-                          <div className="message-text thinking">Thinking…</div>
+                          <div
+                          className="thinking-dots"
+                          aria-label="Thinking"
+                          role="status"
+                        >
+                          <span />
+                          <span />
+                          <span />
+                        </div>
                         )}
                       </div>
                     </div>
@@ -1232,7 +1240,15 @@ function Chat() {
                       </div>
                       <div className="assistant-body">
                         <div className="assistant-name">Aira</div>
-                        <div className="message-text thinking">Thinking…</div>
+                        <div
+                          className="thinking-dots"
+                          aria-label="Thinking"
+                          role="status"
+                        >
+                          <span />
+                          <span />
+                          <span />
+                        </div>
                       </div>
                     </div>
                   </div>
