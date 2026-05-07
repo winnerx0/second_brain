@@ -3,7 +3,7 @@ import z from 'zod';
 import { model } from '../shared.js';
 import { calendarTools } from '../tools/calendar.js';
 import { getCurrentDateTime } from '../tools/miscellaneous.js';
-import { requireConfirmation, streamSubAgent } from './utils.js';
+import { streamSubAgent } from './utils.js';
 
 const CALENDAR_SYSTEM_PROMPT = `You are a Calendar Assistant with access to the user's Google Calendar.
 
@@ -27,13 +27,6 @@ const calendarAgent = createAgent({
 
 export const calendarTool = tool(
   async ({ query }) => {
-    const confirmation = requireConfirmation(
-      query,
-      /\b(delete|remove|cancel|edit|reschedule|move|change)\b/i,
-      'change a calendar event',
-    );
-    if (confirmation) return confirmation;
-
     return streamSubAgent(
       calendarAgent,
       [

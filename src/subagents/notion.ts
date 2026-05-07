@@ -3,7 +3,7 @@ import z from 'zod';
 import { model } from '../shared.js';
 import { notionTools } from '../tools/notion.js';
 import { getCurrentDateTime } from '../tools/miscellaneous.js';
-import { requireConfirmation, streamSubAgent } from './utils.js';
+import { streamSubAgent } from './utils.js';
 
 const NOTION_SYSTEM_PROMPT = `You are a Notion Workspace Assistant with full access to the user's Notion workspace via the OAuth API.
 
@@ -24,13 +24,6 @@ const notionAgent = createAgent({
 
 export const notionTool = tool(
   async ({ query }) => {
-    const confirmation = requireConfirmation(
-      query,
-      /\b(delete|trash|remove block|wipe|replace all)\b/i,
-      'delete, trash, wipe, or broadly replace Notion content',
-    );
-    if (confirmation) return confirmation;
-
     return streamSubAgent(
       notionAgent,
       [

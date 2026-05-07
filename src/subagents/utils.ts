@@ -86,9 +86,6 @@ export async function streamSubAgent(
   return getFinalText({ messages: collected });
 }
 
-const CONFIRMATION_RE =
-  /\b(confirm(?:ed)?|yes|yep|go ahead|do it|send it|delete it|trash it|proceed)\b/i;
-
 export function getFinalText(response: AgentResponse): string {
   const finalMessage = response.messages?.[response.messages.length - 1];
   if (!finalMessage) return '';
@@ -112,16 +109,3 @@ export function getFinalText(response: AgentResponse): string {
   return content == null ? '' : String(content);
 }
 
-export function requireConfirmation(
-  query: string,
-  riskPattern: RegExp,
-  actionSummary: string,
-): string | null {
-  if (!riskPattern.test(query)) return null;
-  if (CONFIRMATION_RE.test(query)) return null;
-
-  return [
-    `I need confirmation before I ${actionSummary}.`,
-    'Reply with a clear confirmation and include the target/action again.',
-  ].join(' ');
-}

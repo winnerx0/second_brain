@@ -3,7 +3,7 @@ import z from 'zod';
 import { model } from '../shared.js';
 import { gmailTools } from '../tools/gmail.js';
 import { getCurrentDateTime } from '../tools/miscellaneous.js';
-import { requireConfirmation, streamSubAgent } from './utils.js';
+import { streamSubAgent } from './utils.js';
 
 const GMAIL_SYSTEM_PROMPT = `You are an Email Assistant with access to the user's Gmail inbox.
 
@@ -28,13 +28,6 @@ const gmailAgent = createAgent({
 
 export const gmailTool = tool(
   async ({ query }) => {
-    const confirmation = requireConfirmation(
-      query,
-      /\b(send|reply|trash|delete|forward)\b/i,
-      'send, reply to, forward, or trash email',
-    );
-    if (confirmation) return confirmation;
-
     return streamSubAgent(
       gmailAgent,
       [

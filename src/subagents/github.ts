@@ -9,7 +9,7 @@ import {
   closeIssue,
   deleteIssue,
 } from '../tools/github.js';
-import { requireConfirmation, streamSubAgent } from './utils.js';
+import { streamSubAgent } from './utils.js';
 
 const GITHUB_SYSTEM_PROMPT = `You are a GitHub Assistant with access to the user's GitHub account.
 
@@ -37,13 +37,6 @@ const githubAgent = createAgent({
 
 export const githubTool = tool(
   async ({ query }) => {
-    const confirmation = requireConfirmation(
-      query,
-      /\b(delete|close)\b/i,
-      'close or delete a GitHub issue',
-    );
-    if (confirmation) return confirmation;
-
     return streamSubAgent(
       githubAgent,
       [

@@ -2,7 +2,7 @@ import { createAgent, tool } from 'langchain';
 import z from 'zod';
 import { model } from '../shared.js';
 import { googleDocTools } from '../tools/google-docs.js';
-import { requireConfirmation, streamSubAgent } from './utils.js';
+import { streamSubAgent } from './utils.js';
 
 const DOCS_SYSTEM_PROMPT = `You are a Document Assistant with access to Google Docs.
 
@@ -25,13 +25,6 @@ const docsAgent = createAgent({
 
 export const docsTool = tool(
   async ({ query }) => {
-    const confirmation = requireConfirmation(
-      query,
-      /\b(delete|trash|wipe|replace|remove all)\b/i,
-      'delete, trash, wipe, or replace document content',
-    );
-    if (confirmation) return confirmation;
-
     return streamSubAgent(
       docsAgent,
       [
