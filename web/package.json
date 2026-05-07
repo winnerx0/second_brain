@@ -28,6 +28,7 @@
     "@types/react": "latest",
     "@types/react-dom": "latest",
     "@vitejs/plugin-react": "latest",
+    "sharp": "^0.34.5",
     "typescript": "latest",
     "vite": "latest",
     "vite-plugin-pwa": "^1.2.0"

@@ -10,6 +10,7 @@ import {
 
 import '../styles.css';
 import { SidebarProvider } from '../contexts/sidebar-context';
+import { PwaPrompt } from '../components/pwa-prompt';
 
 export const Route = createRootRoute({
   head: () => ({
@@ -17,7 +18,8 @@ export const Route = createRootRoute({
       { charSet: 'utf-8' },
       {
         name: 'viewport',
-        content: 'width=device-width, initial-scale=1',
+        content:
+          'width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover',
       },
       { name: 'theme-color', content: '#a86828' },
       { name: 'mobile-web-app-capable', content: 'yes' },
@@ -39,7 +41,23 @@ export const Route = createRootRoute({
         href: '/icon.svg',
         type: 'image/svg+xml',
       },
-      { rel: 'apple-touch-icon', href: '/icon.svg' },
+      {
+        rel: 'icon',
+        href: '/icon-192.png',
+        type: 'image/png',
+        sizes: '192x192',
+      },
+      {
+        rel: 'icon',
+        href: '/icon-512.png',
+        type: 'image/png',
+        sizes: '512x512',
+      },
+      {
+        rel: 'apple-touch-icon',
+        href: '/apple-touch-icon.png',
+        sizes: '180x180',
+      },
     ],
   }),
   component: RootComponent,
@@ -64,6 +82,7 @@ function RootDocument({ children }: Readonly<{ children: ReactNode }>) {
       </head>
       <body>
         {children}
+        <PwaPrompt />
         <Scripts />
       </body>
     </html>

@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+    />
+    <title>Aira — Offline</title>
+    <style>
+      :root { color-scheme: light dark; }
+      html, body {
+        margin: 0;
+        height: 100%;
+        background: #f8f6f3;
+        color: #1a1a1a;
+        font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+      }
+      @media (prefers-color-scheme: dark) {
+        html, body { background: #09090b; color: #f4f4f5; }
+      }
+      main {
+        display: flex;
+        min-height: 100%;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem;
+        text-align: center;
+      }
+      .card { max-width: 24rem; }
+      h1 { margin: 0 0 0.5rem; font-size: 1.25rem; }
+      p { margin: 0 0 1.25rem; opacity: 0.75; line-height: 1.5; }
+      button {
+        appearance: none;
+        border: 0;
+        background: #a86828;
+        color: white;
+        padding: 0.6rem 1.1rem;
+        border-radius: 0.5rem;
+        font-size: 0.95rem;
+        cursor: pointer;
+      }
+      button:hover { filter: brightness(1.05); }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="card">
+        <h1>You're offline</h1>
+        <p>Aira can't reach the network right now. Check your connection and try again.</p>
+        <button onclick="location.reload()">Retry</button>
+      </div>
+    </main>
+  </body>
+</html>
