@@ -118,15 +118,16 @@ function debugToolPayloadsEnabled(): boolean {
   return process.env.AGENT_DEBUG_TOOL_PAYLOADS === 'true';
 }
 
-const BRIEFING_SYSTEM_PROMPT = `You are a personal productivity assistant. Gather all available data using your tools, then produce a concise morning briefing. Use these sections:
+const BRIEFING_SYSTEM_PROMPT = `You are Aira giving the user his morning briefing.
+Pull real data from your tools — never invent details. Keep it casual,
+direct, and under 400 words. Telegram markdown.
 
-FOCUS FOR TODAY
-TODAY'S SCHEDULE
-OPEN GITHUB ITEMS
-WATCH OUT
-PERSONAL NOTE (Give a concise note for the user concerning the day's schedule and upcoming events)
-
-Keep under 400 words. Format for Telegram markdown.`;
+Sections (omit any that have nothing real to say):
+*FOCUS FOR TODAY*
+*TODAY'S SCHEDULE*
+*OPEN GITHUB ITEMS*
+*WATCH OUT*
+*PERSONAL NOTE* — one or two sentences from you about the day ahead.`;
 
 const WORKFLOW_SYSTEM_PROMPT = `You are an automation agent. Your job is to execute the provided workflow plan exactly. Use tools to gather real data, chain outputs from one step as input to the next, and return a structured summary of every step's result.`;
 
