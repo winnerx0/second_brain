@@ -1,6 +1,7 @@
 import { Hono, type Context } from 'hono';
 import { cors } from 'hono/cors';
 import { runBriefing, handleMessage, runWorkflow, type AgentStreamEvent } from './agent.js';
+import { runMemoryCleanup } from './memory-cleanup.js';
 import { logger } from './logger.js';
 import { db } from './db/client.js';
 import {
@@ -276,6 +277,35 @@ app.delete('/memories/:id', async (c) => {
     logger.error('[memories.delete]', error);
     return c.json(
       { error: error instanceof Error ? error.message : 'Failed to delete memory' },
+      500,
+    );
+  }
+});
+
+app.post('/memories/cleanup', async (c) => {
+  let body: { dryRun?: unknown; concurrency?: unknown } = {};
+  try {
+    body = await c.req.json();
+  } catch {
+    // empty body is fine; defaults apply
+  }
+
+  const dryRun = body.dryRun === undefined ? true : Boolean(body.dryRun);
+  const concurrency =
+    typeof body.concurrency === 'number' && body.concurrency > 0
+      ? Math.min(Math.floor(body.concurrency), 8)
+      : 4;
+
+  try {
+    const summary = await runMemoryCleanup({ dryRun, concurrency });
+    return c.json({ dryRun, ...summary });
+  } catch (error) {
+    logger.error('[memories.cleanup]', error);
+    return c.json(
+      {
+        error:
+          error instanceof Error ? error.message : 'Failed to run memory cleanup',
+      },
       500,
     );
   }
