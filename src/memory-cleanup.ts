@@ -136,7 +136,7 @@ export async function runMemoryCleanup(
   deleted: number;
   results: MemoryCleanupResult[];
 }> {
-  const { dryRun = true, concurrency = 4 } = options;
+  const { dryRun = false, concurrency = 4 } = options;
 
   const rows = (await db
     .select({
