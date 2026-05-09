@@ -290,7 +290,7 @@ app.post('/memories/cleanup', async (c) => {
     // empty body is fine; defaults apply
   }
 
-  const dryRun = body.dryRun === undefined ? true : Boolean(body.dryRun);
+  const dryRun = body.dryRun === undefined ? false : Boolean(body.dryRun);
   const concurrency =
     typeof body.concurrency === 'number' && body.concurrency > 0
       ? Math.min(Math.floor(body.concurrency), 8)
