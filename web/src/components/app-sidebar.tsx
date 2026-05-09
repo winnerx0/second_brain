@@ -2,24 +2,7 @@ import { Link } from '@tanstack/react-router';
 import { type ReactNode } from 'react';
 import { useSidebar } from '../contexts/sidebar-context';
 import { ThemeToggle } from './theme-toggle';
-
-function BrainIcon() {
-  return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.46 2.5 2.5 0 0 1-1.773-4.38A2.5 2.5 0 0 1 4 12a2.5 2.5 0 0 1 .8-1.867 2.5 2.5 0 0 1 1.3-4.602A2.5 2.5 0 0 1 9.5 2Z" />
-      <path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96-.46 2.5 2.5 0 0 0 1.773-4.38 2.5 2.5 0 0 0 .267-3.673 2.5 2.5 0 0 0-1.3-4.602A2.5 2.5 0 0 0 14.5 2Z" />
-    </svg>
-  );
-}
+import { AiraMark } from './aira-mark';
 
 function PanelLeftIcon() {
   return (
@@ -151,7 +134,7 @@ export function AppSidebar({ children, onNewChat }: AppSidebarProps) {
         <div className="sidebar-header">
           <div className="sidebar-brand">
             <div className="sidebar-logo">
-              <BrainIcon />
+              <AiraMark />
             </div>
             <span className="sidebar-brand-name">Aira</span>
           </div>

@@ -5,6 +5,7 @@ import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Textarea } from '../components/ui/textarea';
 import { AppSidebar, SidebarTrigger } from '../components/app-sidebar';
+import { AiraMark } from '../components/aira-mark';
 
 /* ─── Types ──────────────────────────────────────────────────────────────── */
 type StreamEvent =
@@ -345,23 +346,6 @@ function PlusIcon() {
   );
 }
 
-function BrainIcon() {
-  return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96-.46 2.5 2.5 0 0 1-1.773-4.38A2.5 2.5 0 0 1 4 12a2.5 2.5 0 0 1 .8-1.867 2.5 2.5 0 0 1 1.3-4.602A2.5 2.5 0 0 1 9.5 2Z" />
-      <path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96-.46 2.5 2.5 0 0 0 1.773-4.38 2.5 2.5 0 0 0 .267-3.673 2.5 2.5 0 0 0-1.3-4.602A2.5 2.5 0 0 0 14.5 2Z" />
-    </svg>
-  );
-}
 
 /** Maps tool names to icons. */
 function ToolIcon({ tool }: { tool: string }) {
@@ -754,6 +738,7 @@ function Chat() {
 
   const toolStackRef = useRef<string[]>([]);
   const endRef = useRef<HTMLDivElement>(null);
+  const messagesAreaRef = useRef<HTMLElement>(null);
 
   const loadSessions = async () => {
     const response = await fetch(SESSIONS_URL);
@@ -858,10 +843,12 @@ function Chat() {
 
   /* Scroll to bottom */
   useEffect(() => {
-    endRef.current?.scrollIntoView({
-      block: 'end',
-      behavior: 'smooth',
+    const area = messagesAreaRef.current;
+    if (!area) return;
+    const id = requestAnimationFrame(() => {
+      area.scrollTop = area.scrollHeight;
     });
+    return () => cancelAnimationFrame(id);
   }, [thread, isStreaming]);
 
   /* Helpers */
@@ -1142,7 +1129,7 @@ function Chat() {
         </div>
 
         {/* Messages */}
-        <main className="messages-area">
+        <main className="messages-area" ref={messagesAreaRef}>
           {!hasThread ? (
             <div className="welcome-container">
               <h1 className="welcome-title">Good to see you.</h1>
@@ -1204,7 +1191,7 @@ function Chat() {
                   <div key={item.id} className="message-row assistant">
                     <div className="assistant-row">
                       <div className="assistant-avatar">
-                        <BrainIcon />
+                        <AiraMark />
                       </div>
                       <div className="assistant-body">
                         <div className="assistant-name">Aira</div>
@@ -1236,7 +1223,7 @@ function Chat() {
                   <div className="message-row assistant">
                     <div className="assistant-row">
                       <div className="assistant-avatar">
-                        <BrainIcon />
+                        <AiraMark />
                       </div>
                       <div className="assistant-body">
                         <div className="assistant-name">Aira</div>
