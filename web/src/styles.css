@@ -2,31 +2,32 @@
 
 /* ─── Design tokens ───────────────────────────────────────────────────────── */
 :root {
-  --bg: #f8f6f3;
+  --bg: #ffffff;
   --surface: #ffffff;
-  --surface-2: #f3f0ec;
-  --surface-3: #ece8e2;
-  --border: #e6e1da;
-  --border-hover: #cec8bf;
-  --fg: #1c1a17;
-  --fg-dim: #6b6460;
-  --fg-muted: #a8a09a;
-  --accent: #a86828;
-  --accent-dim: rgba(168, 104, 40, 0.08);
-  --accent-glow: rgba(168, 104, 40, 0.04);
-  --accent-border: rgba(168, 104, 40, 0.25);
-  --accent-link-underline: rgba(196, 144, 64, 0.4);
-  --danger: #b84030;
-  --danger-bg: rgba(184, 64, 48, 0.05);
-  --danger-border: rgba(192, 80, 58, 0.3);
-  --green: #3d8c54;
-  --green-bg: rgba(61, 140, 84, 0.08);
-  --green-border: rgba(61, 140, 84, 0.25);
-  --backdrop: rgba(0, 0, 0, 0.35);
-  --shadow-soft: 0 1px 6px rgba(0, 0, 0, 0.04);
-  --shadow-card: 0 1px 8px rgba(0, 0, 0, 0.06);
-  --shadow-modal: 0 8px 40px rgba(0, 0, 0, 0.14), 0 2px 8px rgba(0, 0, 0, 0.06);
-  --shadow-sidebar: 4px 0 24px rgba(0, 0, 0, 0.12);
+  --surface-2: #f6f6f6;
+  --surface-3: #ededed;
+  --border: #e6e6e6;
+  --border-hover: #cfcfcf;
+  --fg: #0a0a0a;
+  --fg-dim: #545454;
+  --fg-muted: #9a9a9a;
+  --accent: #111111;
+  --accent-fg: #ffffff;
+  --accent-dim: rgba(17, 17, 17, 0.05);
+  --accent-glow: rgba(17, 17, 17, 0.04);
+  --accent-border: rgba(17, 17, 17, 0.18);
+  --accent-link-underline: rgba(17, 17, 17, 0.35);
+  --danger: #c0382a;
+  --danger-bg: rgba(192, 56, 42, 0.05);
+  --danger-border: rgba(192, 56, 42, 0.25);
+  --green: #1f8a4c;
+  --green-bg: rgba(31, 138, 76, 0.07);
+  --green-border: rgba(31, 138, 76, 0.22);
+  --backdrop: rgba(0, 0, 0, 0.32);
+  --shadow-soft: 0 1px 4px rgba(0, 0, 0, 0.04);
+  --shadow-card: 0 1px 6px rgba(0, 0, 0, 0.05);
+  --shadow-modal: 0 10px 40px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.05);
+  --shadow-sidebar: 4px 0 24px rgba(0, 0, 0, 0.08);
   --radius: 5px;
   --font-sans: 'Figtree', system-ui, sans-serif;
   --font-display: 'Cormorant Garamond', Georgia, serif;
@@ -34,31 +35,32 @@
 }
 
 [data-theme='dark'] {
-  --bg: #0e0d0c;
-  --surface: #161513;
-  --surface-2: #1d1b18;
-  --surface-3: #25221e;
-  --border: #2a2723;
-  --border-hover: #3a342d;
-  --fg: #f0ece6;
-  --fg-dim: #b0a89e;
-  --fg-muted: #6f6862;
-  --accent: #d18a3c;
-  --accent-dim: rgba(209, 138, 60, 0.14);
-  --accent-glow: rgba(209, 138, 60, 0.08);
-  --accent-border: rgba(209, 138, 60, 0.35);
-  --accent-link-underline: rgba(209, 138, 60, 0.5);
+  --bg: #0a0a0a;
+  --surface: #111111;
+  --surface-2: #161616;
+  --surface-3: #1f1f1f;
+  --border: #262626;
+  --border-hover: #3a3a3a;
+  --fg: #f5f5f5;
+  --fg-dim: #a8a8a8;
+  --fg-muted: #6a6a6a;
+  --accent: #f5f5f5;
+  --accent-fg: #0a0a0a;
+  --accent-dim: rgba(245, 245, 245, 0.08);
+  --accent-glow: rgba(245, 245, 245, 0.05);
+  --accent-border: rgba(245, 245, 245, 0.22);
+  --accent-link-underline: rgba(245, 245, 245, 0.4);
   --danger: #e16a55;
   --danger-bg: rgba(225, 106, 85, 0.1);
-  --danger-border: rgba(225, 106, 85, 0.35);
-  --green: #5cba78;
-  --green-bg: rgba(92, 186, 120, 0.12);
-  --green-border: rgba(92, 186, 120, 0.3);
-  --backdrop: rgba(0, 0, 0, 0.6);
+  --danger-border: rgba(225, 106, 85, 0.32);
+  --green: #4ade80;
+  --green-bg: rgba(74, 222, 128, 0.1);
+  --green-border: rgba(74, 222, 128, 0.28);
+  --backdrop: rgba(0, 0, 0, 0.65);
   --shadow-soft: 0 1px 6px rgba(0, 0, 0, 0.5);
   --shadow-card: 0 1px 8px rgba(0, 0, 0, 0.55);
-  --shadow-modal: 0 12px 48px rgba(0, 0, 0, 0.6), 0 2px 8px rgba(0, 0, 0, 0.4);
-  --shadow-sidebar: 4px 0 24px rgba(0, 0, 0, 0.5);
+  --shadow-modal: 0 12px 48px rgba(0, 0, 0, 0.7), 0 2px 8px rgba(0, 0, 0, 0.45);
+  --shadow-sidebar: 4px 0 24px rgba(0, 0, 0, 0.55);
 }
 
 *,
@@ -470,8 +472,6 @@ a {
   flex: 1;
   min-width: 0;
   width: 100%;
-  max-width: 1100px;
-  margin: 0 auto;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -1036,7 +1036,7 @@ a {
   height: 30px;
   border-radius: 8px;
   background: var(--accent);
-  color: #fff8f0;
+  color: var(--accent-fg);
   display: grid;
   place-items: center;
   flex-shrink: 0;
