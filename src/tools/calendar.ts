@@ -3,23 +3,32 @@ import { z } from 'zod';
 import { google } from 'googleapis';
 import { config } from '../config.js';
 import { logger } from '../logger.js';
+import { getDbRefreshToken, getValidToken } from '../oauth.js';
 
 const EVENT_MATCH_TOLERANCE_MS = 10 * 60 * 1000;
 
-function loadServiceAccount(): Record<string, string> {
-  return JSON.parse(config.GOOGLE_CREDENTIALS);
-}
+async function getCalendarClient() {
+  const auth = new google.auth.OAuth2(
+    config.GOOGLE_CLIENT_ID,
+    config.GOOGLE_CLIENT_SECRET,
+    config.OAUTH_REDIRECT_BASE_URL,
+  );
 
-function getCalendarClient() {
-  const serviceAccount = loadServiceAccount();
+  const accessToken = await getValidToken('google_calendar');
+  if (accessToken) {
+    auth.setCredentials({ access_token: accessToken });
+    return google.calendar({ version: 'v3', auth });
+  }
 
-  const auth = new google.auth.JWT({
-    email: serviceAccount.client_email,
-    key: serviceAccount.private_key,
-    scopes: ['https://www.googleapis.com/auth/calendar'],
-  });
+  const refreshToken = await getDbRefreshToken('google_calendar');
+  if (refreshToken) {
+    auth.setCredentials({ refresh_token: refreshToken });
+    return google.calendar({ version: 'v3', auth });
+  }
 
-  return google.calendar({ version: 'v3', auth });
+  throw new Error(
+    'Google Calendar not connected. Go to Connections → Google Calendar to authorize.',
+  );
 }
 
 function getLocalDateInUserTimezone(date = new Date()): string {
@@ -93,7 +102,7 @@ function addDays(date: string, days: number): string {
 export const getCalendarEvents = tool(
   async ({ startDate, endDate }) => {
     try {
-      const calendar = getCalendarClient();
+      const calendar = await getCalendarClient();
 
       const { timeMin, timeMax } = dateRangeToUtcBounds(startDate, endDate);
 
@@ -143,7 +152,7 @@ export const getCalendarEvents = tool(
 export const createCalendarEvent = tool(
   async ({ summary, start, end, description, attendees }) => {
     try {
-      const calendar = getCalendarClient();
+      const calendar = await getCalendarClient();
 
       logger.info(
         `[calendar] createCalendarEvent summary=${summary} start=${start} end=${end} description=${description} attendees=${attendees}`,
@@ -202,7 +211,7 @@ export const createCalendarEvent = tool(
 export const createAllDayCalendarEvent = tool(
   async ({ summary, date, endDate, description, attendees }) => {
     try {
-      const calendar = getCalendarClient();
+      const calendar = await getCalendarClient();
 
       const response = await calendar.events.insert({
         calendarId: config.GOOGLE_CALENDAR_ID,
@@ -255,7 +264,7 @@ export const createAllDayCalendarEvent = tool(
 async function findEventByStart(
   startDateTime: string,
 ): Promise<{ id: string; summary: string } | null> {
-  const calendar = getCalendarClient();
+  const calendar = await getCalendarClient();
   const target = new Date(startDateTime);
   const dayStart = new Date(
     Date.UTC(
@@ -303,7 +312,7 @@ export const editCalendarEvent = tool(
     attendees,
   }) => {
     try {
-      const calendar = getCalendarClient();
+      const calendar = await getCalendarClient();
       const found = await findEventByStart(startDateTime);
       if (!found) return `No event found starting at ${startDateTime}`;
 
@@ -361,7 +370,7 @@ export const editCalendarEvent = tool(
 export const deleteCalendarEvent = tool(
   async ({ startDateTime }) => {
     try {
-      const calendar = getCalendarClient();
+      const calendar = await getCalendarClient();
       logger.info(
         `[calendar] deleteCalendarEvent startDateTime=${startDateTime}`,
       );
