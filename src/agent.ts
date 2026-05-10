@@ -27,7 +27,6 @@ import { notionTool } from './subagents/notion.js';
 import { clickupTool } from './subagents/clickup.js';
 import { spotifyTool } from './subagents/spotify.js';
 import { twitterTool } from './subagents/twitter.js';
-import { linkedinTool } from './subagents/linkedin.js';
 import { runWithSubagentStreamContext } from './subagents/utils.js';
 import { model } from './shared.js';
 import { ChatOpenAI } from '@langchain/openai';
@@ -68,7 +67,6 @@ const tools = [
   clickupTool,
   spotifyTool,
   twitterTool,
-  linkedinTool,
 ];
 
 const mainAgent = createAgent({

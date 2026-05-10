@@ -23,6 +23,7 @@ import {
 import { config } from './config.js';
 import {kiviaHonoMiddleware} from "@kivia/sdk"
 const API_KEY_CONNECTIONS = new Set(['clickup']);
+const REMOVED_CONNECTIONS = new Set(['linkedin']);
 // MCP OAuth imports - disabled, using traditional OAuth instead
 // import {
 //   startMcpOAuthFlow,
@@ -315,19 +316,21 @@ app.post('/memories/cleanup', async (c) => {
 
 app.get('/connections', async (c) => {
   try {
-    const rows = await db
-      .select({
-        id: connections.id,
-        name: connections.name,
-        label: connections.label,
-        enabled: connections.enabled,
-        oauthConnected: connections.oauthConnected,
-        accessToken: connections.accessToken,
-        createdAt: connections.createdAt,
-        updatedAt: connections.updatedAt,
-      })
-      .from(connections)
-      .orderBy(asc(connections.id));
+    const rows = (
+      await db
+        .select({
+          id: connections.id,
+          name: connections.name,
+          label: connections.label,
+          enabled: connections.enabled,
+          oauthConnected: connections.oauthConnected,
+          accessToken: connections.accessToken,
+          createdAt: connections.createdAt,
+          updatedAt: connections.updatedAt,
+        })
+        .from(connections)
+        .orderBy(asc(connections.id))
+    ).filter((row) => !REMOVED_CONNECTIONS.has(row.name));
 
     const oauthSupported = Object.keys(OAUTH_CONFIGS);
     return c.json({
@@ -399,6 +402,8 @@ app.post('/connections', async (c) => {
     const label = typeof rawBody.label === 'string' ? rawBody.label : '';
     if (!name || !label)
       return c.json({ error: 'name and label are required' }, 400);
+    if (REMOVED_CONNECTIONS.has(name.toLowerCase()))
+      return c.json({ error: `"${name}" is no longer supported` }, 400);
 
     const [created] = await db
       .insert(connections)

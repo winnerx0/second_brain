@@ -2,6 +2,7 @@ import { createAgent, tool } from 'langchain';
 import z from 'zod';
 import { model } from '../shared.js';
 import { twitterTools } from '../tools/twitter.js';
+import { getCurrentDateTime } from '../tools/miscellaneous.js';
 import { streamSubAgent } from './utils.js';
 
 const TWITTER_SYSTEM_PROMPT = `You are a Twitter/X Assistant with access to the user's Twitter/X account.
@@ -16,11 +17,15 @@ You can:
 When helping:
 - Always use real Twitter/X data from tools; never invent posts, metrics, usernames, or IDs
 - For a username request, look up the user first, then use the returned user ID for timelines or mentions
+- Use get_current_datetime when any date/time context is needed (e.g. "today", "this week", "recent")
 - Ask for confirmation before creating, replying with, or deleting any post
 - Keep draft posts within 280 characters
 - If a tool returns an Error/Failed result, report that failure instead of treating it as success`;
 
-const twitterAgent = createAgent({ model, tools: twitterTools });
+const twitterAgent = createAgent({
+  model,
+  tools: [getCurrentDateTime, ...twitterTools],
+});
 
 export const twitterTool = tool(
   async ({ query }) => {

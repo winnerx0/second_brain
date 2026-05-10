@@ -2,6 +2,7 @@ import { createAgent, tool } from 'langchain';
 import z from 'zod';
 import { model } from '../shared.js';
 import { knowledgeGraphTools } from '../tools/knowledge-graph.js';
+import { getCurrentDateTime } from '../tools/miscellaneous.js';
 import { streamSubAgent } from './utils.js';
 
 const KNOWLEDGE_GRAPH_SYSTEM_PROMPT = `You are a Knowledge Graph Assistant.
@@ -20,13 +21,14 @@ Operating rules:
 - Prefer add_graph_fact when a user states a relationship.
 - Keep relation labels short, snake_case, and directional (depends_on, decided_in, mentions, blocked_by).
 - Use evidence/source whenever the user provides it.
+- Use get_current_datetime when the user states relative timing such as today, yesterday, current, or recent.
 - For ambiguous entity references, search first.
 - If a tool returns an Error/Failed result, report that failure instead of treating it as success.
 - Return concise summaries, and when useful include a machine-readable JSON block.`;
 
 const knowledgeGraphAgent = createAgent({
   model,
-  tools: knowledgeGraphTools,
+  tools: [getCurrentDateTime, ...knowledgeGraphTools],
 });
 
 export const knowledgeGraphTool = tool(

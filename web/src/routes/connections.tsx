@@ -1,7 +1,7 @@
 import { createRoute } from '@tanstack/react-router';
 import React, { useEffect, useState } from 'react';
 import { AppSidebar, SidebarTrigger } from '../components/app-sidebar';
-import { FaCalendarDays, FaGithub, FaLinkedin, FaSpotify, FaXTwitter } from 'react-icons/fa6';
+import { FaCalendarDays, FaGithub, FaSpotify, FaXTwitter } from 'react-icons/fa6';
 import { FiCheck, FiFileText, FiFilm, FiMail, FiPlus, FiShare2, FiX } from 'react-icons/fi';
 import { SiClickup, SiNotion, SiTodoist } from 'react-icons/si';
 import { Route as RootRoute } from './__root';
@@ -151,16 +151,6 @@ const META: Record<string, ConnMeta> = {
       borderColor: '#7dd3fc',
     },
     icon: FaXTwitter,
-  },
-  linkedin: {
-    description: 'Posts, profile, and professional network',
-    category: 'communication',
-    iconStyle: {
-      background: '#eff6ff',
-      color: '#0a66c2',
-      borderColor: '#7dd3fc',
-    },
-    icon: FaLinkedin,
   },
 };
 

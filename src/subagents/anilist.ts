@@ -2,6 +2,7 @@ import { createAgent, tool } from 'langchain';
 import z from 'zod';
 import { model } from '../shared.js';
 import { addListEntry, anilistTools } from '../tools/anilist.js';
+import { getCurrentDateTime } from '../tools/miscellaneous.js';
 import { streamSubAgent } from './utils.js';
 
 const STATUS_VALUES = [
@@ -52,12 +53,16 @@ When helping users:
 - If a user says "update my rating" and gives a title, resolve the title to mediaId first, then update the entry
 - If required details are genuinely missing (e.g., ambiguous title), ask exactly one concise clarifying question
 - Respect spoiler boundaries — never reveal plot twists or major developments
+- Use get_current_datetime when current season, current year, airing recency, or relative date context is needed
 - Keep responses focused on what was asked (synopsis, recommendations, current status)
 - If multiple matches exist, present the most popular/relevant one with a brief note
 - When the query is vague, ask one clarifying question before proceeding
 - If a tool returns an Error/Failed result, report that failure instead of treating it as success`;
 
-const anilistAgent = createAgent({ model, tools: anilistTools });
+const anilistAgent = createAgent({
+  model,
+  tools: [getCurrentDateTime, ...anilistTools],
+});
 
 export const anilistTool = tool(
   async ({ query }) => {
