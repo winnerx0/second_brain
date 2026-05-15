@@ -56,7 +56,9 @@ export async function streamSubAgent(
     const entry = Object.entries(chunk)[0];
     if (!entry) continue;
     const [, content] = entry as [string, { messages?: unknown[] }];
-    const stepMessages = Array.isArray(content?.messages) ? content.messages : [];
+    const stepMessages = Array.isArray(content?.messages)
+      ? content.messages
+      : [];
 
     for (const message of stepMessages) {
       collected.push(message as { content?: unknown });
@@ -108,4 +110,3 @@ export function getFinalText(response: AgentResponse): string {
   if (typeof finalMessage.text === 'string') return finalMessage.text;
   return content == null ? '' : String(content);
 }
-

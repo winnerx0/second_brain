@@ -4,15 +4,12 @@ import { google } from 'googleapis';
 import { config } from '../config.js';
 import { logger } from '../logger.js';
 import { getDbRefreshToken, getValidToken } from '../oauth.js';
+import { createGoogleOAuthClient } from './google-auth.js';
 
 const EVENT_MATCH_TOLERANCE_MS = 10 * 60 * 1000;
 
 async function getCalendarClient() {
-  const auth = new google.auth.OAuth2(
-    config.GOOGLE_CLIENT_ID,
-    config.GOOGLE_CLIENT_SECRET,
-    config.OAUTH_REDIRECT_BASE_URL,
-  );
+  const auth = createGoogleOAuthClient();
 
   const accessToken = await getValidToken('google_calendar');
   if (accessToken) {

@@ -2,7 +2,6 @@ import { createAgent, tool } from 'langchain';
 import z from 'zod';
 import { model } from '../shared.js';
 import { calendarTools } from '../tools/calendar.js';
-import { getCurrentDateTime } from '../tools/miscellaneous.js';
 import { streamSubAgent } from './utils.js';
 
 const CALENDAR_SYSTEM_PROMPT = `You are a Calendar Assistant with access to the user's Google Calendar.
@@ -22,7 +21,7 @@ When helping:
 
 const calendarAgent = createAgent({
   model,
-  tools: [...calendarTools, getCurrentDateTime],
+  tools: [...calendarTools],
 });
 
 export const calendarTool = tool(

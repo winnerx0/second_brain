@@ -2,7 +2,6 @@ import { createAgent, tool } from 'langchain';
 import z from 'zod';
 import { model } from '../shared.js';
 import { gmailTools } from '../tools/gmail.js';
-import { getCurrentDateTime } from '../tools/miscellaneous.js';
 import { streamSubAgent } from './utils.js';
 
 const GMAIL_SYSTEM_PROMPT = `You are an Email Assistant with access to the user's Gmail inbox.
@@ -23,7 +22,7 @@ When helping:
 
 const gmailAgent = createAgent({
   model,
-  tools: [...gmailTools, getCurrentDateTime],
+  tools: [...gmailTools],
 });
 
 export const gmailTool = tool(

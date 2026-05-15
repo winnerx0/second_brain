@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(echo \"exit:$?\")",
+      "Bash(grep -rn \"background.*#\\\\|color.*#[0-9a-fA-F]\\\\{3,6\\\\}\\\\|backgroundColor.*#\" /home/winner/Documents/projects/second_brain/web/src --include=\"*.tsx\")",
+      "Read(//home/winner/**)",
+      "mcp__plugin_playwright_playwright__browser_click",
+      "mcp__plugin_playwright_playwright__browser_close",
+      "Bash(grep -n \"#[0-9a-fA-F]\\\\{3,6\\\\}\\\\|rgb\\(\" /home/winner/Documents/projects/second_brain/web/src/styles.css)"
+    ]
+  }
+}

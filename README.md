@@ -64,22 +64,22 @@ Fill in `.env`:
 
 **OAuth Configuration (Optional but Recommended):**
 
-| Variable                        | Description                                            |
-| ------------------------------- | ------------------------------------------------------ |
-| `OAUTH_REDIRECT_BASE_URL`       | OAuth callback base URL (e.g. `http://localhost:3000`) |
-| `APP_URL`                       | Web app URL (e.g. `http://localhost:5173`)             |
-| `GITHUB_OAUTH_CLIENT_ID`        | GitHub OAuth app client ID                             |
-| `GITHUB_OAUTH_CLIENT_SECRET`    | GitHub OAuth app client secret                         |
-| `NOTION_OAUTH_CLIENT_ID`        | Notion OAuth integration client ID                     |
-| `NOTION_OAUTH_CLIENT_SECRET`    | Notion OAuth integration client secret                 |
-| `GOOGLE_OAUTH_CLIENT_ID`        | Google OAuth client ID (Gmail, Calendar, Docs)         |
-| `GOOGLE_OAUTH_CLIENT_SECRET`    | Google OAuth client secret                             |
-| `SPOTIFY_OAUTH_CLIENT_ID`       | Spotify OAuth app client ID                            |
-| `SPOTIFY_OAUTH_CLIENT_SECRET`   | Spotify OAuth app client secret                        |
-| `TWITTER_OAUTH_CLIENT_ID`       | Twitter/X OAuth app client ID                          |
-| `TWITTER_OAUTH_CLIENT_SECRET`   | Twitter/X OAuth app client secret                      |
-| `ANILIST_OAUTH_CLIENT_ID`       | AniList OAuth client ID                                |
-| `ANILIST_OAUTH_CLIENT_SECRET`   | AniList OAuth client secret                            |
+| Variable                      | Description                                            |
+| ----------------------------- | ------------------------------------------------------ |
+| `OAUTH_REDIRECT_BASE_URL`     | OAuth callback base URL (e.g. `http://localhost:3000`) |
+| `APP_URL`                     | Web app URL (e.g. `http://localhost:5173`)             |
+| `GITHUB_OAUTH_CLIENT_ID`      | GitHub OAuth app client ID                             |
+| `GITHUB_OAUTH_CLIENT_SECRET`  | GitHub OAuth app client secret                         |
+| `NOTION_OAUTH_CLIENT_ID`      | Notion OAuth integration client ID                     |
+| `NOTION_OAUTH_CLIENT_SECRET`  | Notion OAuth integration client secret                 |
+| `GOOGLE_OAUTH_CLIENT_ID`      | Google OAuth client ID (Gmail, Calendar, Docs)         |
+| `GOOGLE_OAUTH_CLIENT_SECRET`  | Google OAuth client secret                             |
+| `SPOTIFY_OAUTH_CLIENT_ID`     | Spotify OAuth app client ID                            |
+| `SPOTIFY_OAUTH_CLIENT_SECRET` | Spotify OAuth app client secret                        |
+| `TWITTER_OAUTH_CLIENT_ID`     | Twitter/X OAuth app client ID                          |
+| `TWITTER_OAUTH_CLIENT_SECRET` | Twitter/X OAuth app client secret                      |
+| `ANILIST_OAUTH_CLIENT_ID`     | AniList OAuth client ID                                |
+| `ANILIST_OAUTH_CLIENT_SECRET` | AniList OAuth client secret                            |
 
 **For detailed OAuth setup instructions, see [OAUTH_SETUP.md](./OAUTH_SETUP.md)**
 
@@ -141,6 +141,8 @@ curl -X POST http://localhost:3000/chat \
   -d '{"message": "what commits did I make today?"}'
 ```
 
+Telegram-shaped webhook updates posted to `/chat` or `/telegram/webhook` are also handled and replied to through the configured bot.
+
 ### `POST /chat/stream`
 
 Streaming chat endpoint for the browser UI. It returns SSE events for status, tool start/end, assistant token deltas, and the final response.
@@ -184,6 +186,8 @@ Navigate to `/connections`, click **Connect**, and follow the prompts. OAuth con
 
 The agent has access to the following tools:
 
+- **Skills**: Load project-local `skills/<skill-name>/SKILL.md` workflow instructions on demand
+- **Telegram**: Send messages through the configured Telegram bot
 - **GitHub**: `get_open_prs`, `get_assigned_issues`, `get_recent_pushes`, `create_issue`, `close_issue`, `delete_issue`
 - **Notion**: Search, read, create, and update pages, databases, and blocks
 - **Google Calendar**: View and manage calendar events
@@ -192,10 +196,27 @@ The agent has access to the following tools:
 - **ClickUp**: Browse workspaces/spaces/lists; get, create, update, delete tasks; search tasks; add comments
 - **Spotify**: Playback control, playlists, listening history
 - **Twitter/X**: Read posts and mentions
-- **AniList**: Track anime and manga
+- **AniList**: Search/discover anime and manga, inspect airing schedules, characters/staff/studios, manage list entries, and toggle favourites
 - **Memory**: Store and recall information with importance scoring
 - **Knowledge Graph**: Build and query a knowledge graph of entities and relationships
 - **Miscellaneous**: Get current date/time, perform calculations
+
+## Skills
+
+Add agent skills under `skills/<skill-name>/SKILL.md`.
+
+```md
+---
+name: my-skill
+description: Use this when Aira should follow my custom workflow for X.
+---
+
+# My Skill
+
+Follow these steps when the request matches this skill.
+```
+
+At runtime, Aira adds the skill catalog to its system prompt and calls `read_skill` when a request matches a skill description. Set `AGENT_SKILLS_DIR` or `AGENT_SKILLS_DIRS` to load skills from another directory.
 
 ## Contributing
 

@@ -2,7 +2,6 @@ import { createAgent, tool } from 'langchain';
 import z from 'zod';
 import { model } from '../shared.js';
 import { notionTools } from '../tools/notion.js';
-import { getCurrentDateTime } from '../tools/miscellaneous.js';
 import { streamSubAgent } from './utils.js';
 
 const NOTION_SYSTEM_PROMPT = `You are a Notion Workspace Assistant with full access to the user's Notion workspace via the OAuth API.
@@ -13,13 +12,12 @@ How to work correctly:
 - For "that page" or vague references, search first.
 - When creating content, structure it logically using the available blocks.
 - READ database schemas first to understand property names before querying or adding rows.
-- Use get_current_datetime when any date/time context is needed.
 - Ask for confirmation before trashing pages, deleting blocks, or making broad replacements.
 - If a tool returns an Error/Failed result, report that failure instead of treating it as success.`;
 
 const notionAgent = createAgent({
   model,
-  tools: [getCurrentDateTime, ...notionTools],
+  tools: [...notionTools],
 });
 
 export const notionTool = tool(
