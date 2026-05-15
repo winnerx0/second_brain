@@ -8,6 +8,9 @@ import {
   createIssue,
   closeIssue,
   deleteIssue,
+  createPullRequest,
+  getPullRequest,
+  mergePullRequest,
 } from '../tools/github.js';
 import { streamSubAgent } from './utils.js';
 
@@ -32,6 +35,9 @@ const githubAgent = createAgent({
     createIssue,
     closeIssue,
     deleteIssue,
+    createPullRequest,
+    getPullRequest,
+    mergePullRequest,
   ],
 });
 

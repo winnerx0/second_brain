@@ -10,17 +10,17 @@ import { ChatXAI } from '@langchain/xai';
 //   maxRetries: 3,
 // });
 
-export const model = new ChatOpenRouter({
-  apiKey: config.OPENROUTER_API_KEY,
-  model: 'openrouter/owl-alpha',
-  temperature: 1,
-  maxRetries: 3,
-});
+// export const model = new ChatOpenRouter({
+//   apiKey: config.OPENROUTER_API_KEY,
+//   model: 'openrouter/owl-alpha',
+//   temperature: 1,
+//   maxRetries: 3,
+// });
 
-// export const model = new ChatXAI({
-//     apiKey: config.XAI_API_KEY,
-//     model: "grok-4-1-fast-reasoning", 
-//     temperature: 0.8,
-//     maxTokens: 5000,
-//     maxRetries: 3,
-// })
+export const model = new ChatXAI({
+    apiKey: config.XAI_API_KEY,
+    model: "grok-4-1-fast-reasoning", 
+    temperature: 0.8,
+    maxTokens: 5000,
+    maxRetries: 3,
+})
