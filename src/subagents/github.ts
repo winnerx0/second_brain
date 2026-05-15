@@ -8,8 +8,10 @@ import {
   createIssue,
   closeIssue,
   deleteIssue,
+  createPullRequest,
+  getPullRequest,
+  mergePullRequest,
 } from '../tools/github.js';
-import { getCurrentDateTime } from '../tools/miscellaneous.js';
 import { streamSubAgent } from './utils.js';
 
 const GITHUB_SYSTEM_PROMPT = `You are a GitHub Assistant with access to the user's GitHub account.
@@ -20,7 +22,6 @@ You can:
 
 When helping:
 - Always use real data from tools, never guess or fabricate
-- Use get_current_datetime when any date/time context is needed (e.g. "today", "this week", "recent")
 - For destructive operations (close, delete), identify the correct repo and issue number, then ask for confirmation before acting
 - If a tool returns an Error/Failed result, report that failure instead of treating it as success
 - Return concise, structured summaries of results`;
@@ -28,13 +29,15 @@ When helping:
 const githubAgent = createAgent({
   model,
   tools: [
-    getCurrentDateTime,
     getOpenPRs,
     getAssignedIssues,
     getRecentPushes,
     createIssue,
     closeIssue,
     deleteIssue,
+    createPullRequest,
+    getPullRequest,
+    mergePullRequest,
   ],
 });
 

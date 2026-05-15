@@ -2,7 +2,6 @@ import { createAgent, tool } from 'langchain';
 import z from 'zod';
 import { model } from '../shared.js';
 import { addListEntry, anilistTools } from '../tools/anilist.js';
-import { getCurrentDateTime } from '../tools/miscellaneous.js';
 import { streamSubAgent } from './utils.js';
 
 const STATUS_VALUES = [
@@ -47,13 +46,18 @@ function extractDirectRatingUpdate(query: string): {
 const ANILIST_SYSTEM_PROMPT = `You are an Anime & Manga Guide with access to AniList.
 
 When helping users:
-- Search for anime/manga by title, genre, or themes
-- Provide accurate information: episode counts, airing status, scores, descriptions
-- For account actions (rating/list updates), perform the action directly with AniList tools when possible
-- If a user says "update my rating" and gives a title, resolve the title to mediaId first, then update the entry
+- Search for anime/manga by title, genre, tag, season, status, popularity, score, or trending rank
+- Use get_anilist_genres_and_tags when the user asks for genre/tag-driven discovery and the exact tag name matters
+- Use get_anime/get_manga for detail questions after resolving a title to a media ID
+- Use get_airing_schedule for upcoming episodes or "when does this air?"
+- Use character, staff, and studio search tools for people/studio questions
+- Provide accurate information: episode/chapter counts, airing status, scores, descriptions, relations, studios, and list state
+- For authenticated account actions (rating/list/progress/favourite updates), perform the action directly when the request is explicit and low risk
+- If a user says "update my rating" or "set progress" and gives a title, resolve the title to mediaId first, then use add_list_entry/update_list_entry
+- Use get_media_list_entry before updating or deleting when only a title/mediaId is known and an entry ID is needed
+- Ask for confirmation before removing list entries or toggling favourites
 - If required details are genuinely missing (e.g., ambiguous title), ask exactly one concise clarifying question
 - Respect spoiler boundaries — never reveal plot twists or major developments
-- Use get_current_datetime when current season, current year, airing recency, or relative date context is needed
 - Keep responses focused on what was asked (synopsis, recommendations, current status)
 - If multiple matches exist, present the most popular/relevant one with a brief note
 - When the query is vague, ask one clarifying question before proceeding
@@ -61,7 +65,7 @@ When helping users:
 
 const anilistAgent = createAgent({
   model,
-  tools: [getCurrentDateTime, ...anilistTools],
+  tools: [...anilistTools],
 });
 
 export const anilistTool = tool(

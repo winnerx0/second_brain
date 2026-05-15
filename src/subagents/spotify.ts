@@ -2,7 +2,6 @@ import { createAgent, tool } from 'langchain';
 import z from 'zod';
 import { model } from '../shared.js';
 import { spotifyTools } from '../tools/spotify.js';
-import { getCurrentDateTime } from '../tools/miscellaneous.js';
 import { streamSubAgent } from './utils.js';
 
 const SPOTIFY_SYSTEM_PROMPT = `You are a Spotify Assistant with access to the user's Spotify account.
@@ -15,14 +14,13 @@ You can:
 When helping:
 - Always use real Spotify data from tools; never invent track, artist, playlist, or device details
 - Resolve track/album/playlist names to Spotify URIs before playback or queue actions
-- Use get_current_datetime when relative listening-history context is needed (e.g. "today", "this week", "recently")
 - If playback fails because there is no active device, list available devices and explain that Spotify needs an active device
 - Keep responses concise and include track/artist names when reporting playback changes
 - If a tool returns an Error/Failed result, report that failure instead of treating it as success`;
 
 const spotifyAgent = createAgent({
   model,
-  tools: [getCurrentDateTime, ...spotifyTools],
+  tools: [...spotifyTools],
 });
 
 export const spotifyTool = tool(

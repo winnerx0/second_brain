@@ -1,13 +1,11 @@
 import { tool } from 'langchain';
 import { z } from 'zod';
 import { google } from 'googleapis';
-import { config } from '../config.js';
 import { logger } from '../logger.js';
 import { getDbRefreshToken, getValidToken } from '../oauth.js';
+import { createGoogleOAuthClient } from './google-auth.js';
 
-type GoogleAuthCredential =
-  | { accessToken: string }
-  | { refreshToken: string };
+type GoogleAuthCredential = { accessToken: string } | { refreshToken: string };
 
 async function getGoogleCredential(): Promise<GoogleAuthCredential> {
   // Only use the google_docs token — never fall back to gmail's token.
@@ -32,12 +30,7 @@ async function getGoogleCredential(): Promise<GoogleAuthCredential> {
 }
 
 function createGoogleAuth() {
-  const auth = new google.auth.OAuth2(
-    config.GOOGLE_CLIENT_ID,
-    config.GOOGLE_CLIENT_SECRET,
-    'http://localhost:3000',
-  );
-  return auth;
+  return createGoogleOAuthClient();
 }
 
 async function getDriveClient() {
@@ -117,7 +110,8 @@ export const searchDocuments = tool(
       const res = await drive.files.list({
         q,
         pageSize: Math.min(Math.max(limit ?? 10, 1), 25),
-        fields: 'files(id, name, webViewLink, modifiedTime, owners(displayName))',
+        fields:
+          'files(id, name, webViewLink, modifiedTime, owners(displayName))',
         orderBy: 'modifiedTime desc',
         supportsAllDrives: true,
         includeItemsFromAllDrives: true,

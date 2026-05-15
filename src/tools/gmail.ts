@@ -4,6 +4,7 @@ import { google } from 'googleapis';
 import { config } from '../config.js';
 import { logger } from '../logger.js';
 import { getDbRefreshToken } from '../oauth.js';
+import { createGoogleOAuthClient } from './google-auth.js';
 
 async function getGmailClient() {
   const dbRefreshToken = await getDbRefreshToken('gmail');
@@ -13,11 +14,7 @@ async function getGmailClient() {
       'Gmail not configured: connect Gmail in Connections or set GMAIL_REFRESH_TOKEN.',
     );
   }
-  const auth = new google.auth.OAuth2(
-    config.GOOGLE_CLIENT_ID,
-    config.GOOGLE_CLIENT_SECRET,
-    config.OAUTH_REDIRECT_BASE_URL,
-  );
+  const auth = createGoogleOAuthClient();
   auth.setCredentials({ refresh_token: refreshToken });
   return google.gmail({ version: 'v1', auth });
 }
@@ -75,7 +72,6 @@ function buildRaw(
   lines.push('', body);
   return Buffer.from(lines.join('\r\n')).toString('base64url');
 }
-
 
 export const listEmails = tool(
   async ({ query, maxResults }) => {

@@ -2,7 +2,6 @@ import { createAgent, tool } from 'langchain';
 import z from 'zod';
 import { model } from '../shared.js';
 import { googleDocTools } from '../tools/google-docs.js';
-import { getCurrentDateTime } from '../tools/miscellaneous.js';
 import { streamSubAgent } from './utils.js';
 
 const DOCS_SYSTEM_PROMPT = `You are a Document Assistant with access to Google Docs.
@@ -15,14 +14,13 @@ When helping users:
 - Update existing docs by appending or modifying specific sections
 - To DELETE a document entirely, use trashDocument — it moves the file to Google Trash
 - For delete/trash/wipe/replace, identify the document and ask for confirmation before acting
-- Use get_current_datetime when document titles/content need current date/time or relative date context
 - When creating documents, ensure proper formatting (headings, lists, paragraphs)
 - If the user refers to "the doc" or "my notes" without being specific, search recent documents first
 - If a tool returns an Error/Failed result, report that failure instead of treating it as success`;
 
 const docsAgent = createAgent({
   model,
-  tools: [getCurrentDateTime, ...googleDocTools],
+  tools: [...googleDocTools],
 });
 
 export const docsTool = tool(

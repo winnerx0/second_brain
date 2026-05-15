@@ -12,7 +12,7 @@ import { ChatXAI } from '@langchain/xai';
 
 // export const model = new ChatOpenRouter({
 //   apiKey: config.OPENROUTER_API_KEY,
-//   model: 'deepseek/deepseek-v3.2',
+//   model: 'openrouter/owl-alpha',
 //   temperature: 1,
 //   maxRetries: 3,
 // });

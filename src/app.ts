@@ -1,6 +1,12 @@
 import { Hono, type Context } from 'hono';
 import { cors } from 'hono/cors';
-import { runBriefing, handleMessage, runWorkflow, type AgentStreamEvent } from './agent.js';
+import {
+  runBriefing,
+  handleMessage,
+  runWorkflow,
+  type AgentStreamEvent,
+} from './agent.js';
+import { sendTelegramMessage } from './delivery/telegram.js';
 import { runMemoryCleanup } from './memory-cleanup.js';
 import { logger } from './logger.js';
 import { db } from './db/client.js';
@@ -21,7 +27,7 @@ import {
   OAUTH_CONFIGS,
 } from './oauth.js';
 import { config } from './config.js';
-import {kiviaHonoMiddleware} from "@kivia/sdk"
+import { kiviaHonoMiddleware } from '@kivia/sdk';
 const API_KEY_CONNECTIONS = new Set(['clickup']);
 const REMOVED_CONNECTIONS = new Set(['linkedin']);
 // MCP OAuth imports - disabled, using traditional OAuth instead
@@ -80,9 +86,9 @@ function formatSseEvent(event: AgentStreamEvent): string {
 
 app.use('*', cors({ origin: [config.APP_URL] }));
 
-const kivia = kiviaHonoMiddleware({apiKey: config.KIVIA_API_KEY})
+const kivia = kiviaHonoMiddleware({ apiKey: config.KIVIA_API_KEY });
 
-app.use(kivia)
+app.use(kivia);
 
 app.get('/health', (c) => {
   return c.json({ status: 'ok', timestamp: Date.now() });
@@ -97,7 +103,8 @@ app.get('/sessions', async (c) => {
 
     return c.json({ sessions });
   } catch (error) {
-    const cause = error instanceof Error ? (error as { cause?: unknown }).cause : undefined;
+    const cause =
+      error instanceof Error ? (error as { cause?: unknown }).cause : undefined;
     const causeText =
       cause instanceof Error
         ? `\nCaused by: ${cause.stack ?? cause.message}`
@@ -105,7 +112,7 @@ app.get('/sessions', async (c) => {
           ? `\nCaused by: ${typeof cause === 'string' ? cause : JSON.stringify(cause)}`
           : '';
     logger.error(
-      `[sessions.list] ${error instanceof Error ? error.stack ?? error.message : String(error)}${causeText}`,
+      `[sessions.list] ${error instanceof Error ? (error.stack ?? error.message) : String(error)}${causeText}`,
     );
     return c.json(
       {
@@ -240,7 +247,10 @@ app.patch('/memories/:id', async (c) => {
   }
 
   try {
-    const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+    const body = (await c.req.json().catch(() => ({}))) as Record<
+      string,
+      unknown
+    >;
     const value = typeof body.value === 'string' ? body.value.trim() : '';
     if (!value) return c.json({ error: 'value is required' }, 400);
 
@@ -255,7 +265,10 @@ app.patch('/memories/:id', async (c) => {
   } catch (error) {
     logger.error('[memories.patch]', error);
     return c.json(
-      { error: error instanceof Error ? error.message : 'Failed to update memory' },
+      {
+        error:
+          error instanceof Error ? error.message : 'Failed to update memory',
+      },
       500,
     );
   }
@@ -277,7 +290,10 @@ app.delete('/memories/:id', async (c) => {
   } catch (error) {
     logger.error('[memories.delete]', error);
     return c.json(
-      { error: error instanceof Error ? error.message : 'Failed to delete memory' },
+      {
+        error:
+          error instanceof Error ? error.message : 'Failed to delete memory',
+      },
       500,
     );
   }
@@ -305,7 +321,9 @@ app.post('/memories/cleanup', async (c) => {
     return c.json(
       {
         error:
-          error instanceof Error ? error.message : 'Failed to run memory cleanup',
+          error instanceof Error
+            ? error.message
+            : 'Failed to run memory cleanup',
       },
       500,
     );
@@ -341,7 +359,8 @@ app.get('/connections', async (c) => {
           process.env[OAUTH_CONFIGS[r.name]?.clientIdEnv ?? ''],
         ),
         apiKeySupported: API_KEY_CONNECTIONS.has(r.name),
-        apiKeyConnected: API_KEY_CONNECTIONS.has(r.name) && Boolean(accessToken),
+        apiKeyConnected:
+          API_KEY_CONNECTIONS.has(r.name) && Boolean(accessToken),
       })),
     });
   } catch (error) {
@@ -433,20 +452,35 @@ app.put('/connections/:name/apikey', async (c) => {
     return c.json({ error: `${name} does not use API key auth` }, 400);
 
   try {
-    const rawBody = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
-    const apiKey = typeof rawBody.apiKey === 'string' ? rawBody.apiKey.trim() : '';
+    const rawBody = (await c.req.json().catch(() => ({}))) as Record<
+      string,
+      unknown
+    >;
+    const apiKey =
+      typeof rawBody.apiKey === 'string' ? rawBody.apiKey.trim() : '';
     if (!apiKey) return c.json({ error: 'apiKey is required' }, 400);
 
     await db
       .update(connections)
-      .set({ accessToken: apiKey, oauthConnected: true, enabled: true, updatedAt: new Date() })
+      .set({
+        accessToken: apiKey,
+        oauthConnected: true,
+        enabled: true,
+        updatedAt: new Date(),
+      })
       .where(eq(connections.name, name));
 
     logger.info(`[connections] ${name} api key saved`);
     return c.json({ ok: true });
   } catch (error) {
     logger.error('[connections.apikey.put]', error);
-    return c.json({ error: error instanceof Error ? error.message : 'Failed to save API key' }, 500);
+    return c.json(
+      {
+        error:
+          error instanceof Error ? error.message : 'Failed to save API key',
+      },
+      500,
+    );
   }
 });
 
@@ -465,7 +499,13 @@ app.delete('/connections/:name/apikey', async (c) => {
     return c.json({ ok: true });
   } catch (error) {
     logger.error('[connections.apikey.delete]', error);
-    return c.json({ error: error instanceof Error ? error.message : 'Failed to remove API key' }, 500);
+    return c.json(
+      {
+        error:
+          error instanceof Error ? error.message : 'Failed to remove API key',
+      },
+      500,
+    );
   }
 });
 
@@ -539,25 +579,104 @@ app.delete('/connections/:name/oauth', async (c) => {
 
 const processedUpdateIds = new Set<number>();
 
-app.post('/chat', async (c) => {
-  const body = await c.req.json<{
-    message: { text: string };
-    update_id: number;
-  }>();
-  const { message, update_id } = body;
+type TelegramMessage = {
+  text?: string;
+  chat?: { id?: string | number };
+};
 
-  if (processedUpdateIds.has(update_id)) {
-    logger.warn(`[chat] duplicate message received with update_id: ${update_id}`);
+type ChatRequestBody = {
+  message?: string | TelegramMessage;
+  text?: string;
+  update_id?: number;
+};
+
+function getIncomingChatText(body: ChatRequestBody): string {
+  if (typeof body.text === 'string') return body.text;
+  if (typeof body.message === 'string') return body.message;
+  if (
+    typeof body.message === 'object' &&
+    body.message !== null &&
+    typeof body.message.text === 'string'
+  ) {
+    return body.message.text;
+  }
+  return '';
+}
+
+function isTelegramUpdate(body: ChatRequestBody): body is ChatRequestBody & {
+  message: TelegramMessage;
+} {
+  return typeof body.message === 'object' && body.message !== null;
+}
+
+function isAllowedTelegramChat(message: TelegramMessage): boolean {
+  const chatId = message.chat?.id;
+  if (chatId === undefined || chatId === null) return false;
+  return String(chatId) === String(config.TELEGRAM_CHAT_ID);
+}
+
+function isDuplicateUpdate(updateId: number | undefined): boolean {
+  if (typeof updateId !== 'number') return false;
+  if (processedUpdateIds.has(updateId)) return true;
+
+  processedUpdateIds.add(updateId);
+  if (processedUpdateIds.size > 10_000) processedUpdateIds.clear();
+  return false;
+}
+
+app.post('/chat', async (c) => {
+  const body = await c.req.json<ChatRequestBody>();
+  const text = getIncomingChatText(body).trim();
+
+  if (!text)
+    return c.json({ success: false, error: 'Message text required' }, 400);
+
+  if (isDuplicateUpdate(body.update_id)) {
+    logger.warn(
+      `[chat] duplicate message received with update_id: ${body.update_id}`,
+    );
     return c.json({ success: false, error: 'Duplicate message' });
   }
-  processedUpdateIds.add(update_id);
-  if (processedUpdateIds.size > 10_000) processedUpdateIds.clear();
 
-  logger.info(`[chat] received: ${message.text}`);
+  if (isTelegramUpdate(body) && !isAllowedTelegramChat(body.message)) {
+    logger.warn('[telegram] ignored message from unauthorized chat');
+    return c.json({ success: false, error: 'Unauthorized Telegram chat' }, 403);
+  }
 
-  const reply = await handleMessage(message.text);
+  logger.info(`[chat] received: ${text}`);
+
+  const reply = await handleMessage(text);
+
+  if (isTelegramUpdate(body)) {
+    await sendTelegramMessage(reply);
+  }
 
   return c.json({ success: true, reply });
+});
+
+app.post('/telegram/webhook', async (c) => {
+  const body = await c.req.json<ChatRequestBody>();
+  const text = getIncomingChatText(body).trim();
+
+  if (!text) return c.json({ success: true, ignored: true });
+  if (isDuplicateUpdate(body.update_id)) {
+    logger.warn(
+      `[telegram] duplicate update received with update_id: ${body.update_id}`,
+    );
+    return c.json({ success: true, duplicate: true });
+  }
+
+  if (isTelegramUpdate(body) && !isAllowedTelegramChat(body.message)) {
+    logger.warn('[telegram] ignored message from unauthorized chat');
+    return c.json({ success: true, ignored: true });
+  }
+
+  logger.info(`[telegram] received: ${text}`);
+
+  const reply = await handleMessage(text);
+  await sendTelegramMessage(reply);
+
+  return c.json({ success: true });
 });
 
 app.post('/chat/stream', async (c) => {
@@ -659,7 +778,10 @@ app.post('/cron/briefing', async (c) => {
 
 app.get('/workflows', async (c) => {
   try {
-    const wfs = await db.select().from(workflows).orderBy(desc(workflows.updatedAt));
+    const wfs = await db
+      .select()
+      .from(workflows)
+      .orderBy(desc(workflows.updatedAt));
     return c.json({ workflows: wfs });
   } catch (error) {
     logger.error('[workflows.list]', error);
@@ -681,8 +803,13 @@ app.get('/workflows/:id', async (c) => {
 
 app.post('/workflows', async (c) => {
   try {
-    const body = await c.req.json() as { name: string; description?: string; plan: string };
-    if (!body.name || !body.plan) return c.json({ error: 'Missing name or plan' }, 400);
+    const body = (await c.req.json()) as {
+      name: string;
+      description?: string;
+      plan: string;
+    };
+    if (!body.name || !body.plan)
+      return c.json({ error: 'Missing name or plan' }, 400);
 
     const [inserted] = await db
       .insert(workflows)
@@ -703,7 +830,12 @@ app.post('/workflows', async (c) => {
 app.patch('/workflows/:id', async (c) => {
   try {
     const id = parseInt(c.req.param('id'), 10);
-    const body = await c.req.json() as { name?: string; description?: string; plan?: string; enabled?: boolean };
+    const body = (await c.req.json()) as {
+      name?: string;
+      description?: string;
+      plan?: string;
+      enabled?: boolean;
+    };
 
     const [updated] = await db
       .update(workflows)
@@ -752,10 +884,7 @@ app.get('/workflows/:id/runs', async (c) => {
 app.post('/workflows/:id/run', async (c) => {
   try {
     const id = parseInt(c.req.param('id'), 10);
-    const [wf] = await db
-      .select()
-      .from(workflows)
-      .where(eq(workflows.id, id));
+    const [wf] = await db.select().from(workflows).where(eq(workflows.id, id));
 
     if (!wf) return c.json({ error: 'Workflow not found' }, 404);
 
@@ -805,7 +934,7 @@ app.post('/workflows/:id/run', async (c) => {
       headers: {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive',
+        Connection: 'keep-alive',
       },
     });
   } catch (error) {

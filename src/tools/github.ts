@@ -330,6 +330,247 @@ export const deleteIssue = tool(
   },
 );
 
+export const createPullRequest = tool(
+  async ({ repo, title, head, base, body, draft, owner }) => {
+    try {
+      const repoOwner = owner ?? config.GITHUB_USERNAME;
+      const headers = await getHeaders();
+
+      const res = await fetch(
+        `https://api.github.com/repos/${repoOwner}/${repo}/pulls`,
+        {
+          method: 'POST',
+          headers: {
+            ...headers,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            title,
+            head,
+            base,
+            ...(body ? { body } : {}),
+            ...(draft !== undefined ? { draft } : {}),
+          }),
+        },
+      );
+
+      if (!res.ok) {
+        const err = await res.text();
+        return `Failed to create pull request (${res.status}): ${err}`;
+      }
+
+      const data = (await res.json()) as {
+        html_url: string;
+        number: number;
+        title: string;
+        state: string;
+        draft?: boolean;
+      };
+
+      return JSON.stringify({
+        message: `Pull request #${data.number} created.`,
+        number: data.number,
+        title: data.title,
+        state: data.state,
+        draft: data.draft ?? false,
+        url: data.html_url,
+      });
+    } catch (error) {
+      logger.error('[github]', error);
+      return `Error creating pull request: ${
+        error instanceof Error ? error.message : String(error)
+      }`;
+    }
+  },
+  {
+    name: 'create_pull_request',
+    description:
+      'Create a GitHub pull request from a head branch into a base branch. Use this after code has already been pushed to GitHub.',
+    schema: z.object({
+      repo: z.string().describe('Repository name, e.g. "kron"'),
+      title: z.string().describe('Pull request title'),
+      head: z
+        .string()
+        .describe(
+          'The branch containing changes. Example: "feature/jobs" or "winnerx0:feature/jobs" for forks.',
+        ),
+      base: z
+        .string()
+        .default('main')
+        .describe('The branch to merge into, usually "main" or "master".'),
+      body: z
+        .string()
+        .optional()
+        .describe('Pull request body / description in markdown.'),
+      draft: z
+        .boolean()
+        .optional()
+        .describe('Whether to create the pull request as a draft.'),
+      owner: z
+        .string()
+        .optional()
+        .describe('Repository owner. Omit to use your own username.'),
+    }),
+  },
+);
+
+export const getPullRequest = tool(
+  async ({ repo, pull_number, owner }) => {
+    try {
+      const repoOwner = owner ?? config.GITHUB_USERNAME;
+      const headers = await getHeaders();
+
+      const res = await fetch(
+        `https://api.github.com/repos/${repoOwner}/${repo}/pulls/${pull_number}`,
+        { headers },
+      );
+
+      if (!res.ok) {
+        const err = await res.text();
+        return `Failed to get pull request (${res.status}): ${err}`;
+      }
+
+      const data = (await res.json()) as {
+        number: number;
+        title: string;
+        state: string;
+        draft: boolean;
+        html_url: string;
+        mergeable: boolean | null;
+        mergeable_state?: string;
+        merged: boolean;
+        base: { ref: string };
+        head: { ref: string; sha: string };
+        user?: { login: string };
+      };
+
+      return JSON.stringify({
+        number: data.number,
+        title: data.title,
+        state: data.state,
+        draft: data.draft,
+        merged: data.merged,
+        mergeable: data.mergeable,
+        mergeableState: data.mergeable_state,
+        base: data.base.ref,
+        head: data.head.ref,
+        headSha: data.head.sha,
+        author: data.user?.login,
+        url: data.html_url,
+      });
+    } catch (error) {
+      logger.error('[github]', error);
+      return `Error fetching pull request: ${
+        error instanceof Error ? error.message : String(error)
+      }`;
+    }
+  },
+  {
+    name: 'get_pull_request',
+    description:
+      'Get details about a GitHub pull request, including mergeability, branch names, state, and URL.',
+    schema: z.object({
+      repo: z.string().describe('Repository name, e.g. "kron"'),
+      pull_number: z.number().describe('Pull request number'),
+      owner: z
+        .string()
+        .optional()
+        .describe('Repository owner. Omit to use your own username.'),
+    }),
+  },
+);
+
+export const mergePullRequest = tool(
+  async ({
+    repo,
+    pull_number,
+    commit_title,
+    commit_message,
+    merge_method,
+    expected_head_sha,
+    owner,
+  }) => {
+    try {
+      const repoOwner = owner ?? config.GITHUB_USERNAME;
+      const headers = await getHeaders();
+
+      const res = await fetch(
+        `https://api.github.com/repos/${repoOwner}/${repo}/pulls/${pull_number}/merge`,
+        {
+          method: 'PUT',
+          headers: {
+            ...headers,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            ...(commit_title ? { commit_title } : {}),
+            ...(commit_message ? { commit_message } : {}),
+            ...(merge_method ? { merge_method } : {}),
+            ...(expected_head_sha ? { sha: expected_head_sha } : {}),
+          }),
+        },
+      );
+
+      if (!res.ok) {
+        const err = await res.text();
+        return `Failed to merge pull request (${res.status}): ${err}`;
+      }
+
+      const data = (await res.json()) as {
+        sha: string;
+        merged: boolean;
+        message: string;
+      };
+
+      return JSON.stringify({
+        message: data.message,
+        merged: data.merged,
+        sha: data.sha,
+        pullNumber: pull_number,
+        repo: `${repoOwner}/${repo}`,
+      });
+    } catch (error) {
+      logger.error('[github]', error);
+      return `Error merging pull request: ${
+        error instanceof Error ? error.message : String(error)
+      }`;
+    }
+  },
+  {
+    name: 'merge_pull_request',
+    description:
+      'Merge an open GitHub pull request by number. If unsure whether it is mergeable, call get_pull_request first.',
+    schema: z.object({
+      repo: z.string().describe('Repository name, e.g. "kron"'),
+      pull_number: z.number().describe('Pull request number to merge'),
+      commit_title: z
+        .string()
+        .optional()
+        .describe('Custom merge commit title.'),
+      commit_message: z
+        .string()
+        .optional()
+        .describe('Custom merge commit message.'),
+      merge_method: z
+        .enum(['merge', 'squash', 'rebase'])
+        .optional()
+        .describe(
+          'Merge strategy. Use "merge", "squash", or "rebase". Defaults to the repository default if omitted.',
+        ),
+      expected_head_sha: z
+        .string()
+        .optional()
+        .describe(
+          'Optional expected head SHA. This prevents merging if the PR changed after it was checked.',
+        ),
+      owner: z
+        .string()
+        .optional()
+        .describe('Repository owner. Omit to use your own username.'),
+    }),
+  },
+);
+
 export const githubTools = [
   getOpenPRs,
   getAssignedIssues,
@@ -337,4 +578,7 @@ export const githubTools = [
   createIssue,
   closeIssue,
   deleteIssue,
+  createPullRequest,
+  getPullRequest,
+  mergePullRequest,
 ];
