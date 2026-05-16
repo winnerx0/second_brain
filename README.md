@@ -1,6 +1,6 @@
 # Second Brain
 
-A daily briefing agent powered by a LangChain planning agent that dynamically delegates to GitHub, Google Calendar, Notion, ClickUp, and memory tools, delivered via Telegram.
+A daily briefing agent powered by a LangChain planning agent that dynamically delegates to GitHub, Google Calendar, Notion, ClickUp, Tavily web search, and memory tools, delivered via Telegram.
 
 ## Features
 
@@ -26,6 +26,7 @@ User/Cron → Hono → Planning Agent (createAgent) → Tools → Response → T
                          ├── AniList (anime/manga tracking) [OAuth]
                          ├── Spotify (playback, playlists) [OAuth]
                          ├── Twitter/X (posts, mentions) [OAuth]
+                         ├── Tavily (live web search) [API key]
                          ├── Knowledge Graph (entities, relationships)
                          └── Memory (store/recall from Postgres)
 ```
@@ -61,6 +62,7 @@ Fill in `.env`:
 | `TELEGRAM_CHAT_ID`    | Your Telegram chat ID                                            |
 | `DATABASE_URL`        | Postgres connection string                                       |
 | `NOTION_TOKEN`        | Notion integration token (fallback if OAuth not used)            |
+| `TAVILY_API_KEY`      | Optional Tavily API key for live web search                      |
 
 **OAuth Configuration (Optional but Recommended):**
 
@@ -196,6 +198,7 @@ The agent has access to the following tools:
 - **ClickUp**: Browse workspaces/spaces/lists; get, create, update, delete tasks; search tasks; add comments
 - **Spotify**: Playback control, playlists, listening history
 - **Twitter/X**: Read posts and mentions
+- **Tavily Web Search**: Search the live web for current information and source-backed answers
 - **AniList**: Search/discover anime and manga, inspect airing schedules, characters/staff/studios, manage list entries, and toggle favourites
 - **Memory**: Store and recall information with importance scoring
 - **Knowledge Graph**: Build and query a knowledge graph of entities and relationships
