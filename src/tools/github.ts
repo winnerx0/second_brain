@@ -571,6 +571,487 @@ export const mergePullRequest = tool(
   },
 );
 
+const MAX_PATCH_LENGTH = 6000;
+const MAX_FILE_LENGTH = 50000;
+
+function truncate(text: string, max: number): string {
+  if (text.length <= max) return text;
+  return `${text.slice(0, max)}\n…[truncated, ${text.length - max} more characters]`;
+}
+
+interface RepoSummary {
+  name: string;
+  full_name: string;
+  private: boolean;
+  description: string | null;
+  language: string | null;
+  default_branch: string;
+  updated_at: string;
+  html_url: string;
+}
+
+interface CommitListItem {
+  sha: string;
+  commit: {
+    message: string;
+    author: { name: string; date: string } | null;
+  };
+  author: { login: string } | null;
+  html_url: string;
+}
+
+interface CommitFile {
+  filename: string;
+  status: string;
+  additions: number;
+  deletions: number;
+  patch?: string;
+}
+
+interface IssueComment {
+  user: { login: string } | null;
+  body: string;
+}
+
+export const listRepos = tool(
+  async ({ limit }) => {
+    try {
+      const res = await fetch(
+        `https://api.github.com/user/repos?per_page=${limit ?? 30}&sort=updated&affiliation=owner,collaborator`,
+        { headers: await getHeaders() },
+      );
+
+      if (!res.ok) {
+        const err = await res.text();
+        return `Failed to list repos (${res.status}): ${err}`;
+      }
+
+      const data = (await res.json()) as RepoSummary[];
+      return JSON.stringify(
+        data.map((r) => ({
+          name: r.name,
+          fullName: r.full_name,
+          private: r.private,
+          description: r.description,
+          language: r.language,
+          defaultBranch: r.default_branch,
+          updatedAt: r.updated_at,
+          url: r.html_url,
+        })),
+      );
+    } catch (error) {
+      logger.error('[github]', error);
+      return `Error listing repos: ${error instanceof Error ? error.message : String(error)}`;
+    }
+  },
+  {
+    name: 'list_repos',
+    description:
+      'List repositories the user owns or collaborates on, most recently updated first.',
+    schema: z.object({
+      limit: z
+        .number()
+        .optional()
+        .describe('Max number of repos to return (default 30).'),
+    }),
+  },
+);
+
+export const getRepo = tool(
+  async ({ repo, owner }) => {
+    try {
+      const repoOwner = owner ?? config.GITHUB_USERNAME;
+      const res = await fetch(
+        `https://api.github.com/repos/${repoOwner}/${repo}`,
+        { headers: await getHeaders() },
+      );
+
+      if (!res.ok) {
+        const err = await res.text();
+        return `Failed to get repo (${res.status}): ${err}`;
+      }
+
+      const data = (await res.json()) as {
+        full_name: string;
+        description: string | null;
+        language: string | null;
+        default_branch: string;
+        stargazers_count: number;
+        forks_count: number;
+        open_issues_count: number;
+        topics?: string[];
+        visibility?: string;
+        html_url: string;
+      };
+
+      return JSON.stringify({
+        fullName: data.full_name,
+        description: data.description,
+        language: data.language,
+        defaultBranch: data.default_branch,
+        stars: data.stargazers_count,
+        forks: data.forks_count,
+        openIssues: data.open_issues_count,
+        topics: data.topics ?? [],
+        visibility: data.visibility,
+        url: data.html_url,
+      });
+    } catch (error) {
+      logger.error('[github]', error);
+      return `Error getting repo: ${error instanceof Error ? error.message : String(error)}`;
+    }
+  },
+  {
+    name: 'get_repo',
+    description:
+      'Get metadata about a repository: description, default branch, language, star/fork/issue counts, topics, and URL.',
+    schema: z.object({
+      repo: z.string().describe('Repository name (e.g. "second-brain")'),
+      owner: z
+        .string()
+        .optional()
+        .describe('Repo owner — omit to use your own username'),
+    }),
+  },
+);
+
+export const getFileContent = tool(
+  async ({ repo, path, ref, owner }) => {
+    try {
+      const repoOwner = owner ?? config.GITHUB_USERNAME;
+      const query = ref ? `?ref=${encodeURIComponent(ref)}` : '';
+      const res = await fetch(
+        `https://api.github.com/repos/${repoOwner}/${repo}/contents/${path ?? ''}${query}`,
+        { headers: await getHeaders() },
+      );
+
+      if (!res.ok) {
+        const err = await res.text();
+        return `Failed to get content (${res.status}): ${err}`;
+      }
+
+      const data = (await res.json()) as
+        | Array<{ name: string; path: string; type: string }>
+        | {
+            name: string;
+            path: string;
+            type: string;
+            size: number;
+            encoding?: string;
+            content?: string;
+          };
+
+      // Directory listing
+      if (Array.isArray(data)) {
+        return JSON.stringify({
+          type: 'directory',
+          path: path ?? '',
+          entries: data.map((e) => ({
+            name: e.name,
+            path: e.path,
+            type: e.type,
+          })),
+        });
+      }
+
+      if (data.type !== 'file' || data.encoding !== 'base64' || !data.content) {
+        return `Path "${data.path}" is a ${data.type}, not a readable file.`;
+      }
+
+      const decoded = Buffer.from(data.content, 'base64').toString('utf-8');
+      return JSON.stringify({
+        type: 'file',
+        path: data.path,
+        size: data.size,
+        content: truncate(decoded, MAX_FILE_LENGTH),
+      });
+    } catch (error) {
+      logger.error('[github]', error);
+      return `Error getting file content: ${error instanceof Error ? error.message : String(error)}`;
+    }
+  },
+  {
+    name: 'get_file_content',
+    description:
+      'Read the content of a file in a repository, or list a directory. Omit path for the repo root. Returns decoded UTF-8 text for files, or entry names for directories.',
+    schema: z.object({
+      repo: z.string().describe('Repository name (e.g. "second-brain")'),
+      path: z
+        .string()
+        .optional()
+        .describe('File or directory path (e.g. "src/index.ts"). Omit for root.'),
+      ref: z
+        .string()
+        .optional()
+        .describe('Branch, tag, or commit SHA. Omit for the default branch.'),
+      owner: z
+        .string()
+        .optional()
+        .describe('Repo owner — omit to use your own username'),
+    }),
+  },
+);
+
+export const getIssue = tool(
+  async ({ repo, issue_number, owner }) => {
+    try {
+      const repoOwner = owner ?? config.GITHUB_USERNAME;
+      const headers = await getHeaders();
+
+      const res = await fetch(
+        `https://api.github.com/repos/${repoOwner}/${repo}/issues/${issue_number}`,
+        { headers },
+      );
+
+      if (!res.ok) {
+        const err = await res.text();
+        return `Failed to get issue (${res.status}): ${err}`;
+      }
+
+      const data = (await res.json()) as {
+        title: string;
+        state: string;
+        body: string | null;
+        user: { login: string } | null;
+        labels: Array<{ name: string } | string>;
+        comments: number;
+        html_url: string;
+      };
+
+      let comments: IssueComment[] = [];
+      if (data.comments > 0) {
+        const commentsRes = await fetch(
+          `https://api.github.com/repos/${repoOwner}/${repo}/issues/${issue_number}/comments`,
+          { headers },
+        );
+        if (commentsRes.ok) {
+          comments = (await commentsRes.json()) as IssueComment[];
+        }
+      }
+
+      return JSON.stringify({
+        number: issue_number,
+        title: data.title,
+        state: data.state,
+        author: data.user?.login,
+        labels: data.labels.map((l) => (typeof l === 'string' ? l : l.name)),
+        body: data.body,
+        url: data.html_url,
+        comments: comments.map((c) => ({
+          author: c.user?.login,
+          body: c.body,
+        })),
+      });
+    } catch (error) {
+      logger.error('[github]', error);
+      return `Error getting issue: ${error instanceof Error ? error.message : String(error)}`;
+    }
+  },
+  {
+    name: 'get_issue',
+    description:
+      'Get the full content of a GitHub issue by number: title, state, body, labels, author, and all comments.',
+    schema: z.object({
+      repo: z.string().describe('Repository name (e.g. "second-brain")'),
+      issue_number: z.number().describe('Issue number'),
+      owner: z
+        .string()
+        .optional()
+        .describe('Repo owner — omit to use your own username'),
+    }),
+  },
+);
+
+export const getPullRequestContent = tool(
+  async ({ repo, pull_number, owner }) => {
+    try {
+      const repoOwner = owner ?? config.GITHUB_USERNAME;
+      const headers = await getHeaders();
+      const base = `https://api.github.com/repos/${repoOwner}/${repo}/pulls/${pull_number}`;
+
+      const prRes = await fetch(base, { headers });
+      if (!prRes.ok) {
+        const err = await prRes.text();
+        return `Failed to get pull request (${prRes.status}): ${err}`;
+      }
+
+      const pr = (await prRes.json()) as {
+        title: string;
+        state: string;
+        body: string | null;
+        user: { login: string } | null;
+        html_url: string;
+      };
+
+      const [filesRes, commentsRes] = await Promise.all([
+        fetch(`${base}/files?per_page=100`, { headers }),
+        fetch(`${base}/comments?per_page=100`, { headers }),
+      ]);
+
+      const files = filesRes.ok
+        ? ((await filesRes.json()) as CommitFile[])
+        : [];
+      const comments = commentsRes.ok
+        ? ((await commentsRes.json()) as Array<{
+            user: { login: string } | null;
+            path?: string;
+            body: string;
+          }>)
+        : [];
+
+      return JSON.stringify({
+        number: pull_number,
+        title: pr.title,
+        state: pr.state,
+        author: pr.user?.login,
+        body: pr.body,
+        url: pr.html_url,
+        files: files.map((f) => ({
+          filename: f.filename,
+          status: f.status,
+          additions: f.additions,
+          deletions: f.deletions,
+          patch: f.patch ? truncate(f.patch, MAX_PATCH_LENGTH) : undefined,
+        })),
+        reviewComments: comments.map((c) => ({
+          author: c.user?.login,
+          path: c.path,
+          body: c.body,
+        })),
+      });
+    } catch (error) {
+      logger.error('[github]', error);
+      return `Error getting pull request content: ${error instanceof Error ? error.message : String(error)}`;
+    }
+  },
+  {
+    name: 'get_pull_request_content',
+    description:
+      'Get the content of a pull request: body, changed files with diffs, and review comments. Use get_pull_request for mergeability/state metadata.',
+    schema: z.object({
+      repo: z.string().describe('Repository name (e.g. "second-brain")'),
+      pull_number: z.number().describe('Pull request number'),
+      owner: z
+        .string()
+        .optional()
+        .describe('Repo owner — omit to use your own username'),
+    }),
+  },
+);
+
+export const listCommits = tool(
+  async ({ repo, branch, limit, owner }) => {
+    try {
+      const repoOwner = owner ?? config.GITHUB_USERNAME;
+      const shaQuery = branch ? `&sha=${encodeURIComponent(branch)}` : '';
+      const res = await fetch(
+        `https://api.github.com/repos/${repoOwner}/${repo}/commits?per_page=${limit ?? 20}${shaQuery}`,
+        { headers: await getHeaders() },
+      );
+
+      if (!res.ok) {
+        const err = await res.text();
+        return `Failed to list commits (${res.status}): ${err}`;
+      }
+
+      const data = (await res.json()) as CommitListItem[];
+      return JSON.stringify(
+        data.map((c) => ({
+          sha: c.sha,
+          message: c.commit.message.split('\n')[0],
+          author: c.author?.login ?? c.commit.author?.name,
+          date: c.commit.author?.date,
+          url: c.html_url,
+        })),
+      );
+    } catch (error) {
+      logger.error('[github]', error);
+      return `Error listing commits: ${error instanceof Error ? error.message : String(error)}`;
+    }
+  },
+  {
+    name: 'list_commits',
+    description:
+      'List recent commits for a repository (optionally on a specific branch), newest first.',
+    schema: z.object({
+      repo: z.string().describe('Repository name (e.g. "second-brain")'),
+      branch: z
+        .string()
+        .optional()
+        .describe('Branch, tag, or SHA to list from. Omit for the default branch.'),
+      limit: z
+        .number()
+        .optional()
+        .describe('Max number of commits to return (default 20).'),
+      owner: z
+        .string()
+        .optional()
+        .describe('Repo owner — omit to use your own username'),
+    }),
+  },
+);
+
+export const getCommit = tool(
+  async ({ repo, ref, owner }) => {
+    try {
+      const repoOwner = owner ?? config.GITHUB_USERNAME;
+      const res = await fetch(
+        `https://api.github.com/repos/${repoOwner}/${repo}/commits/${encodeURIComponent(ref)}`,
+        { headers: await getHeaders() },
+      );
+
+      if (!res.ok) {
+        const err = await res.text();
+        return `Failed to get commit (${res.status}): ${err}`;
+      }
+
+      const data = (await res.json()) as {
+        sha: string;
+        commit: {
+          message: string;
+          author: { name: string; date: string } | null;
+        };
+        author: { login: string } | null;
+        stats?: { additions: number; deletions: number; total: number };
+        files?: CommitFile[];
+        html_url: string;
+      };
+
+      return JSON.stringify({
+        sha: data.sha,
+        message: data.commit.message,
+        author: data.author?.login ?? data.commit.author?.name,
+        date: data.commit.author?.date,
+        stats: data.stats,
+        url: data.html_url,
+        files: (data.files ?? []).map((f) => ({
+          filename: f.filename,
+          status: f.status,
+          additions: f.additions,
+          deletions: f.deletions,
+          patch: f.patch ? truncate(f.patch, MAX_PATCH_LENGTH) : undefined,
+        })),
+      });
+    } catch (error) {
+      logger.error('[github]', error);
+      return `Error getting commit: ${error instanceof Error ? error.message : String(error)}`;
+    }
+  },
+  {
+    name: 'get_commit',
+    description:
+      'Get the full content of a single commit: message, author, change stats, and per-file diffs.',
+    schema: z.object({
+      repo: z.string().describe('Repository name (e.g. "second-brain")'),
+      ref: z.string().describe('Commit SHA, branch, or tag'),
+      owner: z
+        .string()
+        .optional()
+        .describe('Repo owner — omit to use your own username'),
+    }),
+  },
+);
+
 export const githubTools = [
   getOpenPRs,
   getAssignedIssues,
@@ -581,4 +1062,11 @@ export const githubTools = [
   createPullRequest,
   getPullRequest,
   mergePullRequest,
+  listRepos,
+  getRepo,
+  getFileContent,
+  getIssue,
+  getPullRequestContent,
+  listCommits,
+  getCommit,
 ];

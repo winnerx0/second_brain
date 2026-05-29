@@ -11,6 +11,13 @@ import {
   createPullRequest,
   getPullRequest,
   mergePullRequest,
+  listRepos,
+  getRepo,
+  getFileContent,
+  getIssue,
+  getPullRequestContent,
+  listCommits,
+  getCommit,
 } from '../tools/github.js';
 import { streamSubAgent } from './utils.js';
 
@@ -19,6 +26,7 @@ const GITHUB_SYSTEM_PROMPT = `You are a GitHub Assistant with access to the user
 You can:
 - Fetch open pull requests, assigned issues, and recent pushes
 - Create, close, and delete issues
+- Read content: list/inspect repositories, read files and directories, read full issue and pull request content (bodies, diffs, comments), and list or inspect commits with their diffs
 
 When helping:
 - Always use real data from tools, never guess or fabricate
@@ -38,6 +46,13 @@ const githubAgent = createAgent({
     createPullRequest,
     getPullRequest,
     mergePullRequest,
+    listRepos,
+    getRepo,
+    getFileContent,
+    getIssue,
+    getPullRequestContent,
+    listCommits,
+    getCommit,
   ],
 });
 
@@ -55,12 +70,12 @@ export const githubTool = tool(
   {
     name: 'github',
     description:
-      'Fetch GitHub data (open PRs, assigned issues, recent pushes) or manage issues (create, close, delete).',
+      'Fetch GitHub data (open PRs, assigned issues, recent pushes), read content (repos, files, issue/PR content, commits and their diffs), or manage issues and pull requests (create, close, delete, merge).',
     schema: z.object({
       query: z
         .string()
         .describe(
-          "Natural language request for GitHub operations (e.g., 'List my open PRs', 'Create an issue in second-brain titled Fix login bug', 'What did I push today?')",
+          "Natural language request for GitHub operations (e.g., 'List my open PRs', 'Show the README of second-brain', 'What's in issue #3?', 'Summarize the changes in PR #24', 'Show the last 5 commits on main')",
         ),
     }),
   },
