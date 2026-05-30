@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as WorkflowsRouteImport } from './routes/workflows'
+import { Route as VoiceRouteImport } from './routes/voice'
 import { Route as MemoriesRouteImport } from './routes/memories'
 import { Route as ConnectionsRouteImport } from './routes/connections'
 import { Route as IndexRouteImport } from './routes/index'
@@ -19,6 +20,11 @@ import { Route as WorkflowsWorkflowIdRouteImport } from './routes/workflows.$wor
 const WorkflowsRoute = WorkflowsRouteImport.update({
   id: '/workflows',
   path: '/workflows',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VoiceRoute = VoiceRouteImport.update({
+  id: '/voice',
+  path: '/voice',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MemoriesRoute = MemoriesRouteImport.update({
@@ -51,6 +57,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/connections': typeof ConnectionsRoute
   '/memories': typeof MemoriesRoute
+  '/voice': typeof VoiceRoute
   '/workflows': typeof WorkflowsRouteWithChildren
   '/workflows/$workflowId': typeof WorkflowsWorkflowIdRoute
   '/workflows/': typeof WorkflowsIndexRoute
@@ -59,6 +66,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/connections': typeof ConnectionsRoute
   '/memories': typeof MemoriesRoute
+  '/voice': typeof VoiceRoute
   '/workflows/$workflowId': typeof WorkflowsWorkflowIdRoute
   '/workflows': typeof WorkflowsIndexRoute
 }
@@ -67,6 +75,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/connections': typeof ConnectionsRoute
   '/memories': typeof MemoriesRoute
+  '/voice': typeof VoiceRoute
   '/workflows': typeof WorkflowsRouteWithChildren
   '/workflows/$workflowId': typeof WorkflowsWorkflowIdRoute
   '/workflows/': typeof WorkflowsIndexRoute
@@ -77,6 +86,7 @@ export interface FileRouteTypes {
     | '/'
     | '/connections'
     | '/memories'
+    | '/voice'
     | '/workflows'
     | '/workflows/$workflowId'
     | '/workflows/'
@@ -85,6 +95,7 @@ export interface FileRouteTypes {
     | '/'
     | '/connections'
     | '/memories'
+    | '/voice'
     | '/workflows/$workflowId'
     | '/workflows'
   id:
@@ -92,6 +103,7 @@ export interface FileRouteTypes {
     | '/'
     | '/connections'
     | '/memories'
+    | '/voice'
     | '/workflows'
     | '/workflows/$workflowId'
     | '/workflows/'
@@ -101,6 +113,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ConnectionsRoute: typeof ConnectionsRoute
   MemoriesRoute: typeof MemoriesRoute
+  VoiceRoute: typeof VoiceRoute
   WorkflowsRoute: typeof WorkflowsRouteWithChildren
 }
 
@@ -111,6 +124,13 @@ declare module '@tanstack/react-router' {
       path: '/workflows'
       fullPath: '/workflows'
       preLoaderRoute: typeof WorkflowsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/voice': {
+      id: '/voice'
+      path: '/voice'
+      fullPath: '/voice'
+      preLoaderRoute: typeof VoiceRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/memories': {
@@ -169,6 +189,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ConnectionsRoute: ConnectionsRoute,
   MemoriesRoute: MemoriesRoute,
+  VoiceRoute: VoiceRoute,
   WorkflowsRoute: WorkflowsRouteWithChildren,
 }
 export const routeTree = rootRouteImport

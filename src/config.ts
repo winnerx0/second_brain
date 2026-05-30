@@ -30,6 +30,13 @@ const envSchema = z.object({
   APP_URL: z.string().min(1).default('http://localhost:3001'),
   XAI_API_KEY: z.string().min(1),
   TAVILY_API_KEY: z.string().min(1),
+  // Voice (Deepgram Voice Agent API)
+  DEEPGRAM_API_KEY: z.string().optional(),
+  // Shared secret the voice LLM adapter requires from Deepgram's think endpoint calls
+  VOICE_LLM_SECRET: z.string().optional(),
+  // Public base URL Deepgram's servers use to reach the think endpoint.
+  // In dev this is a tunnel (cloudflared/ngrok) to the local backend.
+  PUBLIC_API_URL: z.string().optional(),
 });
 
 export const config = envSchema.parse(env);

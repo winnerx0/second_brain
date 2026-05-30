@@ -27,7 +27,13 @@ import {
   OAUTH_CONFIGS,
 } from './oauth.js';
 import { config } from './config.js';
+import { voiceLlmHandler } from './voice/llm-adapter.js';
+import { createVoiceBridge } from './voice/proxy.js';
+import { createBunWebSocket } from 'hono/bun';
 import { kiviaHonoMiddleware } from '@kivia/sdk';
+
+const { upgradeWebSocket, websocket } = createBunWebSocket();
+export { websocket };
 const API_KEY_CONNECTIONS = new Set(['clickup']);
 const REMOVED_CONNECTIONS = new Set(['linkedin']);
 // MCP OAuth imports - disabled, using traditional OAuth instead
@@ -942,5 +948,49 @@ app.post('/workflows/:id/run', async (c) => {
     return c.json({ error: 'Failed to run workflow' }, 500);
   }
 });
+
+/* ─── Voice (Deepgram Voice Agent) ──────────────────────────────────────────── */
+
+// Lets the voice screen know whether voice is usable before connecting.
+app.get('/voice/config', (c) => {
+  return c.json({
+    enabled: Boolean(config.DEEPGRAM_API_KEY),
+    publicApiConfigured: Boolean(config.PUBLIC_API_URL),
+  });
+});
+
+// Browser <-> Deepgram Voice Agent proxy. We hold the authenticated Deepgram
+// connection (the long-lived key never reaches the browser), and the Settings
+// message — including the think-endpoint secret — is built server-side.
+app.get(
+  '/voice/agent',
+  upgradeWebSocket((c) => {
+    const sessionIdRaw = c.req.query('sessionId');
+    const sessionId = sessionIdRaw ? Number(sessionIdRaw) : undefined;
+    const bridge = createVoiceBridge(sessionId);
+
+    return {
+      onOpen(_evt, ws) {
+        bridge.onClientOpen({
+          send: (data) => ws.send(data as never),
+          close: (code, reason) => ws.close(code, reason),
+        });
+      },
+      onMessage(evt) {
+        bridge.onClientMessage(
+          evt.data as string | ArrayBuffer | Uint8Array,
+        );
+      },
+      onClose() {
+        bridge.onClientClose();
+      },
+    };
+  }),
+);
+
+// OpenAI-compatible "think" endpoint Deepgram calls server-to-server.
+// Aliased with /v1 in case Deepgram appends the version segment.
+app.post('/voice/llm/chat/completions', voiceLlmHandler);
+app.post('/voice/llm/v1/chat/completions', voiceLlmHandler);
 
 export default app;
