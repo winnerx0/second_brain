@@ -37,9 +37,9 @@ export interface VoiceCallbacks {
 
 /** Noise-gate tuning. Higher threshold = less sensitive to background noise. */
 export interface NoiseGateOptions {
-  /** RMS level (0–1) that must be exceeded to open the gate. Default 0.022. */
+  /** RMS level (0–1) that must be exceeded to open the gate. Default 0.045. */
   openThreshold?: number;
-  /** RMS level the signal must fall below to start closing. Default 0.012. */
+  /** RMS level the signal must fall below to start closing. Default 0.025. */
   closeThreshold?: number;
   /** How long (ms) the gate stays open after speech drops. Default 700. */
   holdMs?: number;
@@ -113,8 +113,8 @@ export class VoiceSession {
     const source = this.inputCtx.createMediaStreamSource(this.stream);
     this.worklet = new AudioWorkletNode(this.inputCtx, 'recorder-processor', {
       processorOptions: {
-        openThreshold: this.gate.openThreshold ?? 0.022,
-        closeThreshold: this.gate.closeThreshold ?? 0.012,
+        openThreshold: this.gate.openThreshold ?? 0.045,
+        closeThreshold: this.gate.closeThreshold ?? 0.025,
         holdMs: this.gate.holdMs ?? 700,
         prerollMs: this.gate.prerollMs ?? 200,
       },

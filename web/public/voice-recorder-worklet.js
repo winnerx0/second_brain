@@ -21,8 +21,8 @@ class RecorderProcessor extends AudioWorkletProcessor {
   constructor(options) {
     super();
     const o = (options && options.processorOptions) || {};
-    this._openThreshold = o.openThreshold ?? 0.022;
-    this._closeThreshold = o.closeThreshold ?? 0.012;
+    this._openThreshold = o.openThreshold ?? 0.045;
+    this._closeThreshold = o.closeThreshold ?? 0.025;
     this._holdSamples = Math.round(((o.holdMs ?? 700) / 1000) * sampleRate);
     this._prerollSamples = Math.round(
       ((o.prerollMs ?? 200) / 1000) * sampleRate,

@@ -24,7 +24,7 @@ function buildSettings(sessionId: number | undefined) {
             : {},
         },
       },
-      speak: { provider: { type: 'deepgram', model: 'aura-2-thalia-en' } },
+      speak: { provider: { type: 'deepgram', model: 'aura-2-amalthea-en' } },
       greeting: "Hey, I'm Aira. What's on your mind?",
     },
   };
