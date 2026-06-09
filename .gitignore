@@ -1,6 +1,7 @@
 .env
 service_account.json
 /node_modules
+/backend/node_modules
 .config
 dist/
 /web/node_modules

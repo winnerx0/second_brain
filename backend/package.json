@@ -6,9 +6,9 @@
   "scripts": {
     "dev": "bun run --hot src/index.ts",
     "start": "bun run dist/index.js",
-    "web:dev": "bun --cwd web run dev",
-    "web:build": "bun --cwd web run build",
-    "web:preview": "bun --cwd web run preview",
+    "web:dev": "bun --cwd ../web run dev",
+    "web:build": "bun --cwd ../web run build",
+    "web:preview": "bun --cwd ../web run preview",
     "db:generate": "bunx drizzle-kit generate",
     "db:migrate": "bunx drizzle-kit migrate",
     "db:studio": "bunx drizzle-kit studio",

@@ -5,9 +5,12 @@ import { tool } from 'langchain';
 import { z } from 'zod';
 import { logger } from '../logger.js';
 
+type SkillType = 'workflow' | 'personality' | 'context';
+
 type Skill = {
   name: string;
   description: string;
+  type: SkillType;
   body: string;
   filePath: string;
 };
@@ -57,9 +60,14 @@ async function loadSkill(filePath: string): Promise<Skill | null> {
     return null;
   }
 
+  const rawType = metadata.type?.trim().toLowerCase();
+  const type: SkillType =
+    rawType === 'personality' || rawType === 'context' ? rawType : 'workflow';
+
   return {
     name,
     description,
+    type,
     body,
     filePath,
   };
@@ -110,16 +118,34 @@ export async function buildSkillsSystemPrompt(): Promise<string> {
   const skills = await loadSkills();
   if (skills.length === 0) return '';
 
-  const catalog = skills
-    .map((skill) => `- ${skill.name}: ${skill.description}`)
-    .join('\n');
+  const parts: string[] = [];
 
-  return `Skills:
+  const personalitySkills = skills.filter((s) => s.type === 'personality');
+  const contextSkills = skills.filter((s) => s.type === 'context');
+  const workflowSkills = skills.filter((s) => s.type === 'workflow');
+
+  for (const skill of personalitySkills) {
+    parts.push(skill.body);
+  }
+
+  for (const skill of contextSkills) {
+    parts.push(`## ${skill.name}\n${skill.body}`);
+  }
+
+  if (workflowSkills.length > 0) {
+    const catalog = workflowSkills
+      .map((skill) => `- ${skill.name}: ${skill.description}`)
+      .join('\n');
+
+    parts.push(`Skills:
 The user can add project-local skills as skills/<skill-name>/SKILL.md. A skill is a named workflow or domain guide.
 Available skills:
 ${catalog}
 
-When a request clearly matches a skill description, call read_skill with that skill name before acting. Use only the relevant skill body; do not mention skills or internal routing to the user.`;
+When a request clearly matches a skill description, call read_skill with that skill name before acting. Use only the relevant skill body; do not mention skills or internal routing to the user.`);
+  }
+
+  return parts.join('\n\n');
 }
 
 export const listSkills = tool(
@@ -128,6 +154,7 @@ export const listSkills = tool(
     return JSON.stringify(
       skills.map((skill) => ({
         name: skill.name,
+        type: skill.type,
         description: skill.description,
       })),
     );

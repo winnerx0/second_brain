@@ -3,17 +3,6 @@ import { handleMessage } from '../agent.js';
 import { config } from '../config.js';
 import { logger } from '../logger.js';
 
-/**
- * OpenAI-compatible chat-completions endpoint used as Deepgram's Voice Agent
- * "bring-your-own-LLM" (think) provider.
- *
- * Deepgram's servers POST here with the standard OpenAI request body. We ignore
- * the supplied conversation (Aira reloads its own history from the DB by
- * sessionId — the single source of truth) and only take the latest user turn,
- * run the full Aira agent via handleMessage, and stream the reply back as
- * OpenAI chat.completion.chunk SSE so Deepgram can speak it.
- */
-
 type OpenAIMessage = { role: string; content: unknown };
 type OpenAIRequest = { messages?: OpenAIMessage[]; stream?: boolean };
 
@@ -51,7 +40,7 @@ function chunk(content: string | null, finish: 'stop' | null): string {
 }
 
 export async function voiceLlmHandler(c: Context): Promise<Response> {
-  // Auth: Deepgram includes the header we configured in the Settings message.
+
   if (config.VOICE_LLM_SECRET) {
     const auth = c.req.header('authorization');
     if (auth !== `Bearer ${config.VOICE_LLM_SECRET}`) {
