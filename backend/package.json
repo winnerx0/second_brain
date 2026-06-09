@@ -5,6 +5,7 @@
   "private": true,
   "scripts": {
     "dev": "bun run --hot src/index.ts",
+    "build": "bun build --target=bun --production --outfile=dist/index.js --minify ./src/index.ts",
     "start": "bun run dist/index.js",
     "web:dev": "bun --cwd ../web run dev",
     "web:build": "bun --cwd ../web run build",
