@@ -23,19 +23,6 @@ interface SearchItem {
   created_at: string;
 }
 
-interface EventItem {
-  type: string;
-  repo: { name: string };
-  created_at: string;
-  payload: {
-    commits?: Array<{ message: string }>;
-    size?: number;
-    head?: string;
-    before?: string;
-    ref?: string;
-  };
-}
-
 export const getOpenPRs = tool(
   async () => {
     try {
@@ -99,70 +86,6 @@ export const getAssignedIssues = tool(
   {
     name: 'get_assigned_issues',
     description: 'Get all open issues assigned to the user.',
-    schema: z.object({}),
-  },
-);
-
-export const getRecentPushes = tool(
-  async () => {
-    try {
-      const headers = await getHeaders();
-      const res = await fetch(
-        `https://api.github.com/users/${config.GITHUB_USERNAME}/events?per_page=100`,
-        { headers },
-      );
-      const events = (await res.json()) as EventItem[];
-      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-
-      const pushEvents = events.filter(
-        (e) => e.type === 'PushEvent' && new Date(e.created_at) > oneDayAgo,
-      );
-
-      const pushes = await Promise.all(
-        pushEvents.map(async (e) => {
-          let commits: string[] =
-            e.payload.commits?.map((c) => c.message) ?? [];
-
-          if (commits.length === 0 && e.payload.head && e.payload.before) {
-            try {
-              const compareRes = await fetch(
-                `https://api.github.com/repos/${e.repo.name}/compare/${e.payload.before}...${e.payload.head}`,
-                {
-                  headers,
-                },
-              );
-              const compareData = (await compareRes.json()) as {
-                commits?: Array<{
-                  commit: {
-                    message: string;
-                  };
-                }>;
-              };
-              commits = compareData.commits?.map((c) => c.commit.message) ?? [];
-            } catch {
-              // keep empty
-            }
-          }
-
-          return {
-            repo: e.repo.name,
-            pushedAt: e.created_at,
-            commitCount: e.payload.size ?? commits.length,
-            commits,
-          };
-        }),
-      );
-
-      return JSON.stringify(pushes);
-    } catch (error) {
-      logger.error('[github]', error);
-      return `Error fetching recent pushes: ${error instanceof Error ? error.message : String(error)}`;
-    }
-  },
-  {
-    name: 'get_recent_pushes',
-    description:
-      'Get repos the user pushed to in the last 24 hours, with commit counts and commit messages.',
     schema: z.object({}),
   },
 );
@@ -588,12 +511,11 @@ export const getCommits = tool(
       const commitAuthor = author ?? config.GITHUB_USERNAME;
       const qualifiers = [`author:${commitAuthor}`];
 
-      if (from || to) {
-        // GitHub's author-date qualifier accepts open-ended ranges with "*".
-        const start = from ?? '*';
-        const end = to ?? '*';
-        qualifiers.push(`author-date:${start}..${end}`);
-      }
+      // Default to the last 24 hours when no range is given.
+      const start =
+        from ?? (to ? '*' : new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+      const end = to ?? '*';
+      qualifiers.push(`author-date:${start}..${end}`);
 
       if (repo) {
         const repoOwner = owner ?? config.GITHUB_USERNAME;
@@ -642,13 +564,13 @@ export const getCommits = tool(
   {
     name: 'get_commits',
     description:
-      'Get commits authored by the user within a date/time range, optionally scoped to a single repo. Returns up to 100 commits, newest first.',
+      "Get commits authored by the user, with full commit messages, within a date/time range and optionally scoped to a single repo. Defaults to the user's commits across all their repos in the last 24 hours. Returns up to 100 commits, newest first.",
     schema: z.object({
       from: z
         .string()
         .optional()
         .describe(
-          'Start of the range (inclusive) as an ISO 8601 date or datetime, e.g. "2026-06-01" or "2026-06-01T09:00:00+00:00". Omit for no lower bound.',
+          'Start of the range (inclusive) as an ISO 8601 date or datetime, e.g. "2026-06-01" or "2026-06-01T09:00:00+00:00". If both from and to are omitted, defaults to 24 hours ago.',
         ),
       to: z
         .string()
@@ -659,7 +581,7 @@ export const getCommits = tool(
       repo: z
         .string()
         .optional()
-        .describe('Repository name to scope to (e.g. "second-brain"). Omit to search all repos.'),
+        .describe('Repository name to scope to (e.g. "second-brain"). Omit to search all of the user\'s repos.'),
       owner: z
         .string()
         .optional()
@@ -675,7 +597,6 @@ export const getCommits = tool(
 export const githubTools = [
   getOpenPRs,
   getAssignedIssues,
-  getRecentPushes,
   createIssue,
   closeIssue,
   deleteIssue,

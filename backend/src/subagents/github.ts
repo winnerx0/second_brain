@@ -4,7 +4,7 @@ import { model } from '../shared.js';
 import {
   getOpenPRs,
   getAssignedIssues,
-  getRecentPushes,
+  getCommits,
   createIssue,
   closeIssue,
   deleteIssue,
@@ -17,7 +17,7 @@ import { streamSubAgent } from './utils.js';
 const GITHUB_SYSTEM_PROMPT = `You are a GitHub Assistant with access to the user's GitHub account.
 
 You can:
-- Fetch open pull requests, assigned issues, and recent pushes
+- Fetch open pull requests, assigned issues, and commits (with full messages) in any date/time range — defaults to the last 24 hours
 - Create, close, and delete issues
 
 When helping:
@@ -31,7 +31,7 @@ const githubAgent = createAgent({
   tools: [
     getOpenPRs,
     getAssignedIssues,
-    getRecentPushes,
+    getCommits,
     createIssue,
     closeIssue,
     deleteIssue,
@@ -55,7 +55,7 @@ export const githubTool = tool(
   {
     name: 'github',
     description:
-      'Fetch GitHub data (open PRs, assigned issues, recent pushes) or manage issues (create, close, delete).',
+      'Fetch GitHub data (open PRs, assigned issues, commits in any date/time range) or manage issues (create, close, delete).',
     schema: z.object({
       query: z
         .string()
