@@ -571,6 +571,107 @@ export const mergePullRequest = tool(
   },
 );
 
+interface CommitSearchItem {
+  sha: string;
+  html_url: string;
+  commit: {
+    message: string;
+    author: { name: string; date: string };
+  };
+  repository: { full_name: string };
+  author?: { login: string };
+}
+
+export const getCommits = tool(
+  async ({ from, to, repo, owner, author }) => {
+    try {
+      const commitAuthor = author ?? config.GITHUB_USERNAME;
+      const qualifiers = [`author:${commitAuthor}`];
+
+      if (from || to) {
+        // GitHub's author-date qualifier accepts open-ended ranges with "*".
+        const start = from ?? '*';
+        const end = to ?? '*';
+        qualifiers.push(`author-date:${start}..${end}`);
+      }
+
+      if (repo) {
+        const repoOwner = owner ?? config.GITHUB_USERNAME;
+        qualifiers.push(`repo:${repoOwner}/${repo}`);
+      }
+
+      const query = encodeURIComponent(qualifiers.join(' '));
+      const res = await fetch(
+        `https://api.github.com/search/commits?q=${query}&sort=author-date&order=desc&per_page=100`,
+        { headers: await getHeaders() },
+      );
+
+      if (!res.ok) {
+        const err = await res.text();
+        return `Failed to fetch commits (${res.status}): ${err}`;
+      }
+
+      const data = (await res.json()) as {
+        total_count?: number;
+        items?: CommitSearchItem[];
+      };
+
+      const items = data.items ?? [];
+      logger.info(
+        `[github] fetched ${items.length} commits (total ${data.total_count ?? 0})`,
+      );
+
+      return JSON.stringify({
+        totalCount: data.total_count ?? items.length,
+        commits: items.map((item) => ({
+          sha: item.sha.slice(0, 7),
+          message: item.commit.message,
+          repo: item.repository.full_name,
+          author: item.author?.login ?? item.commit.author.name,
+          date: item.commit.author.date,
+          url: item.html_url,
+        })),
+      });
+    } catch (error) {
+      logger.error('[github]', error);
+      return `Error fetching commits: ${
+        error instanceof Error ? error.message : String(error)
+      }`;
+    }
+  },
+  {
+    name: 'get_commits',
+    description:
+      'Get commits authored by the user within a date/time range, optionally scoped to a single repo. Returns up to 100 commits, newest first.',
+    schema: z.object({
+      from: z
+        .string()
+        .optional()
+        .describe(
+          'Start of the range (inclusive) as an ISO 8601 date or datetime, e.g. "2026-06-01" or "2026-06-01T09:00:00+00:00". Omit for no lower bound.',
+        ),
+      to: z
+        .string()
+        .optional()
+        .describe(
+          'End of the range (inclusive) as an ISO 8601 date or datetime, e.g. "2026-06-14" or "2026-06-14T17:30:00+00:00". Omit for no upper bound.',
+        ),
+      repo: z
+        .string()
+        .optional()
+        .describe('Repository name to scope to (e.g. "second-brain"). Omit to search all repos.'),
+      owner: z
+        .string()
+        .optional()
+        .describe('Repo owner — only used with "repo". Omit to use your own username.'),
+      author: z
+        .string()
+        .optional()
+        .describe('Commit author username. Omit to use your own username.'),
+    }),
+  },
+);
+
 export const githubTools = [
   getOpenPRs,
   getAssignedIssues,
@@ -581,4 +682,5 @@ export const githubTools = [
   createPullRequest,
   getPullRequest,
   mergePullRequest,
+  getCommits,
 ];
