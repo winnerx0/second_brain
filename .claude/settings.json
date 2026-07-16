@@ -6,7 +6,12 @@
       "Read(//home/winner/**)",
       "mcp__plugin_playwright_playwright__browser_click",
       "mcp__plugin_playwright_playwright__browser_close",
-      "Bash(grep -n \"#[0-9a-fA-F]\\\\{3,6\\\\}\\\\|rgb\\(\" /home/winner/Documents/projects/second_brain/web/src/styles.css)"
+      "Bash(grep -n \"#[0-9a-fA-F]\\\\{3,6\\\\}\\\\|rgb\\(\" /home/winner/Documents/projects/second_brain/web/src/styles.css)",
+      "Bash(bun -e ' *)",
+      "Bash(curl -s localhost:3005/health)",
+      "Bash(curl -s localhost:3005/memories)",
+      "Bash(curl -s \"localhost:3005/graph\")",
+      "Bash(curl -s -X POST localhost:3005/graph/maintenance -H 'Content-Type: application/json' -d '{\"dryRun\":true}')"
     ]
   }
 }

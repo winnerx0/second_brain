@@ -5,7 +5,7 @@ import { db } from '../db/client.js';
 import { graphEdges, graphNodes } from '../db/schema.js';
 import { logger } from '../logger.js';
 
-type NodeKind =
+export type NodeKind =
   | 'person'
   | 'project'
   | 'document'
@@ -14,7 +14,7 @@ type NodeKind =
   | 'topic'
   | 'other';
 
-const NODE_KIND_VALUES = [
+export const NODE_KIND_VALUES = [
   'person',
   'project',
   'document',
@@ -24,15 +24,16 @@ const NODE_KIND_VALUES = [
   'other',
 ] as const;
 
-function normalizeName(value: string): string {
+export function normalizeName(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, ' ');
 }
 
-async function ensureNode(params: {
+export async function ensureNode(params: {
   name: string;
   kind: NodeKind;
   aliases?: string[];
   metadata?: Record<string, unknown>;
+  source?: string;
 }) {
   const normalizedName = normalizeName(params.name);
   const [existing] = await db
@@ -81,13 +82,14 @@ async function ensureNode(params: {
       normalizedName,
       aliases: (params.aliases ?? []).map((a) => a.trim()).filter(Boolean),
       metadata: params.metadata ?? {},
+      source: params.source,
     })
     .returning();
 
   return created!;
 }
 
-async function resolveNodeId(
+export async function resolveNodeId(
   name: string,
   kind?: NodeKind,
 ): Promise<number | null> {

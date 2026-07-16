@@ -91,6 +91,25 @@ function MemoriesIcon() {
   );
 }
 
+function GraphIcon() {
+  return (
+    <svg
+      width="12"
+      height="12"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+    >
+      <circle cx="5" cy="6" r="2.5" />
+      <circle cx="19" cy="6" r="2.5" />
+      <circle cx="12" cy="18" r="2.5" />
+      <path d="M7 7.5 10.5 16M17 7.5 13.5 16M6.7 6h10.6" />
+    </svg>
+  );
+}
+
 function ConnectionsIcon() {
   return (
     <svg
@@ -211,6 +230,15 @@ export function AppSidebar({ children, onNewChat }: AppSidebarProps) {
         >
           <MemoriesIcon />
           Memories
+        </Link>
+
+        <Link
+          to="/graph"
+          className="sidebar-nav-item"
+          activeProps={{ className: 'sidebar-nav-item active' }}
+        >
+          <GraphIcon />
+          Graph
         </Link>
 
         <Link

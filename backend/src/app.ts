@@ -8,17 +8,19 @@ import {
 } from './agent.js';
 import { sendTelegramMessage } from './delivery/telegram.js';
 import { runMemoryCleanup } from './memory-cleanup.js';
+import { runMaintenance } from './memory/heal.js';
 import { logger } from './logger.js';
 import { db } from './db/client.js';
 import {
   chatHistory,
   chatSessions,
-  memories,
+  graphNodes,
+  graphEdges,
   connections,
   workflows,
   workflowRuns,
 } from './db/schema.js';
-import { asc, desc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq } from 'drizzle-orm';
 import {
   buildAuthUrl,
   handleCallback,
@@ -95,6 +97,15 @@ app.use('*', cors({ origin: [config.APP_URL] }));
 const kivia = kiviaHonoMiddleware({ apiKey: config.KIVIA_API_KEY });
 
 app.use(kivia);
+
+import { olusoExpress } from 'oluso';
+
+const oluso = olusoExpress({
+  apiKey: process.env.OLUSO_API_KEY,
+  environment: 'development',
+});
+
+app.use(oluso.requestHandler);
 
 app.get('/health', (c) => {
   return c.json({ status: 'ok', timestamp: Date.now() });
@@ -221,17 +232,18 @@ app.get('/memories', async (c) => {
   try {
     const rows = await db
       .select({
-        id: memories.id,
-        key: memories.key,
-        value: memories.value,
-        classification: memories.classification,
-        tier: memories.tier,
-        importance: memories.importance,
-        createdAt: memories.createdAt,
-        updatedAt: memories.updatedAt,
+        id: graphNodes.id,
+        key: graphNodes.key,
+        value: graphNodes.value,
+        classification: graphNodes.classification,
+        tier: graphNodes.tier,
+        importance: graphNodes.importance,
+        createdAt: graphNodes.createdAt,
+        updatedAt: graphNodes.updatedAt,
       })
-      .from(memories)
-      .orderBy(desc(memories.updatedAt));
+      .from(graphNodes)
+      .where(and(eq(graphNodes.kind, 'memory'), eq(graphNodes.status, 'active')))
+      .orderBy(desc(graphNodes.updatedAt));
 
     return c.json({ memories: rows });
   } catch (error) {
@@ -261,9 +273,9 @@ app.patch('/memories/:id', async (c) => {
     if (!value) return c.json({ error: 'value is required' }, 400);
 
     const [updated] = await db
-      .update(memories)
+      .update(graphNodes)
       .set({ value, updatedAt: new Date() })
-      .where(eq(memories.id, id))
+      .where(and(eq(graphNodes.id, id), eq(graphNodes.kind, 'memory')))
       .returning();
 
     if (!updated) return c.json({ error: 'Memory not found' }, 404);
@@ -288,9 +300,9 @@ app.delete('/memories/:id', async (c) => {
 
   try {
     const result = await db
-      .delete(memories)
-      .where(eq(memories.id, id))
-      .returning({ id: memories.id });
+      .delete(graphNodes)
+      .where(and(eq(graphNodes.id, id), eq(graphNodes.kind, 'memory')))
+      .returning({ id: graphNodes.id });
     if (result.length === 0) return c.json({ error: 'Memory not found' }, 404);
     return c.json({ success: true });
   } catch (error) {
@@ -780,6 +792,99 @@ app.post('/cron/briefing', async (c) => {
   }
 });
 
+app.post('/cron/maintenance', async (c) => {
+  if (!authorizeCron(c)) return c.json({ error: 'Unauthorized' }, 401);
+
+  try {
+    logger.info('Running memory-graph maintenance via cron endpoint');
+    const summary = await runMaintenance();
+    return c.json({ success: true, summary });
+  } catch (error) {
+    logger.error('[cron.maintenance]', error);
+    return c.json(
+      { error: error instanceof Error ? error.message : 'Maintenance failed' },
+      500,
+    );
+  }
+});
+
+/* ─── Memory graph ───────────────────────────────────────────────────────── */
+
+app.get('/graph', async (c) => {
+  try {
+    const kind = c.req.query('kind');
+    const status = c.req.query('status') ?? 'active';
+
+    const conditions = [] as ReturnType<typeof eq>[];
+    if (status !== 'all') conditions.push(eq(graphNodes.status, status));
+    if (kind) conditions.push(eq(graphNodes.kind, kind));
+
+    const nodes = await db
+      .select({
+        id: graphNodes.id,
+        kind: graphNodes.kind,
+        name: graphNodes.name,
+        key: graphNodes.key,
+        value: graphNodes.value,
+        classification: graphNodes.classification,
+        tier: graphNodes.tier,
+        importance: graphNodes.importance,
+        status: graphNodes.status,
+        recallCount: graphNodes.recallCount,
+        source: graphNodes.source,
+        confidence: graphNodes.confidence,
+      })
+      .from(graphNodes)
+      .where(conditions.length ? and(...conditions) : undefined);
+
+    const nodeIds = new Set(nodes.map((n) => n.id));
+    const allEdges = await db
+      .select({
+        id: graphEdges.id,
+        fromNodeId: graphEdges.fromNodeId,
+        toNodeId: graphEdges.toNodeId,
+        relation: graphEdges.relation,
+        weight: graphEdges.weight,
+        confidence: graphEdges.confidence,
+        createdBy: graphEdges.createdBy,
+      })
+      .from(graphEdges);
+    // Only return edges whose endpoints are both in the returned node set.
+    const edges = allEdges.filter(
+      (e) => nodeIds.has(e.fromNodeId) && nodeIds.has(e.toNodeId),
+    );
+
+    return c.json({ nodes, edges });
+  } catch (error) {
+    logger.error('[graph]', error);
+    return c.json(
+      { error: error instanceof Error ? error.message : 'Failed to load graph' },
+      500,
+    );
+  }
+});
+
+app.post('/graph/maintenance', async (c) => {
+  let body: { dryRun?: unknown } = {};
+  try {
+    body = await c.req.json();
+  } catch {
+    // empty body is fine
+  }
+  const dryRun = Boolean(body.dryRun);
+
+  try {
+    const summary = await runMaintenance({ dryRun });
+    return c.json({ dryRun, summary });
+  } catch (error) {
+    logger.error('[graph.maintenance]', error);
+    return c.json(
+      { error: error instanceof Error ? error.message : 'Maintenance failed' },
+      500,
+    );
+  }
+});
+
 /* ─── Workflows ──────────────────────────────────────────────────────────── */
 
 app.get('/workflows', async (c) => {
@@ -992,5 +1097,7 @@ app.get(
 // Aliased with /v1 in case Deepgram appends the version segment.
 app.post('/voice/llm/chat/completions', voiceLlmHandler);
 app.post('/voice/llm/v1/chat/completions', voiceLlmHandler);
+
+app.use(oluso.errorHandler);
 
 export default app;

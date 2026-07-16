@@ -14,6 +14,8 @@ import {
   deleteMemoryKey,
   recallMemories,
 } from './tools/memory.js';
+import { consolidateConversation } from './memory/learn.js';
+import { buildRecallContext } from './memory/context.js';
 import { db } from './db/client.js';
 import { agentRuns, chatHistory, chatSessions } from './db/schema.js';
 import { desc, eq, isNull } from 'drizzle-orm';
@@ -21,6 +23,7 @@ import { sendTelegramMessage } from './delivery/telegram.js';
 const env = process.env;
 import { logger } from './logger.js';
 import { getCurrentDateTime } from './tools/miscellaneous.js';
+import { resilientTool } from './tools/resilient.js';
 import { buildSkillsSystemPrompt, skillTools } from './tools/skills.js';
 import { sendTelegramBotMessage } from './tools/telegram.js';
 import { githubTool } from './subagents/github.js';
@@ -77,7 +80,8 @@ const tools = [
   spotifyTool,
   twitterTool,
   tavilyTool,
-];
+  // Wrap every tool so transient failures auto-retry and errors come back uniformly.
+].map((t) => resilientTool(t as never));
 
 const mainAgent = createAgent({
   model,
@@ -402,7 +406,14 @@ export async function handleMessage(
     }
   }
 
-  const systemPrompt = await withSkillsPrompt(CHAT_SYSTEM_PROMPT);
+  const basePrompt = await withSkillsPrompt(CHAT_SYSTEM_PROMPT);
+
+  // Proactive recall: surface the most relevant memories + their graph neighbours so
+  // Aira answers from what she already knows without needing an explicit recall call.
+  const recallContext = await buildRecallContext(text);
+  const systemPrompt = recallContext
+    ? `${basePrompt}\n\n${recallContext}`
+    : basePrompt;
 
   logger.info(
     `[chat] estimated input tokens: ${countTokens(systemPrompt + text)}`,
@@ -556,6 +567,16 @@ export async function handleMessage(
   logger.info(`[chat] reply: ${reply}`);
 
   await emitEvent(options.onEvent, { type: 'final', text: reply });
+
+  // Self-learn: consolidate this turn into the memory graph in the background so it
+  // never adds latency to the chat response.
+  if (reply.trim().length > 0) {
+    void consolidateConversation({
+      userText: text,
+      assistantText: reply,
+      sessionId: options.sessionId ?? null,
+    }).catch((error) => logger.error('[chat.consolidate] failed', error));
+  }
 
   return reply;
 }

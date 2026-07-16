@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as WorkflowsRouteImport } from './routes/workflows'
 import { Route as VoiceRouteImport } from './routes/voice'
 import { Route as MemoriesRouteImport } from './routes/memories'
+import { Route as GraphRouteImport } from './routes/graph'
 import { Route as ConnectionsRouteImport } from './routes/connections'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as WorkflowsIndexRouteImport } from './routes/workflows.index'
@@ -30,6 +31,11 @@ const VoiceRoute = VoiceRouteImport.update({
 const MemoriesRoute = MemoriesRouteImport.update({
   id: '/memories',
   path: '/memories',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GraphRoute = GraphRouteImport.update({
+  id: '/graph',
+  path: '/graph',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ConnectionsRoute = ConnectionsRouteImport.update({
@@ -56,6 +62,7 @@ const WorkflowsWorkflowIdRoute = WorkflowsWorkflowIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/connections': typeof ConnectionsRoute
+  '/graph': typeof GraphRoute
   '/memories': typeof MemoriesRoute
   '/voice': typeof VoiceRoute
   '/workflows': typeof WorkflowsRouteWithChildren
@@ -65,6 +72,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/connections': typeof ConnectionsRoute
+  '/graph': typeof GraphRoute
   '/memories': typeof MemoriesRoute
   '/voice': typeof VoiceRoute
   '/workflows/$workflowId': typeof WorkflowsWorkflowIdRoute
@@ -74,6 +82,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/connections': typeof ConnectionsRoute
+  '/graph': typeof GraphRoute
   '/memories': typeof MemoriesRoute
   '/voice': typeof VoiceRoute
   '/workflows': typeof WorkflowsRouteWithChildren
@@ -85,6 +94,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/connections'
+    | '/graph'
     | '/memories'
     | '/voice'
     | '/workflows'
@@ -94,6 +104,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/connections'
+    | '/graph'
     | '/memories'
     | '/voice'
     | '/workflows/$workflowId'
@@ -102,6 +113,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/connections'
+    | '/graph'
     | '/memories'
     | '/voice'
     | '/workflows'
@@ -112,6 +124,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ConnectionsRoute: typeof ConnectionsRoute
+  GraphRoute: typeof GraphRoute
   MemoriesRoute: typeof MemoriesRoute
   VoiceRoute: typeof VoiceRoute
   WorkflowsRoute: typeof WorkflowsRouteWithChildren
@@ -138,6 +151,13 @@ declare module '@tanstack/react-router' {
       path: '/memories'
       fullPath: '/memories'
       preLoaderRoute: typeof MemoriesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/graph': {
+      id: '/graph'
+      path: '/graph'
+      fullPath: '/graph'
+      preLoaderRoute: typeof GraphRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/connections': {
@@ -188,6 +208,7 @@ const WorkflowsRouteWithChildren = WorkflowsRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ConnectionsRoute: ConnectionsRoute,
+  GraphRoute: GraphRoute,
   MemoriesRoute: MemoriesRoute,
   VoiceRoute: VoiceRoute,
   WorkflowsRoute: WorkflowsRouteWithChildren,

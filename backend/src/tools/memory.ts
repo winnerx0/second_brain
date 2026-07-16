@@ -1,15 +1,23 @@
 import { tool } from 'langchain';
 import { z } from 'zod';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { logger } from '../logger.js';
 import { OpenAI } from 'openai';
 import { config } from '../config.js';
-import { memories } from '../db/schema.js';
+import { graphNodes } from '../db/schema.js';
 
 const embeddingClient = new OpenAI({ apiKey: config.OPENAI_API_KEY });
 
-const classifications = [
+// Memory facts live in graph_nodes with kind='memory'. This predicate scopes every
+// memory query so entity nodes (person/project/...) are never treated as memories.
+const MEMORY_KIND = 'memory';
+const isActiveMemory = and(
+  eq(graphNodes.kind, MEMORY_KIND),
+  eq(graphNodes.status, 'active'),
+);
+
+export const classifications = [
   'identity',
   'relationships',
   'behavior',
@@ -19,10 +27,10 @@ const classifications = [
   'unclassified',
 ] as const;
 
-type Classification = (typeof classifications)[number];
-type Tier = 'short_term' | 'long_term' | 'lifelong';
+export type Classification = (typeof classifications)[number];
+export type Tier = 'short_term' | 'long_term' | 'lifelong';
 
-const importanceByClassification: Record<Classification, number> = {
+export const importanceByClassification: Record<Classification, number> = {
   identity: 0.9,
   relationships: 0.9,
   behavior: 0.9,
@@ -32,17 +40,17 @@ const importanceByClassification: Record<Classification, number> = {
   unclassified: 0.3,
 };
 
-const lifelongClassifications = new Set<Classification>([
+export const lifelongClassifications = new Set<Classification>([
   'identity',
   'relationships',
   'behavior',
 ]);
 
-function importanceForClassification(classification: Classification): number {
+export function importanceForClassification(classification: Classification): number {
   return importanceByClassification[classification];
 }
 
-function determineTier(classification: Classification): Tier {
+export function determineTier(classification: Classification): Tier {
   const importance = importanceForClassification(classification);
   if (lifelongClassifications.has(classification) && importance >= 0.85) {
     return 'lifelong';
@@ -51,7 +59,7 @@ function determineTier(classification: Classification): Tier {
   return 'short_term';
 }
 
-function inferClassificationFromKey(key: string): Classification {
+export function inferClassificationFromKey(key: string): Classification {
   const k = key.toLowerCase();
   if (/^(identity|user|profile|name|age|birthday|location|job|address)\b/.test(k)) return 'identity';
   if (/^(relationship|family|friend|partner|colleague|manager)\b/.test(k)) return 'relationships';
@@ -62,7 +70,7 @@ function inferClassificationFromKey(key: string): Classification {
   return 'unclassified';
 }
 
-async function embed(input: string): Promise<number[]> {
+export async function embed(input: string): Promise<number[]> {
   const res = await embeddingClient.embeddings.create({
     model: config.EMBEDDING_MODEL,
     input,
@@ -70,7 +78,7 @@ async function embed(input: string): Promise<number[]> {
   return res.data[0]!.embedding;
 }
 
-const RECALL_SIMILARITY_THRESHOLD = 0.6;
+export const RECALL_SIMILARITY_THRESHOLD = 0.6;
 
 export const setMemoryKey = tool(
   async ({ key, value, classification }) => {
@@ -89,40 +97,48 @@ export const setMemoryKey = tool(
       const embedding = await embed(trimmedKey);
 
       const [existing] = await db
-        .select({ id: memories.id })
-        .from(memories)
-        .where(eq(memories.key, trimmedKey))
+        .select({ id: graphNodes.id })
+        .from(graphNodes)
+        .where(and(eq(graphNodes.kind, MEMORY_KIND), eq(graphNodes.key, trimmedKey)))
         .limit(1);
 
       if (existing) {
         await db
-          .update(memories)
+          .update(graphNodes)
           .set({
+            name: trimmedKey,
+            normalizedName: trimmedKey.toLowerCase(),
             value: trimmedValue,
             classification: finalClassification,
             tier,
             importance,
+            status: 'active',
             vector: sql`${JSON.stringify(embedding)}::vector`,
             updatedAt: now,
           })
-          .where(eq(memories.id, existing.id));
+          .where(eq(graphNodes.id, existing.id));
         logger.info(`[memory] updated key=${trimmedKey} (id=${existing.id})`);
         return `Updated memory key="${trimmedKey}"`;
       }
 
       const [inserted] = await db
-        .insert(memories)
+        .insert(graphNodes)
         .values({
+          kind: MEMORY_KIND,
+          name: trimmedKey,
+          normalizedName: trimmedKey.toLowerCase(),
           key: trimmedKey,
           value: trimmedValue,
           classification: finalClassification,
           tier,
           importance,
+          status: 'active',
+          source: 'agent',
           vector: sql`${JSON.stringify(embedding)}::vector`,
           createdAt: now,
           updatedAt: now,
         })
-        .returning({ id: memories.id });
+        .returning({ id: graphNodes.id });
 
       logger.info(`[memory] inserted key=${trimmedKey} (id=${inserted?.id})`);
       return `Stored memory key="${trimmedKey}" (class=${finalClassification}, tier=${tier})`;
@@ -156,9 +172,9 @@ export const deleteMemoryKey = tool(
       if (!trimmed) return 'Error: key is required';
 
       const result = await db
-        .delete(memories)
-        .where(eq(memories.key, trimmed))
-        .returning({ id: memories.id });
+        .delete(graphNodes)
+        .where(and(eq(graphNodes.kind, MEMORY_KIND), eq(graphNodes.key, trimmed)))
+        .returning({ id: graphNodes.id });
 
       if (result.length === 0) {
         return `No memory found with key="${trimmed}"`;
@@ -188,18 +204,31 @@ export const recallMemories = tool(
 
       const rows = await db
         .select({
-          id: memories.id,
-          key: memories.key,
-          value: memories.value,
-          classification: memories.classification,
-          tier: memories.tier,
-          importance: memories.importance,
+          id: graphNodes.id,
+          key: graphNodes.key,
+          value: graphNodes.value,
+          classification: graphNodes.classification,
+          tier: graphNodes.tier,
+          importance: graphNodes.importance,
           distance: distanceExpr.as('distance'),
         })
-        .from(memories)
-        .where(sql`${distanceExpr} <= ${maxDistance}`)
+        .from(graphNodes)
+        .where(and(isActiveMemory, sql`vector IS NOT NULL`, sql`${distanceExpr} <= ${maxDistance}`))
         .orderBy(distanceExpr)
         .limit(8);
+
+      // Reinforce: bump recall bookkeeping + importance for nodes that were just used.
+      if (rows.length > 0) {
+        const ids = rows.map((r) => r.id);
+        await db
+          .update(graphNodes)
+          .set({
+            recallCount: sql`${graphNodes.recallCount} + 1`,
+            lastRecalledAt: new Date(),
+            importance: sql`LEAST(0.95, ${graphNodes.importance} + 0.02)`,
+          })
+          .where(inArray(graphNodes.id, ids));
+      }
 
       return {
         memories: rows.map((r) => ({

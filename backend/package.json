@@ -38,6 +38,7 @@
     "hono": "latest",
     "js-tiktoken": "^1.0.21",
     "langchain": "latest",
+    "oluso": "^2.0.0",
     "openai": "^6.34.0",
     "pg": "^8.20.0",
     "prettier": "^3.8.3",

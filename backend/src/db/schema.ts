@@ -82,6 +82,21 @@ export const graphNodes = pgTable('graph_nodes', {
   normalizedName: text('normalized_name').notNull(),
   aliases: text('aliases').array().notNull().default([]),
   metadata: jsonb('metadata').notNull().default('{}'),
+  // Memory-node attributes (populated when kind = 'memory'; null for entity nodes)
+  key: text('key').unique(),
+  value: text('value'),
+  classification: memoryClassificationEnum('classification'),
+  tier: memoryTierEnum('tier'),
+  importance: real('importance').notNull().default(0.2),
+  vector: vector('vector', { dimensions: 1536 }),
+  // Learning / healing bookkeeping
+  recallCount: integer('recall_count').notNull().default(0),
+  lastRecalledAt: timestamp('last_recalled_at'),
+  status: text('status').notNull().default('active'), // active | superseded | archived
+  // Provenance: where this node came from (e.g. 'chat:session:12', 'agent', 'manual',
+  // 'cron') and how confident we are in it (0-1).
+  source: text('source'),
+  confidence: real('confidence').notNull().default(1),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
@@ -92,6 +107,8 @@ export const graphEdges = pgTable('graph_edges', {
   toNodeId: integer('to_node_id').notNull(),
   relation: text('relation').notNull(),
   weight: integer('weight').notNull().default(1),
+  confidence: real('confidence').notNull().default(1),
+  createdBy: text('created_by').notNull().default('user'), // user | agent | inference
   evidence: text('evidence'),
   source: text('source'),
   createdAt: timestamp('created_at').notNull().defaultNow(),

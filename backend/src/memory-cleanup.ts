@@ -1,9 +1,9 @@
 import { z } from 'zod';
-import { inArray } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { HumanMessage, SystemMessage } from 'langchain';
 import { ChatOpenAI } from '@langchain/openai';
 import { db } from './db/client.js';
-import { memories } from './db/schema.js';
+import { graphNodes } from './db/schema.js';
 import { config } from './config.js';
 import { logger } from './logger.js';
 
@@ -127,6 +127,10 @@ async function pLimit<T, R>(
 export interface RunCleanupOptions {
   dryRun?: boolean;
   concurrency?: number;
+  /** When true, judged-delete memories are archived (status='archived') instead of
+   * being permanently removed. Used by the one-click maintenance run so it is
+   * always reversible. */
+  softArchive?: boolean;
 }
 
 export async function runMemoryCleanup(
@@ -136,18 +140,21 @@ export async function runMemoryCleanup(
   deleted: number;
   results: MemoryCleanupResult[];
 }> {
-  const { dryRun = false, concurrency = 4 } = options;
+  const { dryRun = false, concurrency = 4, softArchive = false } = options;
 
   const rows = (await db
     .select({
-      id: memories.id,
-      key: memories.key,
-      value: memories.value,
-      classification: memories.classification,
-      tier: memories.tier,
-      importance: memories.importance,
+      id: graphNodes.id,
+      key: graphNodes.key,
+      value: graphNodes.value,
+      classification: graphNodes.classification,
+      tier: graphNodes.tier,
+      importance: graphNodes.importance,
     })
-    .from(memories)) as MemoryRow[];
+    .from(graphNodes)
+    .where(
+      and(eq(graphNodes.kind, 'memory'), eq(graphNodes.status, 'active')),
+    )) as MemoryRow[];
 
   logger.info(
     `[memory.cleanup] evaluating ${rows.length} memories (dryRun=${dryRun})`,
@@ -191,9 +198,17 @@ export async function runMemoryCleanup(
 
   if (!dryRun && toDelete.length > 0) {
     const ids = toDelete.map((r) => r.id);
-    await db.delete(memories).where(inArray(memories.id, ids));
+    if (softArchive) {
+      await db
+        .update(graphNodes)
+        .set({ status: 'archived', updatedAt: new Date() })
+        .where(inArray(graphNodes.id, ids));
+      logger.info(`[memory.cleanup] archived ${ids.length} memories`);
+    } else {
+      await db.delete(graphNodes).where(inArray(graphNodes.id, ids));
+      logger.info(`[memory.cleanup] deleted ${ids.length} memories`);
+    }
     for (const r of toDelete) r.deleted = true;
-    logger.info(`[memory.cleanup] deleted ${ids.length} memories`);
   }
 
   return {

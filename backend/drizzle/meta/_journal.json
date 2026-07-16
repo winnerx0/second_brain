@@ -29,6 +29,20 @@
       "when": 1778109400612,
       "tag": "0003_smart_sabra",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1781869523370,
+      "tag": "0004_classy_vanisher",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1781877858036,
+      "tag": "0005_fast_mercury",
+      "breakpoints": true
     }
   ]
 }
