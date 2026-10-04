@@ -30,7 +30,7 @@ type Connection = {
 
 type ConnectionsResponse = { connections: Connection[] };
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000';
+const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3005';
 const CONNECTIONS_URL = `${API_BASE.replace(/\/$/, '')}/connections`;
 
 /* ─── Connection metadata ────────────────────────────────────────────────── */

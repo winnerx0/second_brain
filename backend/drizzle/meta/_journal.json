@@ -43,6 +43,13 @@
       "when": 1781877858036,
       "tag": "0005_fast_mercury",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790985600000,
+      "tag": "0006_scheduled_workflows",
+      "breakpoints": true
     }
   ]
 }

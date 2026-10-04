@@ -3,6 +3,7 @@ import z from 'zod';
 import { model } from '../shared.js';
 import { googleDocTools } from '../tools/google-docs.js';
 import { streamSubAgent } from './utils.js';
+import { workflowPolicy } from '../workflows/policy.js';
 
 const DOCS_SYSTEM_PROMPT = `You are a Document Assistant with access to Google Docs.
 
@@ -20,6 +21,7 @@ When helping users:
 
 const docsAgent = createAgent({
   model,
+  middleware: [workflowPolicy],
   tools: [...googleDocTools],
 });
 

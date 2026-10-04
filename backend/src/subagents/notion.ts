@@ -3,6 +3,7 @@ import z from 'zod';
 import { model } from '../shared.js';
 import { notionTools } from '../tools/notion.js';
 import { streamSubAgent } from './utils.js';
+import { workflowPolicy } from '../workflows/policy.js';
 
 const NOTION_SYSTEM_PROMPT = `You are a Notion Workspace Assistant with full access to the user's Notion workspace via the OAuth API.
 
@@ -17,6 +18,7 @@ How to work correctly:
 
 const notionAgent = createAgent({
   model,
+  middleware: [workflowPolicy],
   tools: [...notionTools],
 });
 

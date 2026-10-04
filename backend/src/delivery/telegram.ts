@@ -3,9 +3,10 @@ import { config } from '../config.js';
 const TELEGRAM_API = `https://api.telegram.org/bot${config.TELEGRAM_BOT_TOKEN}`;
 const MAX_LENGTH = 4096;
 
-async function sendMessage(text: string): Promise<void> {
+async function sendMessage(text: string, signal?: AbortSignal): Promise<void> {
   let res = await fetch(`${TELEGRAM_API}/sendMessage`, {
     method: 'POST',
+    signal,
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       chat_id: config.TELEGRAM_CHAT_ID,
@@ -18,6 +19,7 @@ async function sendMessage(text: string): Promise<void> {
   if (res.status === 400) {
     res = await fetch(`${TELEGRAM_API}/sendMessage`, {
       method: 'POST',
+      signal,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         chat_id: config.TELEGRAM_CHAT_ID,
@@ -62,9 +64,10 @@ function splitMessage(text: string): string[] {
   return chunks;
 }
 
-export async function sendTelegramMessage(text: string): Promise<void> {
+export async function sendTelegramMessage(text: string, signal?: AbortSignal): Promise<void> {
   const chunks = splitMessage(text);
   for (const chunk of chunks) {
-    await sendMessage(chunk);
+    signal?.throwIfAborted();
+    await sendMessage(chunk, signal);
   }
 }

@@ -3,6 +3,7 @@ import z from 'zod';
 import { model } from '../shared.js';
 import { clickupTools } from '../tools/clickup.js';
 import { streamSubAgent } from './utils.js';
+import { workflowPolicy } from '../workflows/policy.js';
 
 const CLICKUP_SYSTEM_PROMPT = `You are a ClickUp Assistant with full access to the user's ClickUp workspace.
 
@@ -18,6 +19,7 @@ How to work correctly:
 
 const clickupAgent = createAgent({
   model,
+  middleware: [workflowPolicy],
   tools: [...clickupTools],
 });
 

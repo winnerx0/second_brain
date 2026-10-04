@@ -3,6 +3,7 @@ import z from 'zod';
 import { model } from '../shared.js';
 import { calendarTools } from '../tools/calendar.js';
 import { streamSubAgent } from './utils.js';
+import { workflowPolicy } from '../workflows/policy.js';
 
 const CALENDAR_SYSTEM_PROMPT = `You are a Calendar Assistant with access to the user's Google Calendar.
 
@@ -21,6 +22,7 @@ When helping:
 
 const calendarAgent = createAgent({
   model,
+  middleware: [workflowPolicy],
   tools: [...calendarTools],
 });
 

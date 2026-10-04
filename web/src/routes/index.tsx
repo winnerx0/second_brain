@@ -62,7 +62,7 @@ const SUGGESTIONS = [
   'Show me a summary of my recent notes.',
 ];
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000';
+const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3005';
 const STREAM_URL = `${API_BASE.replace(/\/$/, '')}/chat/stream`;
 const SESSIONS_URL = `${API_BASE.replace(/\/$/, '')}/sessions`;
 

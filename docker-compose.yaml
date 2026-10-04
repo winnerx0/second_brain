@@ -1,70 +1,49 @@
 services:
-  nginx:
-    build: "./nginx/"
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
-      - certbot_www:/var/www/certbot
-      - certbot_conf:/etc/letsencrypt
-    depends_on:
-      backend:
-        condition: service_healthy
-    networks:
-      - internal
-
-  certbot:
-    image: certbot/certbot:latest
-    volumes:
-      - certbot_www:/var/www/certbot
-      - certbot_conf:/etc/letsencrypt
-    entrypoint: >
-      /bin/sh -c "trap exit TERM;
-      while :; do
-        certbot renew --webroot -w /var/www/certbot --quiet;
-        sleep 12h & wait $${!};
-      done"
-
   backend:
-    container_name: "aira_backend"
-    build: "./backend/"
-    expose:
-      - "3005"
+    container_name: aira_backend
+    build: ./backend/
+    ports:
+      - "3005:3005"
     env_file:
       - ./backend/.env
+    environment:
+      PORT: "3005"
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3005/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-    networks:
-      - internal
-    # depends_on:
-    #   db:
-    #     condition: service_healthy
 
-  # db:
-  #   container_name: "aira_db"
-  #   image: "pgvector/pgvector:0.8.2-pg18-trixie"
-  #   environment:
-  #     POSTGRES_USER: "postgres"
-  #     POSTGRES_PASSWORD: "2007"
-  #     POSTGRES_DB: "second_brain"
-  #   ports:
-  #     - "5432:5432"
-  #   volumes:
-  #     - aira:/var/lib/postgresql/18/data
-  #   healthcheck:
-  #     test: ["CMD", "pg_isready", "-U", "postgres"]
-  #     interval: 10s
-  #     timeout: 10s
-  #     retries: 3
-
-volumes:
-  aira:
-  certbot_www:
-  certbot_conf:
-
-networks:
-  internal:
+  worker:
+    build: ./backend/
+    command: ["bun", "dist/worker.js"]
+    env_file:
+      - ./backend/.env
+    restart: unless-stopped
+    stop_grace_period: 90s
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "bun", "-e", "const r=await fetch('http://backend:3005/workflows/health');const h=await r.json();process.exit(r.ok&&h.workers>0?0:1)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+  db:
+    image: pgvector/pgvector:pg16
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: winnerx0
+      POSTGRES_PASSWORD: 2007
+      POSTGRES_DB: aira
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "winnerx0", "-d", "aira"]
+      interval: 30s
+      timeout: 10s
+      retries: 3

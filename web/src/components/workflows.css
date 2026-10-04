@@ -1,0 +1,261 @@
+.wf-page {
+  padding: clamp(16px, 3vw, 36px);
+  overflow: auto;
+  flex: 1;
+  color: var(--fg);
+}
+.wf-page h1 {
+  font-size: 26px;
+  margin: 0 0 8px;
+}
+.wf-page h2 {
+  font-size: 18px;
+  margin: 0 0 10px;
+}
+.wf-page h3 {
+  font-size: 15px;
+}
+.wf-page p {
+  color: var(--fg-dim);
+  line-height: 1.6;
+}
+.wf-page small {
+  color: var(--fg-dim);
+}
+.wf-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 22px;
+  margin-bottom: 20px;
+}
+.wf-toolbar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+.wf-toolbar h1 {
+  flex: 1;
+}
+.wf-page button,
+.wf-page select,
+.wf-page input,
+.wf-page textarea {
+  font: inherit;
+  color: inherit;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 9px 12px;
+}
+.wf-page button {
+  cursor: pointer;
+}
+.wf-page button:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+.wf-page button:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+.wf-page button:focus-visible,
+.wf-page input:focus-visible,
+.wf-page textarea:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.wf-page .wf-primary {
+  background: var(--accent);
+  color: var(--bg);
+  border-color: var(--accent);
+}
+.wf-page textarea {
+  display: block;
+  width: 100%;
+  resize: vertical;
+  margin: 8px 0 14px;
+}
+.wf-page label {
+  display: block;
+  margin: 10px 0 6px;
+  font-size: 13px;
+}
+.wf-examples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 16px 0;
+}
+.wf-examples button {
+  flex: 1;
+  text-align: left;
+  font-size: 12px;
+  min-width: 180px;
+}
+.wf-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  gap: 18px;
+}
+.wf-cards .wf-panel {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.wf-card-title {
+  text-align: left;
+  font-size: 18px !important;
+  font-weight: 600;
+  border: 0 !important;
+  padding: 0 !important;
+}
+.wf-badge {
+  display: inline-block;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  font-size: 11px;
+  padding: 4px 9px;
+  text-transform: capitalize;
+}
+.wf-badge.completed,
+.wf-badge.active {
+  color: var(--green);
+}
+.wf-badge.failed,
+.wf-badge.needs_attention,
+.wf-error {
+  color: var(--danger) !important;
+}
+.wf-notice {
+  padding: 14px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  margin: 12px 0;
+}
+.wf-error {
+  padding: 12px;
+  background: var(--danger-bg);
+  border-radius: 8px;
+}
+.wf-detail-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 20px;
+}
+.wf-graph {
+  height: 400px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.wf-graph-node {
+  background: var(--surface) !important;
+  color: var(--fg) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 10px !important;
+  width: 210px !important;
+  padding: 16px !important;
+}
+.wf-graph-node small {
+  display: block;
+  margin-top: 8px;
+}
+.wf-graph-node.running {
+  border-color: var(--accent) !important;
+}
+.wf-graph-node.completed {
+  border-color: var(--green) !important;
+}
+.wf-graph-node.failed {
+  border-color: var(--danger) !important;
+}
+.wf-page .react-flow__controls-button {
+  padding: 5px;
+  width: 28px;
+  height: 28px;
+  border-radius: 0;
+  color: var(--fg);
+  background: var(--surface);
+}
+.wf-tabs {
+  display: flex;
+  gap: 8px;
+  margin: 20px 0;
+  flex-wrap: wrap;
+}
+.wf-tabs [aria-selected='true'] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.wf-runs {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.wf-runs th,
+.wf-runs td {
+  text-align: left;
+  padding: 12px 8px;
+  border-bottom: 1px solid var(--border);
+}
+.wf-markdown {
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.wf-markdown pre {
+  overflow: auto;
+  padding: 12px;
+  background: var(--surface-2);
+}
+.wf-markdown ul,
+.wf-markdown ol {
+  padding-left: 24px;
+}
+.wf-page details {
+  margin: 12px 0;
+}
+.wf-page pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+.wf-events {
+  max-height: 220px;
+  overflow: auto;
+  font-size: 12px;
+}
+.wf-mobile-steps {
+  display: none;
+}
+@media (max-width: 900px) {
+  .wf-detail-grid {
+    grid-template-columns: 1fr;
+  }
+  .wf-graph {
+    height: 320px;
+  }
+  .wf-runs {
+    display: block;
+    overflow: auto;
+  }
+}
+@media (max-width: 550px) {
+  .wf-graph {
+    display: none;
+  }
+  .wf-mobile-steps {
+    display: grid;
+    gap: 10px;
+  }
+  .wf-mobile-steps button {
+    text-align: left;
+    padding: 16px;
+  }
+  .wf-mobile-steps small {
+    display: block;
+    margin-top: 6px;
+  }
+}

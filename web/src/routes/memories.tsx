@@ -17,7 +17,7 @@ type MemoryResponse = {
   memories: MemoryRecord[];
 };
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000';
+const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3005';
 const MEMORIES_URL = `${API_BASE.replace(/\/$/, '')}/memories`;
 const PAGE_SIZE = 12;
 

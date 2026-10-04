@@ -3,6 +3,7 @@ import z from 'zod';
 import { model } from '../shared.js';
 import { addListEntry, anilistTools } from '../tools/anilist.js';
 import { streamSubAgent } from './utils.js';
+import { workflowPolicy, executionContext } from '../workflows/policy.js';
 
 const STATUS_VALUES = [
   'CURRENT',
@@ -64,6 +65,7 @@ When helping users:
 - If a tool returns an Error/Failed result, report that failure instead of treating it as success`;
 
 const anilistAgent = createAgent({
+  middleware: [workflowPolicy],
   model,
   tools: [...anilistTools],
 });
@@ -71,7 +73,7 @@ const anilistAgent = createAgent({
 export const anilistTool = tool(
   async ({ query }) => {
     const directUpdate = extractDirectRatingUpdate(query);
-    if (directUpdate) {
+    if (directUpdate && !executionContext.getStore()) {
       const result = await addListEntry.invoke({
         mediaId: directUpdate.mediaId,
         score: directUpdate.score,

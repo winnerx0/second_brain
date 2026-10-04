@@ -1,472 +1,709 @@
 import { createRoute, useNavigate, useParams } from '@tanstack/react-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { AppSidebar, SidebarTrigger } from '../components/app-sidebar';
-import { FiArrowLeft, FiCheck, FiPlay, FiX, FiZap } from 'react-icons/fi';
+import { WorkflowComposer } from '../components/workflow-composer';
+import { WorkflowGraph } from '../components/workflow-graph';
+import {
+  workflowApi,
+  WORKFLOWS_URL,
+  scheduleLabel,
+  formatTime,
+  type Workflow,
+  type WorkflowDefinition,
+  type Run,
+} from '../lib/workflows';
 import { Route as RootRoute } from './__root';
-import type { Workflow } from './workflows';
-import { WORKFLOWS_URL } from './workflows';
+import '../components/workflows.css';
 
 export const Route = createRoute({
   getParentRoute: () => RootRoute,
   path: '/workflows/$workflowId',
   component: WorkflowDetailPage,
 });
-
-type ToolStatus = 'pending' | 'running' | 'done' | 'error';
-type FlowNode = { id: string; label: string; kind: 'trigger' | 'tool'; status: ToolStatus };
-
-const STATUS_STYLES: Record<ToolStatus, { color: string; bg: string; border: string; label: string }> = {
-  pending: { color: 'var(--fg-muted)', bg: 'var(--surface)', border: 'var(--border)', label: 'Idle' },
-  running: { color: 'var(--accent)', bg: 'var(--accent-dim)', border: 'var(--accent-border)', label: 'Pending' },
-  done: { color: 'var(--green)', bg: 'var(--green-bg)', border: 'var(--green-border)', label: 'Passed' },
-  error: { color: 'var(--danger)', bg: 'var(--danger-bg)', border: 'var(--danger-border)', label: 'Failed' },
+type Learning = {
+  lessons: { id: number; lesson: string; confidence: number; run_id: number }[];
+  proposals: {
+    id: number;
+    reason: string;
+    status: string;
+    base_revision: number;
+    definition: WorkflowDefinition;
+    run_id: number;
+  }[];
+  revisions: { version: number; definition: WorkflowDefinition }[];
 };
-
-const NODE_W = 220;
-const NODE_H = 76;
-const COL_GAP = 80;
-const ROW_GAP = 60;
-const COLS = 3;
-const PAD_X = 80;
-const PAD_Y = 60;
-
-function nodePosition(index: number): { x: number; y: number } {
-  const row = Math.floor(index / COLS);
-  const colInRow = index % COLS;
-  const col = row % 2 === 0 ? colInRow : COLS - 1 - colInRow;
-  return {
-    x: PAD_X + col * (NODE_W + COL_GAP),
-    y: PAD_Y + row * (NODE_H + ROW_GAP),
-  };
-}
-
-function edgePath(a: { x: number; y: number }, b: { x: number; y: number }): string {
-  const ax = a.x + NODE_W / 2;
-  const ay = a.y + NODE_H;
-  const bx = b.x + NODE_W / 2;
-  const by = b.y;
-  const dy = Math.max(40, (by - ay) / 2);
-  return `M ${ax} ${ay} C ${ax} ${ay + dy}, ${bx} ${by - dy}, ${bx} ${by}`;
-}
-
-function StatusBadge({ status }: { status: ToolStatus }) {
-  const s = STATUS_STYLES[status];
-  if (status === 'done') {
-    return (
-      <span style={badgeStyle(s.color)}>
-        <FiCheck size={13} color="#fff" />
-      </span>
-    );
-  }
-  if (status === 'error') {
-    return (
-      <span style={badgeStyle(s.color)}>
-        <FiX size={13} color="#fff" />
-      </span>
-    );
-  }
-  if (status === 'running') {
-    return (
-      <span style={badgeStyle(s.color)}>
-        <span
-          style={{
-            width: 12,
-            height: 12,
-            border: '2px solid #fff',
-            borderTopColor: 'transparent',
-            borderRadius: '50%',
-            display: 'inline-block',
-            animation: 'wf-spin 0.8s linear infinite',
-          }}
-        />
-      </span>
-    );
-  }
-  return <span style={{ ...badgeStyle('#e5e7eb'), border: '1px solid #d1d5db' }} />;
-}
-
-function badgeStyle(bg: string): React.CSSProperties {
-  return {
-    width: 24,
-    height: 24,
-    borderRadius: '50%',
-    background: bg,
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-  };
-}
-
-function FlowCanvas({ nodes }: { nodes: FlowNode[] }) {
-  const positions = nodes.map((_, i) => nodePosition(i));
-  const lastPos = positions[positions.length - 1] ?? { x: 0, y: 0 };
-  const width = PAD_X * 2 + COLS * NODE_W + (COLS - 1) * COL_GAP;
-  const height = lastPos.y + NODE_H + PAD_Y;
-
-  return (
-    <div
-      style={{
-        position: 'relative',
-        width: '100%',
-        height: '100%',
-        overflow: 'auto',
-        background:
-          'radial-gradient(circle, #d1d5db 1px, transparent 1px) 0 0 / 20px 20px, #fafafa',
-      }}
-    >
-      <style>{`@keyframes wf-spin { to { transform: rotate(360deg); } }`}</style>
-      <div style={{ position: 'relative', width, height, minHeight: '100%' }}>
-        <svg
-          width={width}
-          height={height}
-          style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}
-        >
-          {nodes.slice(0, -1).map((_, i) => {
-            const a = positions[i]!;
-            const b = positions[i + 1]!;
-            const next = nodes[i + 1]!;
-            const stroke =
-              next.status === 'done'
-                ? '#16a34a'
-                : next.status === 'error'
-                ? '#dc2626'
-                : next.status === 'running'
-                ? '#f97316'
-                : '#cbd5e1';
-            const dashed = next.status === 'pending';
-            return (
-              <path
-                key={i}
-                d={edgePath(a, b)}
-                stroke={stroke}
-                strokeWidth={2}
-                strokeDasharray={dashed ? '6 6' : undefined}
-                fill="none"
-              />
-            );
-          })}
-        </svg>
-
-        {nodes.map((node, i) => {
-          const pos = positions[i]!;
-          const s = STATUS_STYLES[node.status];
-          const isTrigger = node.kind === 'trigger';
-          return (
-            <div
-              key={node.id}
-              style={{
-                position: 'absolute',
-                left: pos.x,
-                top: pos.y,
-                width: NODE_W,
-                height: NODE_H,
-                background: s.bg,
-                border: `1px solid ${s.border}`,
-                borderRadius: 12,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 12,
-                padding: '0 14px',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
-              }}
-            >
-              <StatusBadge status={node.status} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div
-                  style={{
-                    fontSize: 13,
-                    fontWeight: 600,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {node.label}
-                </div>
-                <div style={{ fontSize: 10, color: s.color, fontWeight: 600, textTransform: 'uppercase' }}>
-                  {isTrigger ? 'Trigger' : s.label}
-                </div>
-              </div>
-              {isTrigger && <FiZap size={14} color="#f97316" />}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
 function WorkflowDetailPage() {
   const { workflowId } = useParams({ from: '/workflows/$workflowId' });
   const navigate = useNavigate();
-  const [workflow, setWorkflow] = useState<Workflow | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [running, setRunning] = useState(false);
-  const [status, setStatus] = useState<string>('Idle');
-  const [tools, setTools] = useState<FlowNode[]>([]);
-  const [output, setOutput] = useState<string>('');
-  const [error, setError] = useState<string | null>(null);
-  const abortRef = useRef<AbortController | null>(null);
-
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const res = await fetch(`${WORKFLOWS_URL}/${workflowId}`);
-        if (!res.ok) throw new Error(`Failed to load workflow (${res.status})`);
-        const data = (await res.json()) as Workflow;
-        setWorkflow(data);
-      } catch (err) {
-        setLoadError(err instanceof Error ? err.message : String(err));
-      }
-    };
-    void load();
-    return () => abortRef.current?.abort();
-  }, [workflowId]);
-
-  const flowNodes: FlowNode[] = useMemo(() => {
-    const trigger: FlowNode = {
-      id: 'trigger',
-      label: 'Manual Trigger',
-      kind: 'trigger',
-      status: running || tools.length > 0 ? 'done' : 'pending',
-    };
-    return [trigger, ...tools];
-  }, [tools, running]);
-
-  const runWorkflow = async () => {
-    setRunning(true);
-    setStatus('Starting workflow…');
-    setTools([]);
-    setOutput('');
-    setError(null);
-
-    const controller = new AbortController();
-    abortRef.current = controller;
-
+  const [workflow, setWorkflow] = useState<Workflow>();
+  const [runs, setRuns] = useState<Run[]>([]);
+  const [run, setRun] = useState<Run | null>(null);
+  const [learning, setLearning] = useState<Learning>({
+    lessons: [],
+    proposals: [],
+    revisions: [],
+  });
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [tab, setTab] = useState('overview');
+  const [editing, setEditing] = useState(false);
+  const [stepId, setStepId] = useState('');
+  const [events, setEvents] = useState<{ id: string; text: string }[]>([]);
+  const [connected, setConnected] = useState(true);
+  const [feedback, setFeedback] = useState('');
+  const [notice, setNotice] = useState('');
+  const [trigger, setTrigger] = useState<WorkflowDefinition['trigger']>();
+  const load = async () => {
+    const [w, history, learned] = await Promise.all([
+      workflowApi<Workflow>('/' + workflowId),
+      workflowApi<{ runs: Run[] }>('/' + workflowId + '/runs'),
+      workflowApi<Learning>('/' + workflowId + '/learning'),
+    ]);
+    setWorkflow(w);
+    setRuns(history.runs);
+    setLearning(learned);
+    setTrigger(w.definition?.trigger);
+    return history.runs;
+  };
+  const act = async (fn: () => Promise<unknown>) => {
+    setBusy(true);
+    setError('');
+    setNotice('');
     try {
-      const res = await fetch(`${WORKFLOWS_URL}/${workflowId}/run`, {
-        method: 'POST',
-        signal: controller.signal,
-      });
-      if (!res.ok || !res.body) {
-        setError('Failed to start workflow');
-        setRunning(false);
-        return;
-      }
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines[lines.length - 1] ?? '';
-
-        for (let i = 0; i < lines.length - 1; i++) {
-          const line = lines[i];
-          if (!line) continue;
-          if (line.startsWith('event: ')) {
-            const type = line.slice(7);
-            if (type === 'done' || type === 'error') setRunning(false);
-          } else if (line.startsWith('data: ')) {
-            const data = line.slice(6);
-            if (!data || data === 'null') continue;
-            try {
-              const event = JSON.parse(data);
-              if (event.type === 'status') {
-                setStatus(event.message);
-              } else if (event.type === 'tool_start') {
-                setTools((prev) => [
-                  ...prev,
-                  { id: `${event.tool}-${prev.length}`, label: event.tool, kind: 'tool', status: 'running' },
-                ]);
-                setStatus(`Using ${event.tool}…`);
-              } else if (event.type === 'tool_end') {
-                const nextStatus: ToolStatus = event.success === false ? 'error' : 'done';
-                setTools((prev) => {
-                  const idx = [...prev].reverse().findIndex((t) => t.label === event.tool && t.status === 'running');
-                  if (idx === -1) return prev;
-                  const realIdx = prev.length - 1 - idx;
-                  return prev.map((t, i) => (i === realIdx ? { ...t, status: nextStatus } : t));
-                });
-              } else if (event.type === 'assistant_delta') {
-                setOutput((prev) => prev + event.delta);
-              } else if (event.type === 'final') {
-                setOutput(event.text);
-                setStatus('Completed');
-              } else if (event.type === 'error') {
-                setError(event.message);
-                setStatus('Failed');
-              }
-            } catch {
-              // ignore
-            }
-          }
-        }
-      }
-      setRunning(false);
-    } catch (err) {
-      if ((err as Error).name !== 'AbortError') {
-        setError(err instanceof Error ? err.message : 'Unknown error');
-      }
-      setRunning(false);
+      await fn();
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusy(false);
     }
   };
-
-  if (loadError) {
-    return (
-      <div className="app-shell">
-        <AppSidebar />
-        <div className="wf-detail-container">
-          <div className="chat-header">
-            <div className="chat-header-left">
-              <SidebarTrigger />
-              <span className="chat-header-title">Workflow</span>
-            </div>
-          </div>
-          <main className="connections-page">
-            <div className="memories-error">{loadError}</div>
-          </main>
-        </div>
-      </div>
+  useEffect(() => {
+    setRun(null);
+    void load()
+      .then((history) => {
+        if (history[0]) void selectRun(history[0].id);
+      })
+      .catch((e) => setError(String(e)));
+  }, [workflowId]);
+  const selectRun = async (id: number) => {
+    setRun(await workflowApi<Run>('/runs/' + id));
+    setEvents([]);
+  };
+  useEffect(() => {
+    if (!run || !['running', 'queued'].includes(run.status)) return;
+    const source = new EventSource(
+      WORKFLOWS_URL + '/runs/' + run.id + '/events',
     );
-  }
-
-  if (!workflow) {
-    return (
-      <div className="app-shell">
-        <AppSidebar />
-        <div className="wf-detail-container">
-          <div className="chat-header">
-            <div className="chat-header-left">
-              <SidebarTrigger />
-              <span className="chat-header-title">Workflow</span>
-            </div>
-          </div>
-          <main className="connections-page">
-            <div className="memories-empty">Loading…</div>
-          </main>
-        </div>
-      </div>
-    );
-  }
-
+    let alive = true;
+    const refresh = async () => {
+      try {
+        const next = await workflowApi<Run>('/runs/' + run.id);
+        if (alive) setRun(next);
+      } catch (e) {
+        if (alive) setError(String(e));
+      }
+    };
+    source.onopen = () => setConnected(true);
+    source.onerror = () => setConnected(false);
+    source.onmessage = (message) => {
+      const event = JSON.parse(message.data);
+      setEvents((old) =>
+        old.some((e) => e.id === message.lastEventId)
+          ? old
+          : [
+              ...old,
+              {
+                id: message.lastEventId,
+                text: [
+                  event.type,
+                  event.stepId,
+                  event.tool,
+                  event.status,
+                  event.message,
+                ]
+                  .filter(Boolean)
+                  .join(' · '),
+              },
+            ].slice(-100),
+      );
+      void refresh();
+    };
+    source.addEventListener('done', () => {
+      void refresh();
+      void load().catch((e) => setError(String(e)));
+      source.close();
+    });
+    const poll = setInterval(() => void refresh(), 5000);
+    return () => {
+      alive = false;
+      source.close();
+      clearInterval(poll);
+    };
+  }, [run?.id, run?.status]);
+  const definition = run?.definition ?? workflow?.definition;
+  const step = definition?.steps.find((s) => s.id === stepId);
+  const stepRun = run?.steps?.find((s) => s.step_id === stepId);
   return (
     <div className="app-shell">
       <AppSidebar />
-
-      <div className="wf-detail-container">
-        <div className="chat-header">
+      <div className="chat-container">
+        <header className="chat-header">
           <div className="chat-header-left">
             <SidebarTrigger />
-            <button
-              type="button"
-              onClick={() => void navigate({ to: '/workflows' })}
-              className="conn-btn-disconnect"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
-            >
-              <FiArrowLeft size={13} /> Back
+            <span className="chat-header-title">Workflow</span>
+          </div>
+        </header>
+        <main className="wf-page">
+          <div className="wf-toolbar">
+            <button onClick={() => void navigate({ to: '/workflows' })}>
+              ← Workflows
             </button>
-            <span className="chat-header-title">{workflow.name}</span>
-            <span style={{ fontSize: 12, color: 'var(--fg-dim)' }}>{status}</span>
-          </div>
-          <div className="conn-header-actions">
-            <button
-              type="button"
-              onClick={() => void runWorkflow()}
-              disabled={running}
-              className="conn-btn-connect"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
-            >
-              <FiPlay size={13} /> {running ? 'Running…' : 'Run'}
-            </button>
-          </div>
-        </div>
-
-        <main
-          style={{
-            flex: 1,
-            display: 'grid',
-            gridTemplateColumns: 'minmax(0, 1fr) 320px',
-            minHeight: 0,
-          }}
-        >
-          <div style={{ position: 'relative', minHeight: 0 }}>
-            <FlowCanvas nodes={flowNodes} />
-          </div>
-
-          <aside
-            style={{
-              borderLeft: '1px solid var(--border)',
-              padding: 16,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 12,
-              overflow: 'auto',
-              background: 'var(--bg)',
-            }}
-          >
-            <div>
-              <div style={{ fontSize: 11, color: 'var(--fg-dim)', textTransform: 'uppercase', fontWeight: 600 }}>
-                Plan
-              </div>
-              <div
-                style={{
-                  marginTop: 6,
-                  fontSize: 13,
-                  whiteSpace: 'pre-wrap',
-                  background: 'var(--surface-2)',
-                  padding: 10,
-                  borderRadius: 6,
-                  fontFamily: 'monospace',
-                }}
-              >
-                {workflow.plan}
-              </div>
-            </div>
-
-            {output && (
-              <div>
-                <div style={{ fontSize: 11, color: 'var(--fg-dim)', textTransform: 'uppercase', fontWeight: 600 }}>
-                  Output
-                </div>
-                <div
-                  style={{
-                    marginTop: 6,
-                    fontSize: 12,
-                    whiteSpace: 'pre-wrap',
-                    background: 'var(--surface-2)',
-                    padding: 10,
-                    borderRadius: 6,
-                    fontFamily: 'monospace',
-                    maxHeight: 400,
-                    overflow: 'auto',
-                  }}
+            <h1>{workflow?.name ?? 'Loading…'}</h1>
+            {workflow && (
+              <>
+                <button
+                  disabled={busy}
+                  onClick={() =>
+                    void act(async () => {
+                      await workflowApi('/' + workflowId, 'PATCH', {
+                        enabled: !workflow.enabled,
+                      });
+                      await load();
+                    })
+                  }
                 >
-                  {output}
-                </div>
-              </div>
+                  {workflow.enabled ? 'Pause schedule' : 'Resume schedule'}
+                </button>
+                <button onClick={() => setEditing(!editing)}>
+                  Edit instructions
+                </button>
+                <button
+                  className="wf-primary"
+                  disabled={
+                    busy ||
+                    !workflow.definition ||
+                    (!!run && ['running', 'queued'].includes(run.status))
+                  }
+                  onClick={() =>
+                    void act(async () => {
+                      const next = await workflowApi<{ runId: number }>(
+                        '/' + workflowId + '/run',
+                        'POST',
+                      );
+                      await selectRun(next.runId);
+                      setTab('overview');
+                      await load();
+                    })
+                  }
+                >
+                  Run now
+                </button>
+              </>
             )}
-
-            {error && (
+          </div>
+          {error && (
+            <p role="alert" className="wf-error">
+              {error}
+            </p>
+          )}
+          {notice && (
+            <p role="status" className="wf-notice">
+              {notice}
+            </p>
+          )}
+          {workflow && (
+            <>
+              <p>{workflow.description}</p>
+              <div className="wf-toolbar">
+                <span className="wf-badge">
+                  {workflow.enabled ? workflow.lifecycle : 'paused'}
+                </span>
+                <small>{scheduleLabel(workflow)}</small>
+                <small>Next: {formatTime(workflow.nextRunAt)}</small>
+                <small>Revision {workflow.activeRevision}</small>
+              </div>
+              {workflow.connectionIssues?.map((issue) => (
+                <p key={issue} className="wf-notice">
+                  {issue} <a href="/connections">Manage connections</a>
+                </p>
+              ))}
+              {(editing || !workflow.definition) && (
+                <WorkflowComposer
+                  key={workflow.activeRevision}
+                  existing={workflow}
+                  onSaved={(w) => {
+                    setWorkflow(w);
+                    setEditing(false);
+                    setRun(null);
+                    void load();
+                  }}
+                />
+              )}
               <div
-                style={{
-                  fontSize: 12,
-                  background: 'var(--danger-bg)',
-                  color: 'var(--danger)',
-                  border: '1px solid var(--danger-border)',
-                  padding: 10,
-                  borderRadius: 6,
-                }}
+                className="wf-tabs"
+                role="tablist"
+                aria-label="Workflow sections"
               >
-                {error}
+                {['overview', 'runs', 'schedule', 'learning'].map((t) => (
+                  <button
+                    key={t}
+                    role="tab"
+                    aria-selected={tab === t}
+                    onClick={() => setTab(t)}
+                  >
+                    {t[0]!.toUpperCase() + t.slice(1)}
+                  </button>
+                ))}
               </div>
-            )}
-          </aside>
+              {tab === 'overview' && (
+                <div className="wf-detail-grid">
+                  <div>
+                    <div className="wf-toolbar">
+                      <h2>{run ? 'Run #' + run.id : 'Saved workflow'}</h2>
+                      {run && (
+                        <>
+                          <span className={'wf-badge ' + run.status}>
+                            {run.status.replaceAll('_', ' ')}
+                          </span>
+                          <button onClick={() => setRun(null)}>
+                            Show saved plan
+                          </button>
+                          {['running', 'queued'].includes(run.status) && (
+                            <button
+                              disabled={busy}
+                              onClick={() =>
+                                void act(async () => {
+                                  await workflowApi(
+                                    '/runs/' + run.id + '/cancel',
+                                    'POST',
+                                  );
+                                  setNotice(
+                                    'Cancellation requested. An action already sent cannot be undone.',
+                                  );
+                                })
+                              }
+                            >
+                              Cancel run
+                            </button>
+                          )}
+                        </>
+                      )}
+                    </div>
+                    {!connected &&
+                      run &&
+                      ['running', 'queued'].includes(run.status) && (
+                        <p className="wf-notice">
+                          Live connection interrupted. Reconnecting; execution
+                          continues.
+                        </p>
+                      )}
+                    {definition && (
+                      <WorkflowGraph
+                        definition={definition}
+                        run={run}
+                        onSelect={setStepId}
+                      />
+                    )}
+                    {run?.error && <p className="wf-error">{run.error}</p>}
+                    {run?.output && (
+                      <section className="wf-panel wf-markdown">
+                        <h2>Result</h2>
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                          {run.output}
+                        </ReactMarkdown>
+                      </section>
+                    )}
+                    {events.length > 0 && (
+                      <details>
+                        <summary>Live activity</summary>
+                        <div className="wf-events">
+                          {events.map((e) => (
+                            <p key={e.id}>{e.text}</p>
+                          ))}
+                        </div>
+                      </details>
+                    )}
+                    {run && !['queued', 'running'].includes(run.status) && (
+                      <section className="wf-panel">
+                        <h2>Help Aira improve</h2>
+                        <label htmlFor="run-feedback">
+                          What worked, or what should change?
+                        </label>
+                        <textarea
+                          id="run-feedback"
+                          value={feedback}
+                          onChange={(e) => setFeedback(e.target.value)}
+                        />
+                        <button
+                          disabled={busy || !feedback.trim()}
+                          onClick={() =>
+                            void act(async () => {
+                              await workflowApi(
+                                '/runs/' + run.id + '/feedback',
+                                'POST',
+                                { feedback },
+                              );
+                              setFeedback('');
+                              setNotice(
+                                'Feedback saved. Aira will review it in the background.',
+                              );
+                            })
+                          }
+                        >
+                          Save feedback
+                        </button>
+                      </section>
+                    )}
+                  </div>
+                  <aside className="wf-panel">
+                    <h2>{step ? step.title : 'Step inspector'}</h2>
+                    {step ? (
+                      <>
+                        <p>{step.instruction}</p>
+                        <small>
+                          {step.specialist} · {stepRun?.status ?? 'Not run'}
+                        </small>
+                        <h3>Authorized actions</h3>
+                        {step.permissions.length ? (
+                          step.permissions.map((p) => (
+                            <pre key={p.tool}>
+                              {p.tool +
+                                '\n' +
+                                JSON.stringify(p.constraints, null, 2)}
+                            </pre>
+                          ))
+                        ) : (
+                          <p>Read-only</p>
+                        )}
+                        {stepRun?.error && (
+                          <p className="wf-error">{stepRun.error}</p>
+                        )}
+                        {stepRun?.output && (
+                          <div className="wf-markdown">
+                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                              {stepRun.output}
+                            </ReactMarkdown>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <p>
+                        Select a step to inspect its instructions, permissions,
+                        and result.
+                      </p>
+                    )}
+                    <details>
+                      <summary>Original instructions</summary>
+                      <p>{definition?.instructions ?? workflow.plan}</p>
+                    </details>
+                  </aside>
+                </div>
+              )}
+              {tab === 'runs' && (
+                <section className="wf-panel">
+                  <h2>Run history</h2>
+                  {runs.length ? (
+                    <>
+                      <table className="wf-runs">
+                        <thead>
+                          <tr>
+                            <th>Run</th>
+                            <th>Status</th>
+                            <th>Trigger</th>
+                            <th>Scheduled</th>
+                            <th>Created</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {runs.map((r) => (
+                            <tr key={r.id}>
+                              <td>
+                                <button
+                                  onClick={() =>
+                                    void act(async () => {
+                                      await selectRun(r.id);
+                                      setTab('overview');
+                                    })
+                                  }
+                                >
+                                  #{r.id}
+                                </button>
+                              </td>
+                              <td>
+                                <span className={'wf-badge ' + r.status}>
+                                  {r.status.replaceAll('_', ' ')}
+                                </span>
+                              </td>
+                              <td>{r.trigger}</td>
+                              <td>{formatTime(r.scheduled_for)}</td>
+                              <td>{formatTime(r.ran_at)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      <button
+                        disabled={busy}
+                        onClick={() =>
+                          void act(async () => {
+                            const older = await workflowApi<{ runs: Run[] }>(
+                              '/' +
+                                workflowId +
+                                '/runs?before=' +
+                                runs.at(-1)!.id,
+                            );
+                            setRuns((old) => [...old, ...older.runs]);
+                            if (!older.runs.length) setNotice('No older runs.');
+                          })
+                        }
+                      >
+                        Load older runs
+                      </button>
+                    </>
+                  ) : (
+                    <p>
+                      No runs yet. Run this workflow or wait for its schedule.
+                    </p>
+                  )}
+                </section>
+              )}
+              {tab === 'schedule' && trigger && workflow.definition && (
+                <section className="wf-panel">
+                  <h2>Schedule</h2>
+                  <label htmlFor="trigger-kind">Trigger</label>
+                  <select
+                    id="trigger-kind"
+                    value={trigger.kind}
+                    onChange={(e) =>
+                      setTrigger({
+                        ...trigger,
+                        kind: e.target.value as typeof trigger.kind,
+                      })
+                    }
+                  >
+                    <option value="manual">Manual</option>
+                    <option value="once">One time</option>
+                    <option value="cron">Recurring cron</option>
+                  </select>
+                  {trigger.kind === 'cron' && (
+                    <>
+                      <label htmlFor="cron">Five-field cron</label>
+                      <input
+                        id="cron"
+                        value={trigger.cron ?? ''}
+                        onChange={(e) =>
+                          setTrigger({ ...trigger, cron: e.target.value })
+                        }
+                        placeholder="0 8 * * 1-5"
+                      />
+                    </>
+                  )}
+                  {trigger.kind === 'once' && (
+                    <>
+                      <label htmlFor="once">
+                        ISO date and time, including UTC offset
+                      </label>
+                      <input
+                        id="once"
+                        value={trigger.at ?? ''}
+                        onChange={(e) =>
+                          setTrigger({ ...trigger, at: e.target.value })
+                        }
+                        placeholder="2026-10-04T08:00:00+01:00"
+                      />
+                    </>
+                  )}
+                  <label htmlFor="timezone">Timezone</label>
+                  <input
+                    id="timezone"
+                    value={trigger.timezone}
+                    onChange={(e) =>
+                      setTrigger({ ...trigger, timezone: e.target.value })
+                    }
+                    placeholder="Africa/Lagos"
+                  />
+                  <p>
+                    Missed occurrences are combined into one catch-up run. Runs
+                    never overlap this workflow.
+                  </p>
+                  <button
+                    disabled={busy}
+                    onClick={() =>
+                      void act(async () => {
+                        await workflowApi('/' + workflowId, 'PATCH', {
+                          definition: { ...workflow.definition!, trigger },
+                          expectedRevision: workflow.activeRevision,
+                          enabled: workflow.enabled,
+                        });
+                        await load();
+                        setNotice('Schedule saved.');
+                      })
+                    }
+                  >
+                    Save schedule
+                  </button>
+                  <h3>Next executions (saved schedule)</h3>
+                  <ul>
+                    {workflow.preview?.map((date) => (
+                      <li key={date}>
+                        {new Date(date).toLocaleString(undefined, {
+                          timeZone: workflow.definition!.trigger.timezone,
+                        })}{' '}
+                        · {workflow.definition!.trigger.timezone}
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              )}
+              {tab === 'learning' && (
+                <>
+                  <section className="wf-panel">
+                    <h2>Execution lessons</h2>
+                    <p>
+                      Lessons guide execution. Changes to this workflow require
+                      your review.
+                    </p>
+                    {learning.lessons.length === 0 && <p>No lessons yet.</p>}
+                    {learning.lessons.map((l) => (
+                      <article key={l.id}>
+                        <p>{l.lesson}</p>
+                        <small>
+                          Evidence: run #{l.run_id} · confidence{' '}
+                          {Math.round(l.confidence * 100)}%
+                        </small>
+                        <div className="wf-toolbar">
+                          <button
+                            onClick={() =>
+                              void act(async () => {
+                                const lesson = window.prompt(
+                                  'Correct this lesson',
+                                  l.lesson,
+                                );
+                                if (lesson?.trim()) {
+                                  await workflowApi(
+                                    '/lessons/' + l.id,
+                                    'PATCH',
+                                    { lesson },
+                                  );
+                                  await load();
+                                }
+                              })
+                            }
+                          >
+                            Correct
+                          </button>
+                          <button
+                            onClick={() =>
+                              void act(async () => {
+                                await workflowApi('/lessons/' + l.id, 'PATCH', {
+                                  active: false,
+                                });
+                                await load();
+                              })
+                            }
+                          >
+                            Forget
+                          </button>
+                        </div>
+                      </article>
+                    ))}
+                  </section>
+                  <section className="wf-panel">
+                    <h2>Proposed improvements</h2>
+                    {learning.proposals.length === 0 && (
+                      <p>No proposals yet.</p>
+                    )}
+                    {learning.proposals.map((p) => (
+                      <article key={p.id}>
+                        <p>{p.reason}</p>
+                        <small>
+                          Run #{p.run_id} · based on revision {p.base_revision}{' '}
+                          · {p.status}
+                        </small>
+                        <details>
+                          <summary>Compare current and proposed plan</summary>
+                          <h3>Current</h3>
+                          <pre>
+                            {JSON.stringify(workflow.definition, null, 2)}
+                          </pre>
+                          <h3>Proposed</h3>
+                          <pre>{JSON.stringify(p.definition, null, 2)}</pre>
+                        </details>
+                        {p.status === 'pending' && (
+                          <div className="wf-toolbar">
+                            <button
+                              disabled={
+                                busy ||
+                                p.base_revision !== workflow.activeRevision
+                              }
+                              onClick={() =>
+                                void act(async () => {
+                                  await workflowApi(
+                                    '/proposals/' + p.id + '/accept',
+                                    'POST',
+                                  );
+                                  await load();
+                                })
+                              }
+                            >
+                              Accept revision
+                            </button>
+                            <button
+                              disabled={busy}
+                              onClick={() =>
+                                void act(async () => {
+                                  await workflowApi(
+                                    '/proposals/' + p.id + '/reject',
+                                    'POST',
+                                  );
+                                  await load();
+                                })
+                              }
+                            >
+                              Reject
+                            </button>
+                            {p.base_revision !== workflow.activeRevision && (
+                              <small>
+                                This proposal is stale; it cannot replace newer
+                                edits.
+                              </small>
+                            )}
+                          </div>
+                        )}
+                      </article>
+                    ))}
+                  </section>
+                  <section className="wf-panel">
+                    <h2>Revision history</h2>
+                    {learning.revisions.map((r) => (
+                      <div className="wf-toolbar" key={r.version}>
+                        <span>Revision {r.version}</span>
+                        <button
+                          disabled={
+                            busy || r.version === workflow.activeRevision
+                          }
+                          onClick={() =>
+                            void act(async () => {
+                              await workflowApi('/' + workflowId, 'PATCH', {
+                                definition: r.definition,
+                                expectedRevision: workflow.activeRevision,
+                                enabled: workflow.enabled,
+                              });
+                              await load();
+                              setNotice('Restored as a new revision.');
+                            })
+                          }
+                        >
+                          Restore
+                        </button>
+                      </div>
+                    ))}
+                  </section>
+                </>
+              )}
+            </>
+          )}
         </main>
       </div>
     </div>

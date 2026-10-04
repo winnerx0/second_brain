@@ -3,6 +3,7 @@ import z from 'zod';
 import { model } from '../shared.js';
 import { gmailTools } from '../tools/gmail.js';
 import { streamSubAgent } from './utils.js';
+import { workflowPolicy } from '../workflows/policy.js';
 
 const GMAIL_SYSTEM_PROMPT = `You are an Email Assistant with access to the user's Gmail inbox.
 
@@ -22,6 +23,7 @@ When helping:
 
 const gmailAgent = createAgent({
   model,
+  middleware: [workflowPolicy],
   tools: [...gmailTools],
 });
 

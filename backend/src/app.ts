@@ -1,9 +1,9 @@
 import { Hono, type Context } from 'hono';
+import { workflowRoutes } from './workflows/routes.js';
 import { cors } from 'hono/cors';
 import {
   runBriefing,
   handleMessage,
-  runWorkflow,
   type AgentStreamEvent,
 } from './agent.js';
 import { sendTelegramMessage } from './delivery/telegram.js';
@@ -17,8 +17,6 @@ import {
   graphNodes,
   graphEdges,
   connections,
-  workflows,
-  workflowRuns,
 } from './db/schema.js';
 import { and, asc, desc, eq } from 'drizzle-orm';
 import {
@@ -98,14 +96,14 @@ const kivia = kiviaHonoMiddleware({ apiKey: config.KIVIA_API_KEY });
 
 app.use(kivia);
 
-import { olusoExpress } from 'oluso';
+import { Oluso } from 'oluso';
 
-const oluso = olusoExpress({
-  apiKey: process.env.OLUSO_API_KEY,
-  environment: 'development',
-});
-
-app.use(oluso.requestHandler);
+const oluso = process.env.OLUSO_API_KEY
+  ? new Oluso({
+      apiKey: process.env.OLUSO_API_KEY,
+      environment: 'development',
+    })
+  : undefined;
 
 app.get('/health', (c) => {
   return c.json({ status: 'ok', timestamp: Date.now() });
@@ -242,7 +240,9 @@ app.get('/memories', async (c) => {
         updatedAt: graphNodes.updatedAt,
       })
       .from(graphNodes)
-      .where(and(eq(graphNodes.kind, 'memory'), eq(graphNodes.status, 'active')))
+      .where(
+        and(eq(graphNodes.kind, 'memory'), eq(graphNodes.status, 'active')),
+      )
       .orderBy(desc(graphNodes.updatedAt));
 
     return c.json({ memories: rows });
@@ -858,7 +858,9 @@ app.get('/graph', async (c) => {
   } catch (error) {
     logger.error('[graph]', error);
     return c.json(
-      { error: error instanceof Error ? error.message : 'Failed to load graph' },
+      {
+        error: error instanceof Error ? error.message : 'Failed to load graph',
+      },
       500,
     );
   }
@@ -887,172 +889,7 @@ app.post('/graph/maintenance', async (c) => {
 
 /* ─── Workflows ──────────────────────────────────────────────────────────── */
 
-app.get('/workflows', async (c) => {
-  try {
-    const wfs = await db
-      .select()
-      .from(workflows)
-      .orderBy(desc(workflows.updatedAt));
-    return c.json({ workflows: wfs });
-  } catch (error) {
-    logger.error('[workflows.list]', error);
-    return c.json({ error: 'Failed to list workflows' }, 500);
-  }
-});
-
-app.get('/workflows/:id', async (c) => {
-  try {
-    const id = parseInt(c.req.param('id'), 10);
-    const [wf] = await db.select().from(workflows).where(eq(workflows.id, id));
-    if (!wf) return c.json({ error: 'Workflow not found' }, 404);
-    return c.json(wf);
-  } catch (error) {
-    logger.error('[workflows.get]', error);
-    return c.json({ error: 'Failed to load workflow' }, 500);
-  }
-});
-
-app.post('/workflows', async (c) => {
-  try {
-    const body = (await c.req.json()) as {
-      name: string;
-      description?: string;
-      plan: string;
-    };
-    if (!body.name || !body.plan)
-      return c.json({ error: 'Missing name or plan' }, 400);
-
-    const [inserted] = await db
-      .insert(workflows)
-      .values({
-        name: body.name,
-        description: body.description || '',
-        plan: body.plan,
-      })
-      .returning();
-
-    return c.json(inserted, 201);
-  } catch (error) {
-    logger.error('[workflows.create]', error);
-    return c.json({ error: 'Failed to create workflow' }, 500);
-  }
-});
-
-app.patch('/workflows/:id', async (c) => {
-  try {
-    const id = parseInt(c.req.param('id'), 10);
-    const body = (await c.req.json()) as {
-      name?: string;
-      description?: string;
-      plan?: string;
-      enabled?: boolean;
-    };
-
-    const [updated] = await db
-      .update(workflows)
-      .set({
-        ...body,
-        updatedAt: new Date(),
-      })
-      .where(eq(workflows.id, id))
-      .returning();
-
-    return c.json(updated);
-  } catch (error) {
-    logger.error('[workflows.update]', error);
-    return c.json({ error: 'Failed to update workflow' }, 500);
-  }
-});
-
-app.delete('/workflows/:id', async (c) => {
-  try {
-    const id = parseInt(c.req.param('id'), 10);
-    await db.delete(workflows).where(eq(workflows.id, id));
-    return c.json({ success: true });
-  } catch (error) {
-    logger.error('[workflows.delete]', error);
-    return c.json({ error: 'Failed to delete workflow' }, 500);
-  }
-});
-
-app.get('/workflows/:id/runs', async (c) => {
-  try {
-    const id = parseInt(c.req.param('id'), 10);
-    const runs = await db
-      .select()
-      .from(workflowRuns)
-      .where(eq(workflowRuns.workflowId, id))
-      .orderBy(desc(workflowRuns.ranAt))
-      .limit(20);
-
-    return c.json({ runs });
-  } catch (error) {
-    logger.error('[workflows.runs.list]', error);
-    return c.json({ error: 'Failed to list runs' }, 500);
-  }
-});
-
-app.post('/workflows/:id/run', async (c) => {
-  try {
-    const id = parseInt(c.req.param('id'), 10);
-    const [wf] = await db.select().from(workflows).where(eq(workflows.id, id));
-
-    if (!wf) return c.json({ error: 'Workflow not found' }, 404);
-
-    const [run] = await db
-      .insert(workflowRuns)
-      .values({ workflowId: id, status: 'running' })
-      .returning();
-
-    if (!run) return c.json({ error: 'Failed to create run' }, 500);
-
-    const chunks: string[] = [];
-    let output = '';
-
-    try {
-      output = await runWorkflow(id, wf.plan, {
-        onEvent: (event) => {
-          chunks.push(
-            `event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`,
-          );
-        },
-      });
-
-      await db
-        .update(workflowRuns)
-        .set({ status: 'completed', output })
-        .where(eq(workflowRuns.id, run.id));
-
-      await db
-        .update(workflows)
-        .set({ lastRunAt: new Date() })
-        .where(eq(workflows.id, id));
-
-      chunks.push('event: done\ndata: null\n\n');
-    } catch (error) {
-      logger.error('[workflows.run]', error);
-      await db
-        .update(workflowRuns)
-        .set({ status: 'failed' })
-        .where(eq(workflowRuns.id, run.id));
-
-      chunks.push(
-        `event: error\ndata: ${JSON.stringify({ message: error instanceof Error ? error.message : 'Run failed' })}\n\n`,
-      );
-    }
-
-    return new Response(chunks.join(''), {
-      headers: {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        Connection: 'keep-alive',
-      },
-    });
-  } catch (error) {
-    logger.error('[workflows.run]', error);
-    return c.json({ error: 'Failed to run workflow' }, 500);
-  }
-});
+app.route('/workflows', workflowRoutes);
 
 /* ─── Voice (Deepgram Voice Agent) ──────────────────────────────────────────── */
 
@@ -1082,9 +919,7 @@ app.get(
         });
       },
       onMessage(evt) {
-        bridge.onClientMessage(
-          evt.data as string | ArrayBuffer | Uint8Array,
-        );
+        bridge.onClientMessage(evt.data as string | ArrayBuffer | Uint8Array);
       },
       onClose() {
         bridge.onClientClose();
@@ -1098,6 +933,12 @@ app.get(
 app.post('/voice/llm/chat/completions', voiceLlmHandler);
 app.post('/voice/llm/v1/chat/completions', voiceLlmHandler);
 
-app.use(oluso.errorHandler);
+app.onError((error, c) => {
+  logger.error('[http]', error);
+  void oluso
+    ?.captureException(error, { method: c.req.method, path: c.req.path })
+    .catch((reportError) => logger.error('[error-reporting]', reportError));
+  return c.json({ error: 'Internal server error' }, 500);
+});
 
 export default app;

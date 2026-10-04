@@ -11,7 +11,11 @@ import {
   jsonb,
   real,
   unique,
+  primaryKey,
+  index,
+  uniqueIndex,
 } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 
 export const memoryClassificationEnum = pgEnum('memory_classification', [
   'identity',
@@ -101,18 +105,24 @@ export const graphNodes = pgTable('graph_nodes', {
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
 
-export const graphEdges = pgTable('graph_edges', {
-  id: serial('id').primaryKey(),
-  fromNodeId: integer('from_node_id').notNull(),
-  toNodeId: integer('to_node_id').notNull(),
-  relation: text('relation').notNull(),
-  weight: integer('weight').notNull().default(1),
-  confidence: real('confidence').notNull().default(1),
-  createdBy: text('created_by').notNull().default('user'), // user | agent | inference
-  evidence: text('evidence'),
-  source: text('source'),
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-}, (t) => [unique('graph_edges_unique').on(t.fromNodeId, t.toNodeId, t.relation)]);
+export const graphEdges = pgTable(
+  'graph_edges',
+  {
+    id: serial('id').primaryKey(),
+    fromNodeId: integer('from_node_id').notNull(),
+    toNodeId: integer('to_node_id').notNull(),
+    relation: text('relation').notNull(),
+    weight: integer('weight').notNull().default(1),
+    confidence: real('confidence').notNull().default(1),
+    createdBy: text('created_by').notNull().default('user'), // user | agent | inference
+    evidence: text('evidence'),
+    source: text('source'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (t) => [
+    unique('graph_edges_unique').on(t.fromNodeId, t.toNodeId, t.relation),
+  ],
+);
 
 export const connections = pgTable('connections', {
   id: serial('id').primaryKey(),
@@ -127,21 +137,150 @@ export const connections = pgTable('connections', {
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
 
-export const workflows = pgTable('workflows', {
-  id: serial('id').primaryKey(),
-  name: text('name').notNull(),
-  description: text('description').notNull().default(''),
-  plan: text('plan').notNull(),
-  enabled: boolean('enabled').notNull().default(true),
-  lastRunAt: timestamp('last_run_at'),
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-  updatedAt: timestamp('updated_at').notNull().defaultNow(),
-});
+export const workflows = pgTable(
+  'workflows',
+  {
+    activeRevision: integer('active_revision').notNull().default(0),
+    nextRunAt: timestamp('next_run_at', { withTimezone: true }),
+    lifecycle: text('lifecycle').notNull().default('manual'),
+    id: serial('id').primaryKey(),
+    name: text('name').notNull(),
+    description: text('description').notNull().default(''),
+    plan: text('plan').notNull(),
+    enabled: boolean('enabled').notNull().default(true),
+    lastRunAt: timestamp('last_run_at'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  (t) => [
+    index('workflow_due')
+      .on(t.nextRunAt)
+      .where(sql`${t.enabled} = true`),
+  ],
+);
 
-export const workflowRuns = pgTable('workflow_runs', {
+export const workflowRuns = pgTable(
+  'workflow_runs',
+  {
+    revisionId: integer('revision_id').references(() => workflowRevisions.id),
+    scheduledFor: timestamp('scheduled_for', { withTimezone: true }),
+    trigger: text('trigger').notNull().default('manual'),
+    finishedAt: timestamp('finished_at', { withTimezone: true }),
+    error: text('error'),
+    leaseOwner: text('lease_owner'),
+    heartbeatAt: timestamp('heartbeat_at', { withTimezone: true }),
+    cancelRequested: boolean('cancel_requested').notNull().default(false),
+    feedback: text('feedback'),
+    learned: boolean('learned').notNull().default(false),
+    id: serial('id').primaryKey(),
+    workflowId: integer('workflow_id')
+      .notNull()
+      .references(() => workflows.id, { onDelete: 'cascade' }),
+    status: text('status').notNull().default('running'),
+    output: text('output'),
+    ranAt: timestamp('ran_at').notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('workflow_occurrence').on(t.workflowId, t.scheduledFor),
+    uniqueIndex('workflow_one_active')
+      .on(t.workflowId)
+      .where(sql`${t.status} in ('queued','running')`),
+  ],
+);
+
+export const workflowRevisions = pgTable(
+  'workflow_revisions',
+  {
+    id: serial('id').primaryKey(),
+    workflowId: integer('workflow_id')
+      .notNull()
+      .references(() => workflows.id, { onDelete: 'cascade' }),
+    version: integer('version').notNull(),
+    definition: jsonb('definition').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [unique().on(t.workflowId, t.version)],
+);
+export const workflowSteps = pgTable(
+  'workflow_steps',
+  {
+    runId: integer('run_id')
+      .notNull()
+      .references(() => workflowRuns.id, { onDelete: 'cascade' }),
+    stepId: text('step_id').notNull(),
+    status: text('status').notNull().default('pending'),
+    output: text('output'),
+    error: text('error'),
+    startedAt: timestamp('started_at', { withTimezone: true }),
+    finishedAt: timestamp('finished_at', { withTimezone: true }),
+  },
+  (t) => [primaryKey({ columns: [t.runId, t.stepId] })],
+);
+export const workflowEvents = pgTable(
+  'workflow_events',
+  {
+    id: serial('id').primaryKey(),
+    runId: integer('run_id')
+      .notNull()
+      .references(() => workflowRuns.id, { onDelete: 'cascade' }),
+    event: jsonb('event').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index('workflow_events_run').on(t.runId, t.id)],
+);
+export const workflowActions = pgTable(
+  'workflow_actions',
+  {
+    id: serial('id').primaryKey(),
+    runId: integer('run_id')
+      .notNull()
+      .references(() => workflowRuns.id, { onDelete: 'cascade' }),
+    stepId: text('step_id').notNull(),
+    tool: text('tool').notNull(),
+    fingerprint: text('fingerprint').notNull(),
+    status: text('status').notNull(),
+    output: jsonb('output'),
+  },
+  (t) => [unique().on(t.runId, t.stepId, t.fingerprint)],
+);
+export const workflowLessons = pgTable('workflow_lessons', {
   id: serial('id').primaryKey(),
-  workflowId: integer('workflow_id').notNull().references(() => workflows.id, { onDelete: 'cascade' }),
-  status: text('status').notNull().default('running'),
-  output: text('output'),
-  ranAt: timestamp('ran_at').notNull().defaultNow(),
+  workflowId: integer('workflow_id')
+    .notNull()
+    .references(() => workflows.id, { onDelete: 'cascade' }),
+  runId: integer('run_id').references(() => workflowRuns.id, {
+    onDelete: 'set null',
+  }),
+  lesson: text('lesson').notNull(),
+  confidence: real('confidence').notNull().default(0.5),
+  active: boolean('active').notNull().default(true),
+  createdAt: timestamp('created_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+export const workflowProposals = pgTable('workflow_proposals', {
+  id: serial('id').primaryKey(),
+  workflowId: integer('workflow_id')
+    .notNull()
+    .references(() => workflows.id, { onDelete: 'cascade' }),
+  runId: integer('run_id').references(() => workflowRuns.id, {
+    onDelete: 'set null',
+  }),
+  baseRevision: integer('base_revision').notNull(),
+  reason: text('reason').notNull(),
+  definition: jsonb('definition').notNull(),
+  status: text('status').notNull().default('pending'),
+  createdAt: timestamp('created_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+export const workflowWorkers = pgTable('workflow_workers', {
+  id: text('id').primaryKey(),
+  heartbeatAt: timestamp('heartbeat_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });

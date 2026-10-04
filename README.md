@@ -4,6 +4,8 @@ A daily briefing agent powered by a LangChain planning agent that dynamically de
 
 ## Features
 
+- **Scheduled workflows**: Create recurring or one-time automations in natural language, delegate to specialist agents, inspect live steps and run history, and review learned improvements. See [workflow setup and API](backend/WORKFLOWS.md).
+
 - 🤖 **AI-Powered Agent**: Uses LangChain with dynamic tool selection
 - 🔗 **OAuth Integration**: Secure OAuth authentication for GitHub, Notion, Spotify, and more; API key auth for ClickUp and Todoist
 - 📊 **Multiple Data Sources**: GitHub, Google Calendar, Notion, ClickUp, AniList, and more
@@ -68,7 +70,7 @@ Fill in `.env`:
 
 | Variable                      | Description                                            |
 | ----------------------------- | ------------------------------------------------------ |
-| `OAUTH_REDIRECT_BASE_URL`     | OAuth callback base URL (e.g. `http://localhost:3000`) |
+| `OAUTH_REDIRECT_BASE_URL`     | OAuth callback base URL (e.g. `http://localhost:3005`) |
 | `APP_URL`                     | Web app URL (e.g. `http://localhost:5173`)             |
 | `GITHUB_OAUTH_CLIENT_ID`      | GitHub OAuth app client ID                             |
 | `GITHUB_OAUTH_CLIENT_SECRET`  | GitHub OAuth app client secret                         |
@@ -105,7 +107,7 @@ bun run dev     # development (watch mode)
 bun run start   # production
 ```
 
-Server starts on port **3000**.
+Server starts on port **3005**. Run `bun run worker` from `backend/` in a separate terminal to execute queued and scheduled workflows.
 
 ### 5. Start the web app
 
@@ -125,12 +127,12 @@ The web app runs on port **3001**.
 { "status": "ok", "timestamp": 1712000000000 }
 ```
 
-### `POST /cron`
+### `POST /cron/briefing`
 
 Triggers the daily briefing. Fetches GitHub + Calendar data, generates a summary via the planning agent, stores it in the DB, and sends it to Telegram.
 
 ```bash
-curl -X POST http://localhost:3000/cron
+curl -X POST http://localhost:3005/cron/briefing -H "Authorization: Bearer YOUR_CRON_SECRET"
 ```
 
 ### `POST /chat`
@@ -138,7 +140,7 @@ curl -X POST http://localhost:3000/cron
 Ad-hoc question routing — the agent decides which tools to call.
 
 ```bash
-curl -X POST http://localhost:3000/chat \
+curl -X POST http://localhost:3005/chat \
   -H "Content-Type: application/json" \
   -d '{"message": "what commits did I make today?"}'
 ```
@@ -150,7 +152,7 @@ Telegram-shaped webhook updates posted to `/chat` or `/telegram/webhook` are als
 Streaming chat endpoint for the browser UI. It returns SSE events for status, tool start/end, assistant token deltas, and the final response.
 
 ```bash
-curl -N -X POST http://localhost:3000/chat/stream \
+curl -N -X POST http://localhost:3005/chat/stream \
   -H "Content-Type: application/json" \
   -d '{"text": "what am I working on right now?"}'
 ```

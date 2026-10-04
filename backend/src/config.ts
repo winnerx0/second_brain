@@ -23,10 +23,10 @@ const envSchema = z.object({
     .default('https://openrouter.ai/api/v1'),
   OPENROUTER_API_KEY: z.string().min(1),
   GEMINI_API_KEY: z.string().min(1),
-  USER_TIMEZONE: z.string().min(1).default('UTC'),
+  USER_TIMEZONE: z.string().refine(value => { try { new Intl.DateTimeFormat('en', { timeZone: value }); return true; } catch { return false; } }, 'Invalid IANA timezone').default('Africa/Lagos'),
   // Gmail
   GMAIL_REFRESH_TOKEN: z.string().optional(),
-  OAUTH_REDIRECT_BASE_URL: z.string().min(1).default('http://localhost:80'),
+  OAUTH_REDIRECT_BASE_URL: z.string().min(1).default('http://localhost:3005'),
   APP_URL: z.string().min(1).default('http://localhost:3001'),
   XAI_API_KEY: z.string().min(1),
   TAVILY_API_KEY: z.string().min(1),

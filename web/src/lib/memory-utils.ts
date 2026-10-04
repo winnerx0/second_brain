@@ -54,7 +54,7 @@ export function safeDate(value: string | null): string {
 }
 
 export const API_BASE =
-  import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000';
+  import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3005';
 
 export function apiUrl(path: string): string {
   return `${API_BASE.replace(/\/$/, '')}${path.startsWith('/') ? path : `/${path}`}`;

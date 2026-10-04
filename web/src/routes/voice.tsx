@@ -8,7 +8,7 @@ export const Route = createFileRoute('/voice')({
   component: Voice,
 });
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000';
+const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3005';
 const SESSIONS_URL = `${API_BASE.replace(/\/$/, '')}/sessions`;
 
 type Line = { id: string; role: 'user' | 'assistant'; content: string };

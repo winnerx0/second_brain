@@ -15,7 +15,8 @@ WORKDIR /app
 COPY --from=install /app/node_modules ./node_modules
 COPY src ./src
 # COPY .config/google-docs-mcp /root/.config/google-docs-mcp
-RUN bun build --target=bun --production --outfile=dist/index.js --minify ./src/index.ts  
+RUN bun build --target=bun --production --external oluso --outfile=dist/index.js --minify ./src/index.ts
+RUN bun build --target=bun --production --outfile=dist/worker.js --minify ./src/workflows/worker.ts
 
 FROM base AS final
 WORKDIR /app
@@ -26,6 +27,7 @@ COPY package.json bun.lock tsconfig.json ./
 COPY src/db ./src/db
 COPY drizzle ./drizzle
 COPY drizzle.config.ts ./
+COPY skills ./skills
 # COPY .config/google-docs-mcp /root/.config/google-docs-mcp
 
 EXPOSE 3005

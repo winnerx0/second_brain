@@ -3,6 +3,7 @@ import z from 'zod';
 import { model } from '../shared.js';
 import { spotifyTools } from '../tools/spotify.js';
 import { streamSubAgent } from './utils.js';
+import { workflowPolicy } from '../workflows/policy.js';
 
 const SPOTIFY_SYSTEM_PROMPT = `You are a Spotify Assistant with access to the user's Spotify account.
 
@@ -20,6 +21,7 @@ When helping:
 
 const spotifyAgent = createAgent({
   model,
+  middleware: [workflowPolicy],
   tools: [...spotifyTools],
 });
 

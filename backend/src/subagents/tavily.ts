@@ -3,6 +3,7 @@ import z from 'zod';
 import { model } from '../shared.js';
 import { tavilyTools } from '../tools/tavily.js';
 import { streamSubAgent } from './utils.js';
+import { workflowPolicy } from '../workflows/policy.js';
 
 const TAVILY_SYSTEM_PROMPT = `You are a Web Search Assistant with access to Tavily web search.
 
@@ -16,6 +17,7 @@ When helping:
 
 const tavilyAgent = createAgent({
   model,
+  middleware: [workflowPolicy],
   tools: [...tavilyTools],
 });
 

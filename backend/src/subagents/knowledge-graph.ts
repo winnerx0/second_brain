@@ -3,6 +3,7 @@ import z from 'zod';
 import { model } from '../shared.js';
 import { knowledgeGraphTools } from '../tools/knowledge-graph.js';
 import { streamSubAgent } from './utils.js';
+import { workflowPolicy } from '../workflows/policy.js';
 
 const KNOWLEDGE_GRAPH_SYSTEM_PROMPT = `You are a Knowledge Graph Assistant.
 
@@ -26,6 +27,7 @@ Operating rules:
 
 const knowledgeGraphAgent = createAgent({
   model,
+  middleware: [workflowPolicy],
   tools: [...knowledgeGraphTools],
 });
 

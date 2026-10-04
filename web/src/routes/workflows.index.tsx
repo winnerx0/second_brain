@@ -1,270 +1,203 @@
 import { createRoute, useNavigate } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
 import { AppSidebar, SidebarTrigger } from '../components/app-sidebar';
-import { FiPlay, FiPlus, FiX } from 'react-icons/fi';
-import { Route as WorkflowsRoute, WORKFLOWS_URL, type Workflow } from './workflows';
+import { WorkflowComposer } from '../components/workflow-composer';
+import {
+  workflowApi,
+  scheduleLabel,
+  formatTime,
+  type Workflow,
+} from '../lib/workflows';
+import { Route as WorkflowsRoute } from './workflows';
+import '../components/workflows.css';
 
 export const Route = createRoute({
   getParentRoute: () => WorkflowsRoute,
   path: '/',
   component: WorkflowsIndexPage,
 });
-
-function WorkflowCard({
-  workflow,
-  onOpen,
-}: {
-  workflow: Workflow;
-  onOpen: (wf: Workflow) => void;
-}) {
-  return (
-    <div
-      className="conn-card"
-      onClick={() => onOpen(workflow)}
-      style={{ cursor: 'pointer' }}
-    >
-      <div className="conn-card-body">
-        <div className="conn-card-name">{workflow.name}</div>
-        {workflow.description && (
-          <div className="conn-card-desc">{workflow.description}</div>
-        )}
-        <div className="conn-card-meta">
-          {workflow.lastRunAt && (
-            <span className="text-xs text-gray-500">
-              Last run: {new Date(workflow.lastRunAt).toLocaleDateString()}
-            </span>
-          )}
-        </div>
-      </div>
-
-      <div className="conn-card-actions">
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onOpen(workflow);
-          }}
-          className="conn-btn-connect"
-          title="Open workflow"
-        >
-          <FiPlay size={13} style={{ marginRight: '4px' }} /> Open
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function WorkflowModal({
-  onSave,
-  onClose,
-}: {
-  onSave: (data: { name: string; description: string; plan: string; enabled: boolean }) => Promise<void>;
-  onClose: () => void;
-}) {
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [plan, setPlan] = useState('');
-  const [loading, setLoading] = useState(false);
-
-  const handleSave = async () => {
-    if (!name.trim() || !plan.trim()) return;
-    setLoading(true);
-    try {
-      await onSave({ name: name.trim(), description: description.trim(), plan: plan.trim(), enabled: true });
-      onClose();
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="conn-modal-overlay" onClick={onClose}>
-      <div className="conn-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px' }}>
-        <div className="conn-modal-header">
-          <span className="conn-modal-title">New Workflow</span>
-          <button type="button" aria-label="Close" onClick={onClose} className="conn-modal-close">
-            <FiX size={13} />
-          </button>
-        </div>
-
-        <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <div>
-            <label style={{ display: 'block', fontSize: '12px', marginBottom: '4px', fontWeight: 500 }}>
-              Name
-            </label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Workflow name"
-              style={{
-                width: '100%',
-                padding: '8px',
-                border: '1px solid var(--border)',
-                borderRadius: '6px',
-                fontSize: '14px',
-              }}
-            />
-          </div>
-
-          <div>
-            <label style={{ display: 'block', fontSize: '12px', marginBottom: '4px', fontWeight: 500 }}>
-              Description (optional)
-            </label>
-            <input
-              type="text"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Brief description"
-              style={{
-                width: '100%',
-                padding: '8px',
-                border: '1px solid var(--border)',
-                borderRadius: '6px',
-                fontSize: '14px',
-              }}
-            />
-          </div>
-
-          <div>
-            <label style={{ display: 'block', fontSize: '12px', marginBottom: '4px', fontWeight: 500 }}>
-              Plan (natural language)
-            </label>
-            <textarea
-              value={plan}
-              onChange={(e) => setPlan(e.target.value)}
-              placeholder="Describe the workflow steps (e.g., 'Get my GitHub PRs, then summarize them')"
-              style={{
-                width: '100%',
-                padding: '8px',
-                border: '1px solid var(--border)',
-                borderRadius: '6px',
-                fontSize: '14px',
-                fontFamily: 'monospace',
-                minHeight: '200px',
-                resize: 'vertical',
-              }}
-            />
-          </div>
-
-          <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-            <button
-              type="button"
-              onClick={onClose}
-              className="conn-btn-disconnect"
-              disabled={loading}
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={() => void handleSave()}
-              className="conn-btn-connect"
-              disabled={loading || !name.trim() || !plan.trim()}
-            >
-              {loading ? 'Saving…' : 'Save'}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function WorkflowsIndexPage() {
   const navigate = useNavigate();
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [showModal, setShowModal] = useState(false);
-
+  const [error, setError] = useState('');
+  const [query, setQuery] = useState('');
+  const [filter, setFilter] = useState('all');
+  const [creating, setCreating] = useState(false);
+  const [health, setHealth] = useState<{
+    workers: number;
+    overdue: number;
+    schedulerEnabled: boolean;
+  }>();
   const load = async () => {
-    setLoading(true);
     try {
-      const res = await fetch(WORKFLOWS_URL);
-      if (!res.ok) throw new Error(`Failed to load workflows (${res.status})`);
-      const data = (await res.json()) as { workflows: Workflow[] };
+      const [data, status] = await Promise.all([
+        workflowApi<{ workflows: Workflow[] }>(),
+        workflowApi<typeof health>('/health'),
+      ]);
       setWorkflows(data.workflows);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setHealth(status);
+      setError('');
+    } catch (e) {
+      setError(String(e));
     } finally {
       setLoading(false);
     }
   };
-
   useEffect(() => {
     void load();
+    const timer = setInterval(() => void load(), 15000);
+    return () => clearInterval(timer);
   }, []);
-
-  const handleCreate = async (data: { name: string; description: string; plan: string; enabled: boolean }) => {
-    const res = await fetch(WORKFLOWS_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
+  const open = (w: Workflow) =>
+    void navigate({
+      to: '/workflows/$workflowId',
+      params: { workflowId: String(w.id) },
     });
-    if (!res.ok) throw new Error(`Failed to create workflow (${res.status})`);
-    const created = (await res.json()) as Workflow;
-    await load();
-    if (created?.id) {
-      void navigate({ to: '/workflows/$workflowId', params: { workflowId: String(created.id) } });
+  const action = async (
+    w: Workflow,
+    type: 'toggle' | 'duplicate' | 'delete',
+  ) => {
+    try {
+      if (type === 'toggle')
+        await workflowApi('/' + w.id, 'PATCH', { enabled: !w.enabled });
+      if (type === 'duplicate' && w.definition) {
+        const copy = await workflowApi<Workflow>('', 'POST', {
+          definition: { ...w.definition, name: w.name + ' (copy)' },
+          enabled: false,
+        });
+        open(copy);
+      }
+      if (
+        type === 'delete' &&
+        window.confirm('Delete this workflow and its run history?')
+      )
+        await workflowApi('/' + w.id, 'DELETE');
+      await load();
+    } catch (e) {
+      setError(String(e));
     }
   };
-
-  const openWorkflow = (wf: Workflow) => {
-    void navigate({ to: '/workflows/$workflowId', params: { workflowId: String(wf.id) } });
-  };
-
+  const visible = workflows.filter(
+    (w) =>
+      (w.name + ' ' + w.description)
+        .toLowerCase()
+        .includes(query.toLowerCase()) &&
+      (filter === 'all' ||
+        (filter === 'paused'
+          ? !w.enabled
+          : filter === 'failed'
+            ? ['failed', 'needs_attention'].includes(w.last_status ?? '')
+            : w.enabled)),
+  );
   return (
     <div className="app-shell">
       <AppSidebar />
-
       <div className="chat-container">
-        <div className="chat-header">
+        <header className="chat-header">
           <div className="chat-header-left">
             <SidebarTrigger />
             <span className="chat-header-title">Workflows</span>
           </div>
-          <div className="conn-header-actions">
-            {!loading && (
-              <span className="chat-header-badge">
-                <span className={`chat-header-dot${workflows.length > 0 ? '' : ' idle'}`} />
-                {workflows.length} workflows
-              </span>
-            )}
+        </header>
+        <main className="wf-page">
+          <div className="wf-toolbar">
+            <div style={{ flex: 1 }}>
+              <h1>Your work, on schedule.</h1>
+              <p>Give Aira a process. Follow every step from here.</p>
+            </div>
             <button
-              type="button"
-              onClick={() => setShowModal(true)}
-              className="conn-add-btn"
+              className="wf-primary"
+              onClick={() => setCreating(!creating)}
             >
-              <FiPlus size={13} />
-              New Workflow
+              {creating ? 'Close composer' : '+ New workflow'}
             </button>
           </div>
-        </div>
-
-        <main className="connections-page">
-          {error && <div className="memories-error">{error}</div>}
-
+          {health && (
+            <p role="status">
+              {health.workers
+                ? 'Worker connected'
+                : 'Worker offline — runs will stay queued'}{' '}
+              ·{' '}
+              {health.schedulerEnabled
+                ? 'Scheduling enabled'
+                : 'Scheduling paused globally'}{' '}
+              · {health.overdue} overdue
+            </p>
+          )}
+          {error && (
+            <p role="alert" className="wf-error">
+              {error} <button onClick={() => void load()}>Retry</button>
+            </p>
+          )}
+          {(creating || (!loading && !workflows.length)) && (
+            <WorkflowComposer onSaved={open} />
+          )}
+          <div className="wf-toolbar">
+            <input
+              aria-label="Search workflows"
+              placeholder="Search workflows…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+            <select
+              aria-label="Filter workflows"
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+            >
+              <option value="all">All workflows</option>
+              <option value="active">Enabled</option>
+              <option value="paused">Paused</option>
+              <option value="failed">Needs attention</option>
+            </select>
+            <small>{visible.length} workflows</small>
+          </div>
           {loading ? (
-            <div className="memories-empty">Loading workflows…</div>
-          ) : workflows.length === 0 ? (
-            <div className="memories-empty">No workflows yet. Create one to get started.</div>
+            <p>Loading workflows…</p>
           ) : (
-            <div className="conn-grid">
-              {workflows.map((wf) => (
-                <WorkflowCard key={wf.id} workflow={wf} onOpen={openWorkflow} />
+            <div className="wf-cards">
+              {visible.map((w) => (
+                <article className="wf-panel" key={w.id}>
+                  <div>
+                    <span className={'wf-badge ' + w.lifecycle}>
+                      {w.enabled ? w.lifecycle : 'paused'}
+                    </span>{' '}
+                    {w.last_status && (
+                      <span className={'wf-badge ' + w.last_status}>
+                        {w.last_status.replaceAll('_', ' ')}
+                      </span>
+                    )}
+                  </div>
+                  <button className="wf-card-title" onClick={() => open(w)}>
+                    {w.name}
+                  </button>
+                  <p>{w.description}</p>
+                  <small>{scheduleLabel(w)}</small>
+                  <small>Next: {formatTime(w.nextRunAt)}</small>
+                  <small>Last completed: {formatTime(w.lastRunAt)}</small>
+                  <div className="wf-toolbar">
+                    <button onClick={() => open(w)}>Open</button>
+                    <button onClick={() => void action(w, 'toggle')}>
+                      {w.enabled ? 'Pause' : 'Resume'}
+                    </button>
+                    {w.definition && (
+                      <button onClick={() => void action(w, 'duplicate')}>
+                        Duplicate
+                      </button>
+                    )}
+                    <button onClick={() => void action(w, 'delete')}>
+                      Delete
+                    </button>
+                  </div>
+                </article>
               ))}
             </div>
           )}
+          {!loading && workflows.length > 0 && visible.length === 0 && (
+            <p>No workflows match this search.</p>
+          )}
         </main>
       </div>
-
-      {showModal && (
-        <WorkflowModal
-          onSave={handleCreate}
-          onClose={() => setShowModal(false)}
-        />
-      )}
     </div>
   );
 }

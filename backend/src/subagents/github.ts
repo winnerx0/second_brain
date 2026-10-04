@@ -13,6 +13,7 @@ import {
   mergePullRequest,
 } from '../tools/github.js';
 import { streamSubAgent } from './utils.js';
+import { workflowPolicy } from '../workflows/policy.js';
 
 const GITHUB_SYSTEM_PROMPT = `You are a GitHub Assistant with access to the user's GitHub account.
 
@@ -28,6 +29,7 @@ When helping:
 
 const githubAgent = createAgent({
   model,
+  middleware: [workflowPolicy],
   tools: [
     getOpenPRs,
     getAssignedIssues,

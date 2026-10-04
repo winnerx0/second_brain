@@ -7,7 +7,7 @@ const connectionString = hasSslMode
   ? config.DATABASE_URL.replace(/([?&])sslmode=[^&]*&?/g, '$1').replace(/[?&]$/, '')
   : config.DATABASE_URL;
 
-const pool = new Pool({
+export const pool = new Pool({
   connectionString,
   ssl: hasSslMode ? { rejectUnauthorized: true } : undefined,
 });

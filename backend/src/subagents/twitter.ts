@@ -3,6 +3,7 @@ import z from 'zod';
 import { model } from '../shared.js';
 import { twitterTools } from '../tools/twitter.js';
 import { streamSubAgent } from './utils.js';
+import { workflowPolicy } from '../workflows/policy.js';
 
 const TWITTER_SYSTEM_PROMPT = `You are a Twitter/X Assistant with access to the user's Twitter/X account.
 
@@ -22,6 +23,7 @@ When helping:
 
 const twitterAgent = createAgent({
   model,
+  middleware: [workflowPolicy],
   tools: [...twitterTools],
 });
 
