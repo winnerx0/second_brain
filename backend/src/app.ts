@@ -29,10 +29,10 @@ import {
 import { config } from './config.js';
 import { voiceLlmHandler } from './voice/llm-adapter.js';
 import { createVoiceBridge } from './voice/proxy.js';
-import { createBunWebSocket } from 'hono/bun';
+import { upgradeWebSocket, websocket } from 'hono/bun';
 import { kiviaHonoMiddleware } from '@kivia/sdk';
+import { Oluso } from 'oluso';
 
-const { upgradeWebSocket, websocket } = createBunWebSocket();
 export { websocket };
 const API_KEY_CONNECTIONS = new Set(['clickup']);
 const REMOVED_CONNECTIONS = new Set(['linkedin']);
@@ -90,20 +90,90 @@ function formatSseEvent(event: AgentStreamEvent): string {
   return `event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`;
 }
 
-app.use('*', cors({ origin: [config.APP_URL] }));
-
-const kivia = kiviaHonoMiddleware({ apiKey: config.KIVIA_API_KEY });
-
-app.use(kivia);
-
-import { Oluso } from 'oluso';
-
 const oluso = process.env.OLUSO_API_KEY
   ? new Oluso({
       apiKey: process.env.OLUSO_API_KEY,
       environment: 'development',
     })
   : undefined;
+
+function olusoRequestContext(c: Context) {
+  return {
+    url: c.req.url,
+    method: c.req.method,
+    headers: Object.fromEntries(c.req.raw.headers.entries()),
+    query: c.req.query(),
+    params: c.req.param(),
+  };
+}
+
+function reportOlusoError(error: Error, c: Context) {
+  if (!oluso) return;
+
+  void oluso
+    .reportError(error, olusoRequestContext(c), { statusCode: c.res.status })
+    .catch((reportingError) => {
+      logger.warn(
+        `[oluso] failed to report error: ${reportingError instanceof Error ? reportingError.message : String(reportingError)}`,
+      );
+    });
+}
+
+declare module 'hono' {
+  interface ContextVariableMap {
+    olusoErrorReported: boolean;
+  }
+}
+
+app.use('*', cors({ origin: [config.APP_URL] }));
+
+const kivia = kiviaHonoMiddleware({ apiKey: config.KIVIA_API_KEY });
+
+app.use(kivia);
+
+// Oluso's Express adapter expects a Node ServerResponse. Hono on Bun exposes a
+// Fetch Response instead, so use the core client with Hono middleware.
+app.use('*', async (c, next) =>
+  oluso?.getContextManager().run(async () => {
+    const startTime = Date.now();
+    oluso.getContextManager().setRequestStartTime(startTime);
+    oluso.addBreadcrumb({
+      message: `${c.req.method} ${c.req.path}`,
+      level: 'info',
+      category: 'http',
+      data: {
+        method: c.req.method,
+        url: c.req.path,
+        query: c.req.query(),
+      },
+    });
+
+    await next();
+
+    const statusCode = c.res.status;
+    oluso.addBreadcrumb({
+      message: `Response ${statusCode} - ${c.req.method} ${c.req.path}`,
+      level: statusCode >= 400 ? 'error' : 'info',
+      category: 'http',
+      data: { statusCode, duration: Date.now() - startTime },
+    });
+
+    if (statusCode >= 500 && !c.get('olusoErrorReported')) {
+      const error = new Error(
+        `Server error: ${statusCode} - ${c.req.method} ${c.req.path}`,
+      ) as Error & { severity?: string };
+      error.severity = 'critical';
+      reportOlusoError(error, c);
+    }
+  }) ?? next(),
+);
+
+app.onError((error, c) => {
+  c.set('olusoErrorReported', true);
+  reportOlusoError(error, c);
+  logger.error('[http]', error);
+  return c.json({ error: 'Internal server error' }, 500);
+});
 
 app.get('/health', (c) => {
   return c.json({ status: 'ok', timestamp: Date.now() });
@@ -932,13 +1002,5 @@ app.get(
 // Aliased with /v1 in case Deepgram appends the version segment.
 app.post('/voice/llm/chat/completions', voiceLlmHandler);
 app.post('/voice/llm/v1/chat/completions', voiceLlmHandler);
-
-app.onError((error, c) => {
-  logger.error('[http]', error);
-  void oluso
-    ?.captureException(error, { method: c.req.method, path: c.req.path })
-    .catch((reportError) => logger.error('[error-reporting]', reportError));
-  return c.json({ error: 'Internal server error' }, 500);
-});
 
 export default app;
