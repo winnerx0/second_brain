@@ -8,7 +8,7 @@ RUN apt-get update && apt-get install -y curl \
 
 FROM base AS build
 WORKDIR /app
-COPY --from=install /app/node_modules ./node_modules
+RUN bun install --frozen-lockfile --production
 COPY src ./src
 # COPY .config/google-docs-mcp /root/.config/google-docs-mcp
 RUN bun build --target=bun --production --external oluso --outfile=dist/index.js --minify ./src/index.ts
