@@ -6,10 +6,6 @@ RUN apt-get update && apt-get install -y curl \
     && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
-FROM base AS install
-COPY package.json bun.lock ./
-RUN bun install --frozen-lockfile --production
-
 FROM base AS build
 WORKDIR /app
 COPY --from=install /app/node_modules ./node_modules
@@ -22,7 +18,7 @@ FROM base AS final
 WORKDIR /app
 
 COPY --from=build /app/dist ./dist
-COPY --from=install /app/node_modules ./node_modules
+RUN bun install --frozen-lockfile --production
 COPY package.json bun.lock tsconfig.json ./
 COPY src/db ./src/db
 COPY drizzle ./drizzle
