@@ -8,6 +8,7 @@ RUN apt-get update && apt-get install -y curl \
 
 FROM base AS build
 WORKDIR /app
+COPY package.json bun.lock ./
 RUN bun install --frozen-lockfile --production
 COPY src ./src
 # COPY .config/google-docs-mcp /root/.config/google-docs-mcp
@@ -16,7 +17,7 @@ RUN bun build --target=bun --production --outfile=dist/worker.js --minify ./src/
 
 FROM base AS final
 WORKDIR /app
-
+COPY package.json bun.lock ./
 COPY --from=build /app/dist ./dist
 RUN bun install --frozen-lockfile --production
 COPY package.json bun.lock tsconfig.json ./
