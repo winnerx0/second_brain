@@ -1,4 +1,4 @@
-FROM oven/bun:latest AS base
+FROM docker.io/oven/bun:latest AS base
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y curl \
