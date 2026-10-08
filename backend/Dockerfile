@@ -13,7 +13,6 @@ RUN bun install --frozen-lockfile --production
 COPY src ./src
 # COPY .config/google-docs-mcp /root/.config/google-docs-mcp
 RUN bun build --target=bun --production --external oluso --outfile=dist/index.js --minify ./src/index.ts
-RUN bun build --target=bun --production --outfile=dist/worker.js --minify ./src/workflows/worker.ts
 
 FROM base AS final
 WORKDIR /app

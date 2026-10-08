@@ -395,4 +395,38 @@ suite('persistent workflow engine (isolated Postgres)', () => {
     expect(text).not.toContain('queued');
     await service.setEnabled(id, false);
   });
+  test('embedded worker registers and removes its heartbeat on shutdown', async () => {
+    await pool.query(
+      `UPDATE workflow_runs SET status='cancelled',finished_at=now() WHERE status='queued'`,
+    );
+    const { startWorkflowWorker } = await import('./worker.js');
+    const { workerId } = await import('./engine.js');
+    const previousLearningSetting = process.env.WORKFLOW_LEARNING_ENABLED;
+    process.env.WORKFLOW_LEARNING_ENABLED = 'false';
+    const worker = startWorkflowWorker();
+    try {
+      let heartbeat = await pool.query(
+        'SELECT id FROM workflow_workers WHERE id=$1',
+        [workerId],
+      );
+      for (let attempt = 0; !heartbeat.rowCount && attempt < 100; attempt++) {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        heartbeat = await pool.query(
+          'SELECT id FROM workflow_workers WHERE id=$1',
+          [workerId],
+        );
+      }
+      expect(heartbeat.rowCount).toBe(1);
+    } finally {
+      await worker.stop();
+      if (previousLearningSetting === undefined)
+        delete process.env.WORKFLOW_LEARNING_ENABLED;
+      else process.env.WORKFLOW_LEARNING_ENABLED = previousLearningSetting;
+    }
+    const stopped = await pool.query(
+      'SELECT id FROM workflow_workers WHERE id=$1',
+      [workerId],
+    );
+    expect(stopped.rowCount).toBe(0);
+  });
 });

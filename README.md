@@ -107,7 +107,7 @@ bun run dev     # development (watch mode)
 bun run start   # production
 ```
 
-Server starts on port **3005**. Run `bun run worker` from `backend/` in a separate terminal to execute queued and scheduled workflows.
+Server starts on port **3005**. The backend process handles API requests and queued or scheduled workflows together.
 
 ### 5. Start the web app
 
