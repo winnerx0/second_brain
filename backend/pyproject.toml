@@ -1,0 +1,75 @@
+[project]
+name = "second-brain"
+version = "0.1.0"
+description = "Aira — a daily briefing agent with scheduled workflows, memory and a knowledge graph"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+    # HTTP / ASGI
+    "fastapi>=0.118",
+    "uvicorn[standard]>=0.38",
+    "sse-starlette>=3.0",
+    "websockets>=15.0",
+    "httpx>=0.28",
+    # Persistence
+    "sqlalchemy[asyncio]>=2.0.44",
+    "alembic>=1.17",
+    "psycopg[binary,pool]>=3.2",
+    "pgvector>=0.4",
+    # Config / validation
+    "pydantic>=2.12",
+    "pydantic-settings>=2.12",
+    # Agent
+    "langchain>=1.0",
+    "langchain-core>=1.0",
+    "langgraph>=1.0",
+    "langchain-xai>=1.0",
+    "langchain-openai>=1.0",
+    "openai>=2.0",
+    "tiktoken>=0.12",
+    # Scheduling
+    "croniter>=6.0",
+    # Google APIs (Gmail, Calendar, Docs/Drive)
+    "google-api-python-client>=2.187",
+    "google-auth>=2.42",
+    "google-auth-oauthlib>=1.2",
+    # Observability
+    "structlog>=25.4",
+    "opentelemetry-sdk>=1.39",
+    "opentelemetry-exporter-otlp>=1.39",
+    "opentelemetry-instrumentation-fastapi>=0.60b0",
+    "opentelemetry-instrumentation-sqlalchemy>=0.60b0",
+    "opentelemetry-instrumentation-httpx>=0.60b0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4",
+    "pytest-asyncio>=1.3",
+    "ruff>=0.14",
+    "mypy>=1.18",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "ASYNC", "RUF"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.mypy]
+python_version = "3.13"
+plugins = ["pydantic.mypy"]
+ignore_missing_imports = true
+
+[build-system]
+requires = ["uv_build>=0.9,<0.10"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "app"
+module-root = ""
