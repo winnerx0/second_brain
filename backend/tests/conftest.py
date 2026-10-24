@@ -12,6 +12,7 @@ import os
 from collections.abc import AsyncIterator
 from urllib.parse import urlparse
 
+import httpx
 import psycopg
 import pytest
 import pytest_asyncio
@@ -97,3 +98,33 @@ async def drizzle_engine() -> AsyncIterator[AsyncEngine]:
         yield engine
     finally:
         await engine.dispose()
+
+
+@pytest_asyncio.fixture
+async def api_client() -> AsyncIterator[httpx.AsyncClient]:
+    """Drive the ASGI app in-process against the guarded test database.
+
+    `ASGITransport` deliberately does not run the lifespan, so the workflow worker
+    never starts and `seed_connections()` does not fire — which is what contract tests
+    want. Tests that need seeded rows insert them explicitly.
+    """
+    url = resolve_test_database_url()
+    assert url is not None
+    rebuild_legacy_schema(url)
+
+    import app.db.engine as engine_module
+    from app.config import get_settings
+
+    os.environ["DATABASE_URL"] = url
+    get_settings.cache_clear()
+    await engine_module.dispose_engine()
+
+    from app.main import create_app
+
+    application = create_app()
+    transport = httpx.ASGITransport(app=application)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        try:
+            yield client
+        finally:
+            await engine_module.dispose_engine()
