@@ -1,15 +1,3 @@
-"""Outbound OAuth 2.0 for third-party connections — port of `src/oauth.ts`.
-
-This is the app acting as an OAuth *client* against nine providers; it is not user
-authentication. The service has none — it is single-user and assumed to sit behind a
-private proxy.
-
-Pending authorization states are held in memory with a ten-minute TTL, exactly as in
-the TypeScript. That makes the OAuth flow single-process: a callback arriving at a
-different worker would not find its state. The server therefore runs with one worker;
-moving this to a table is the prerequisite for scaling out.
-"""
-
 from __future__ import annotations
 
 import base64

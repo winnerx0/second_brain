@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -38,7 +38,6 @@ from app.routes import graph, health, memories, oauth, sessions
 logger = get_logger("http")
 
 
-#: `src/oauth.ts` swept expired authorization states with a bare `setInterval`.
 OAUTH_STATE_SWEEP_INTERVAL = 5 * 60
 
 
@@ -57,7 +56,7 @@ async def _sweep_oauth_states(stop: asyncio.Event) -> None:
 
 
 @asynccontextmanager
-async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+async def lifespan(_app: FastAPI) -> AsyncGenerator[None]:
     configure_logging()
     configure_tracing()
     logger.info("[startup] starting")
@@ -89,8 +88,6 @@ def create_app() -> FastAPI:
         openapi_url=None,
     )
 
-    # `cors({origin: [config.APP_URL]})` in Hono allows all methods and headers by
-    # default and does not enable credentials.
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[settings.APP_URL],

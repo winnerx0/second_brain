@@ -43,8 +43,6 @@ def default(value: Any) -> Any:
     if isinstance(value, dt.datetime):
         return js_date(value)
     if isinstance(value, dt.date):
-        # Drizzle's `date` columns (task_history.first_seen/completed_at) come back
-        # as plain 'YYYY-MM-DD' strings, not Dates.
         return value.isoformat()
     if isinstance(value, Decimal):
         return float(value)
