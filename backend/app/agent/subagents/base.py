@@ -19,6 +19,7 @@ from app.agent.resilient import resilient_middleware
 from app.agent.stream import StreamTranslator
 from app.shared import get_model
 from app.workflows.context import current_execution
+from app.workflows.policy import workflow_policy
 
 #: Matches `recursionLimit: 30` on the subagent streams in `src/subagents/utils.ts`.
 SUBAGENT_RECURSION_LIMIT = 30
@@ -27,15 +28,14 @@ SUBAGENT_RECURSION_LIMIT = 30
 def make_subagent(tools: Sequence[BaseTool]) -> Any:
     """Build a specialist graph.
 
-    `app/workflows/policy.py`'s middleware is added here once Phase 4 lands; it is
-    what enforces step permissions and the write-idempotency ledger during a workflow
-    run. Outside a run it is a pass-through, so its absence does not change ordinary
-    chat behaviour — but workflow steps must not execute until it is wired.
+    The policy middleware is outermost so it owns the write ledger, with error
+    handling inside it. Outside a workflow run the policy is a pass-through, so
+    ordinary chat is unaffected.
     """
     return create_agent(
         get_model(),
         tools=list(tools),
-        middleware=resilient_middleware(),
+        middleware=[workflow_policy(), *resilient_middleware()],
     )
 
 

@@ -28,11 +28,4 @@ COPY --from=build /app /app
 
 EXPOSE 3005
 
-# Single worker, deliberately. The workflow worker runs in this process, and the
-# OAuth pending-state map and Telegram update de-duplication are both in-memory, so
-# a second worker would double-schedule runs and break the OAuth callback.
-#
-# --timeout-graceful-shutdown 80 reproduces the 80s forced HTTP close that
-# src/index.ts implemented by hand; the rest of compose's 17m stop_grace_period is
-# then available for in-flight workflow runs to drain.
 CMD ["sh", "-c", "python -m app.scripts.bootstrap_db && exec uvicorn app.main:app --host 0.0.0.0 --port 3005 --workers 1 --timeout-graceful-shutdown 80"]

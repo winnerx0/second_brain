@@ -34,6 +34,7 @@ from app.logging import configure_logging, configure_tracing, get_logger
 from app.oauth import prune_states
 from app.routes import chat, graph, health, memories, oauth, sessions, workflows
 from app.routes import connections as connections_routes
+from app.workflows.worker import WorkflowWorker
 
 logger = get_logger("http")
 
@@ -64,10 +65,20 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None]:
 
     stop = asyncio.Event()
     sweeper = asyncio.create_task(_sweep_oauth_states(stop), name="oauth-state-sweeper")
+
+    # The worker lives in this process, as src/index.ts did, which is why
+    # /workflows/health reports worker liveness and compose allows a 17m stop grace
+    # period. Run with a single uvicorn worker; see app/workflows/worker.py.
+    worker = WorkflowWorker()
+    await worker.start()
+
     try:
         yield
     finally:
         logger.info("[shutdown] stopping")
+        # Stop the worker first and let in-flight runs settle; they record
+        # themselves as queued so a restart resumes them.
+        await worker.stop()
         stop.set()
         sweeper.cancel()
         with contextlib.suppress(asyncio.CancelledError):

@@ -13,19 +13,16 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    # The image has no bun and no curl, so this uses the Python stdlib.
-    #
-    # TODO(phase-4): point this back at /workflows/health and require workers > 0.
-    # That is the check that proves the embedded workflow worker is alive, which is
-    # why stop_grace_period below is 17m. It cannot be used yet because the workflow
-    # routes and worker are not ported, so the endpoint does not exist.
+    # Requires a live workflow worker, not just a responding HTTP server — which is
+    # why stop_grace_period is 17m, enough for a 15-minute run to drain. The image
+    # has neither bun nor curl, so this uses the Python stdlib.
     healthcheck:
       test:
         [
           "CMD",
           "python",
           "-c",
-          "import sys,urllib.request; sys.exit(0 if urllib.request.urlopen('http://localhost:3005/health', timeout=5).status == 200 else 1)",
+          "import json,sys,urllib.request; r=urllib.request.urlopen('http://localhost:3005/workflows/health', timeout=5); sys.exit(0 if json.load(r).get('workers',0) > 0 else 1)",
         ]
       interval: 30s
       timeout: 10s

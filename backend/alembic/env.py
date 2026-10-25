@@ -1,11 +1,3 @@
-"""Alembic environment.
-
-This database was created by Drizzle (`backend/drizzle/0000` .. `0006`) and is
-adopted, not rebuilt: the first revision is an empty baseline that the live
-database is `stamp`-ed with. From then on `--autogenerate` must report no
-difference; see `tests/test_schema_parity.py` for the automated form of that check.
-"""
-
 from __future__ import annotations
 
 import asyncio
@@ -25,12 +17,6 @@ if config.config_file_name is not None:
 
 target_metadata = Base.metadata
 
-#: Tables that exist in the database but are deliberately not modelled.
-#:
-#: `linkedin_drafts` was created by `drizzle/0003_smart_sabra.sql` and never dropped;
-#: it had already been removed from `src/db/schema.ts` before this migration, and
-#: 'linkedin' is in the app's REMOVED_CONNECTIONS set. Without this exclusion the
-#: first autogenerate run would emit a `DROP TABLE` for it.
 UNMANAGED_TABLES = {"linkedin_drafts"}
 
 

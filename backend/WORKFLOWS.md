@@ -1,11 +1,10 @@
 # Scheduled workflows
 
-> **Status on this branch:** the workflow engine is **not yet ported** to the Python
-> backend. Everything below describes the behaviour being ported *to*, and is
-> accurate for the TypeScript implementation on `main` (see
-> `git show main:backend/src/workflows/`). On this branch the `/workflows` routes and
-> the embedded worker do not exist yet, so the scheduler, executor and learning loop
-> do not run. The database schema they use is already in place.
+> **Status on this branch:** the engine, worker, scheduler and learning loop are
+> ported and running. Nine specialists (github, gmail, calendar, docs, notion,
+> clickup, spotify, twitter, anilist) do not have their tool modules ported yet,
+> so a step naming one is refused at save time rather than failing at run time.
+> `synthesis`, `telegram` and `web_search` work.
 
 Create an automation in chat, Telegram, or the Workflows dashboard: “Every weekday at 8am, summarize my GitHub PRs and calendar, then send it to Telegram.” Clear requests activate immediately; unresolved schedules, destinations, or connections produce clarification questions. The timezone is always visible and defaults to `USER_TIMEZONE` (`Africa/Lagos`).
 
