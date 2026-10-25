@@ -11,12 +11,14 @@ replace the raw `pool.query` / `sqlTransaction` call sites in `src/workflows/`.
 
 No psycopg `vector` type adapter is registered. ORM access goes through
 `pgvector.sqlalchemy.Vector`, which converts values itself, and the raw similarity
-queries bind the embedding as a JSON string with an explicit `::vector` cast — the
-same thing `src/memory/context.ts` and `src/tools/memory.ts` already do:
+queries bind the embedding as a JSON string with an explicit cast — the same thing
+`src/memory/context.ts` and `src/tools/memory.ts` already do, except that the
+Postgres `::` cast shorthand collides with SQLAlchemy's `:param` syntax inside
+`text()`, so the functional form is required:
 
-    ORDER BY vector <=> :embedding::vector
+    ORDER BY vector <=> CAST(:embedding AS vector)
 
-`embedding_param()` below produces that string.
+`embedding_param()` below produces the bound string.
 """
 
 from __future__ import annotations
