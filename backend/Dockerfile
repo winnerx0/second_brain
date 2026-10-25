@@ -1,30 +1,38 @@
-FROM docker.io/oven/bun:latest AS base
+FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim AS build
+WORKDIR /app
+# UV_HTTP_TIMEOUT: the 30s default is not enough for the larger wheels
+# (google-api-python-client is 16MiB) on a slow link.
+ENV UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    UV_HTTP_TIMEOUT=180
+
+# Dependencies first, so a source change does not invalidate the dependency layer.
+COPY pyproject.toml uv.lock ./
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev --no-install-project
+
+COPY . .
+RUN --mount=type=cache,target=/root/.cache/uv uv sync --frozen --no-dev
+
+FROM python:3.13-slim-bookworm AS final
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y curl \
-    && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
-    && apt-get install -y nodejs \
-    && rm -rf /var/lib/apt/lists/*
+# Every timestamp this service reads or writes is treated as UTC. The schema mixes
+# naive `timestamp` and `timestamptz` columns, so a non-UTC container clock would
+# shift workflow schedules.
+ENV PATH="/app/.venv/bin:$PATH" \
+    PYTHONUNBUFFERED=1 \
+    TZ=UTC
 
-FROM base AS build
-WORKDIR /app
-COPY package.json bun.lock tsconfig.json ./
-RUN bun install --frozen-lockfile --production
-COPY src ./src
-# COPY .config/google-docs-mcp /root/.config/google-docs-mcp
-RUN bun build --target=bun --production --external oluso --outfile=dist/index.js --minify ./src/index.ts
-
-FROM base AS final
-WORKDIR /app
-COPY --from=build /app/dist ./dist
-COPY package.json bun.lock tsconfig.json ./
-RUN bun install --frozen-lockfile --production
-COPY src/db ./src/db
-COPY drizzle ./drizzle
-COPY drizzle.config.ts ./
-COPY skills ./skills
-# COPY .config/google-docs-mcp /root/.config/google-docs-mcp
+COPY --from=build /app /app
 
 EXPOSE 3005
 
-CMD ["bun", "start"]
+# Single worker, deliberately. The workflow worker runs in this process, and the
+# OAuth pending-state map and Telegram update de-duplication are both in-memory, so
+# a second worker would double-schedule runs and break the OAuth callback.
+#
+# --timeout-graceful-shutdown 80 reproduces the 80s forced HTTP close that
+# src/index.ts implemented by hand; the rest of compose's 17m stop_grace_period is
+# then available for in-flight workflow runs to drain.
+CMD ["sh", "-c", "python -m app.scripts.bootstrap_db && exec uvicorn app.main:app --host 0.0.0.0 --port 3005 --workers 1 --timeout-graceful-shutdown 80"]

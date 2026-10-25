@@ -1,10 +1,17 @@
 # Scheduled workflows
 
+> **Status on this branch:** the workflow engine is **not yet ported** to the Python
+> backend. Everything below describes the behaviour being ported *to*, and is
+> accurate for the TypeScript implementation on `main` (see
+> `git show main:backend/src/workflows/`). On this branch the `/workflows` routes and
+> the embedded worker do not exist yet, so the scheduler, executor and learning loop
+> do not run. The database schema they use is already in place.
+
 Create an automation in chat, Telegram, or the Workflows dashboard: “Every weekday at 8am, summarize my GitHub PRs and calendar, then send it to Telegram.” Clear requests activate immediately; unresolved schedules, destinations, or connections produce clarification questions. The timezone is always visible and defaults to `USER_TIMEZONE` (`Africa/Lagos`).
 
 ## Run locally
 
-From `backend/`, install dependencies and run `bun run db:migrate`, then start `bun run dev`. The backend process serves the API and runs the workflow scheduler, executor, and learning loop together. Start the frontend with `bun --cwd ../web run dev`. Backend port: 3005. Frontend port: 3001. Existing text-only workflows are retained; use “Edit instructions” to convert them before execution.
+From `backend/`, install dependencies with `uv sync`, bring the database up to date with `uv run python -m app.scripts.bootstrap_db`, then start `uv run uvicorn app.main:app --port 3005 --reload`. The backend process serves the API and runs the workflow scheduler, executor, and learning loop together. Start the frontend with `bun --cwd ../web run dev`. Backend port: 3005. Frontend port: 3001. Existing text-only workflows are retained; use “Edit instructions” to convert them before execution.
 
 `docker compose up -d --build` starts the backend process, which handles HTTP and workflows together. The backend applies migrations before starting. The database remains the externally configured Postgres instance. No live deployment or production migration is performed by the source-code change itself.
 
@@ -53,6 +60,6 @@ All paths below are under `/workflows`:
 
 ## Validation
 
-Run `bun test src/workflows/types.test.ts`, `bun run typecheck`, and `bun run build` in `backend/`; run `bun run typecheck` and `bun run build` in `web/`.
+Run `uv run pytest`, `uv run ruff check`, and `uv run mypy app` in `backend/`; run `bun run typecheck` and `bun run build` in `web/`.
 
-Integration tests require a disposable local Postgres database named `workflow_test` with pgvector. They intentionally recreate only that database's public schema. Pass its URL explicitly as `WORKFLOW_TEST_DATABASE_URL` when running `bun test src/workflows`; they never fall back to the application's `DATABASE_URL`. Tests exercise migration preservation, duplicate claims, catch-up, revision conflicts, cancellation, uncertain writes, run persistence and proposal acceptance.
+Integration tests require a disposable local Postgres database named `workflow_test` with pgvector. They intentionally recreate only that database's public schema. Pass its URL explicitly as `WORKFLOW_TEST_DATABASE_URL` when running `uv run pytest`; they never fall back to the application's `DATABASE_URL`. Tests exercise migration preservation, duplicate claims, catch-up, revision conflicts, cancellation, uncertain writes, run persistence and proposal acceptance.

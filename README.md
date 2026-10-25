@@ -17,7 +17,7 @@ A daily briefing agent powered by a LangChain planning agent that dynamically de
 ## Architecture
 
 ```
-User/Cron → Hono → Planning Agent (createAgent) → Tools → Response → Telegram
+User/Cron → FastAPI → Planning Agent (create_agent) → Tools → Response → Telegram
                          │
                          ├── GitHub (open PRs, assigned issues, recent pushes) [OAuth]
                          ├── Notion (pages, databases, blocks) [OAuth]
@@ -38,7 +38,7 @@ User/Cron → Hono → Planning Agent (createAgent) → Tools → Response → T
 ### 1. Install dependencies
 
 ```bash
-bun install
+cd backend && uv sync
 ```
 
 ### 2. Configure environment
@@ -96,15 +96,18 @@ base64 -w 0 service-account.json
 ### 3. Run database migrations
 
 ```bash
-bun run db:generate
-bun run db:migrate
+cd backend && uv run python -m app.scripts.bootstrap_db
 ```
+
+This brings any database up to date: it adopts an existing schema, or builds one from
+`backend/drizzle/*.sql` if the database is empty, then applies Alembic migrations.
 
 ### 4. Start the server
 
 ```bash
-bun run dev     # development (watch mode)
-bun run start   # production
+cd backend
+uv run uvicorn app.main:app --port 3005 --reload   # development
+uv run uvicorn app.main:app --port 3005            # production
 ```
 
 Server starts on port **3005**. The backend process handles API requests and queued or scheduled workflows together.
@@ -114,7 +117,7 @@ Server starts on port **3005**. The backend process handles API requests and que
 The browser UI lives in `web/` and connects to the streaming chat API on the backend.
 
 ```bash
-bun run web:dev
+cd web && bun run dev
 ```
 
 The web app runs on port **3001**.
@@ -159,7 +162,7 @@ curl -N -X POST http://localhost:3005/chat/stream \
 
 ## Database
 
-Multiple tables managed by Drizzle ORM:
+Multiple tables managed by SQLAlchemy, with Alembic migrations:
 
 - **`agent_runs`** — log of each briefing run
 - **`task_history`** — GitHub issues/PRs tracked over time
@@ -170,8 +173,12 @@ Multiple tables managed by Drizzle ORM:
 - **`graph_nodes`** — knowledge graph nodes
 - **`graph_edges`** — knowledge graph relationships
 
+Schema changes are managed with Alembic:
+
 ```bash
-bun run db:studio   # open Drizzle Studio
+cd backend
+uv run alembic revision --autogenerate -m "describe the change"
+uv run alembic upgrade head
 ```
 
 ## Connections
