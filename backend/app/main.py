@@ -32,7 +32,7 @@ from app.http import close_client
 from app.json import JsonResponse
 from app.logging import configure_logging, configure_tracing, get_logger
 from app.oauth import prune_states
-from app.routes import chat, graph, health, memories, oauth, sessions
+from app.routes import chat, graph, health, memories, oauth, sessions, workflows
 from app.routes import connections as connections_routes
 
 logger = get_logger("http")
@@ -105,6 +105,7 @@ def create_app() -> FastAPI:
     app.include_router(connections_routes.router)
     app.include_router(oauth.router)
     app.include_router(chat.router)
+    app.include_router(workflows.router)
     return app
 
 
