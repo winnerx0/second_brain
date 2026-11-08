@@ -1,14 +1,3 @@
-"""Structured logging and OpenTelemetry wiring.
-
-Replaces `src/logger.ts` (winston) plus the Kivia and Oluso middleware that
-`src/app.ts` installed. Oluso's request context and breadcrumbs become ordinary
-span attributes and bound structlog context; its 5xx auto-reporting becomes a
-recorded exception on the request span.
-
-Log call sites keep the `[module.action]` prefix convention from the TypeScript
-code, so `logger.info("[chat] received: %s", text)` reads the same in both.
-"""
-
 from __future__ import annotations
 
 import logging

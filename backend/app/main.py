@@ -1,17 +1,3 @@
-"""FastAPI application factory — port of `src/app.ts` plus `src/index.ts`'s wiring.
-
-Three things that were module-level side effects in the TypeScript now run in the
-lifespan, so importing the app no longer needs a reachable database (which is what
-lets the route tests use `ASGITransport`):
-
-* `await seedConnections()` at `src/app.ts:85`;
-* the OAuth pending-state sweeper's bare `setInterval` in `src/oauth.ts`;
-* the workflow worker, which `src/index.ts` started before `Bun.serve`.
-
-The Kivia and Oluso middleware are replaced by OpenTelemetry instrumentation; the
-global `app.onError` handler keeps returning the same opaque 500 body.
-"""
-
 from __future__ import annotations
 
 import asyncio
@@ -66,7 +52,7 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None]:
     stop = asyncio.Event()
     sweeper = asyncio.create_task(_sweep_oauth_states(stop), name="oauth-state-sweeper")
 
-    # The worker lives in this process, as src/index.ts did, which is why
+    # The worker lives in this process, which is why
     # /workflows/health reports worker liveness and compose allows a 17m stop grace
     # period. Run with a single uvicorn worker; see app/workflows/worker.py.
     worker = WorkflowWorker()
@@ -93,7 +79,7 @@ def create_app() -> FastAPI:
         title="Aira",
         default_response_class=JsonResponse,
         lifespan=lifespan,
-        # The TypeScript service exposed no schema endpoints; keep the surface identical.
+        # No schema endpoints are exposed.
         docs_url=None,
         redoc_url=None,
         openapi_url=None,
@@ -127,9 +113,8 @@ def _register_exception_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(RequestValidationError)
     async def _validation_error(_request: Request, exc: RequestValidationError) -> JsonResponse:
-        # FastAPI's default is a 422 with a different body. The TypeScript service
-        # surfaced zod failures through Hono's error handler as a 400 carrying the
-        # message, so match that.
+        # FastAPI's default is a 422 with a different body. Clients expect a 400
+        # carrying the first validation message.
         errors = exc.errors()
         message = errors[0].get("msg", "Invalid request") if errors else "Invalid request"
         return JsonResponse({"error": message}, status_code=400)

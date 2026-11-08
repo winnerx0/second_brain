@@ -1,10 +1,3 @@
-"""One shared `httpx.AsyncClient` for every outbound call.
-
-The TypeScript used Bun's global `fetch`, which pools connections process-wide. A
-module-level client reproduces that; creating a client per call would discard the
-connection pool and the TLS session cache.
-"""
-
 from __future__ import annotations
 
 import httpx

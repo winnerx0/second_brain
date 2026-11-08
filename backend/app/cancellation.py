@@ -1,20 +1,3 @@
-"""`AbortController` / `AbortSignal` stand-in.
-
-Python has no stdlib equivalent, and the TypeScript leans on it heavily:
-`src/workflows/engine.ts` composes three signals per run
-(`AbortSignal.any([shutdown, controller, AbortSignal.timeout(15 * 60_000)])`),
-`policy.ts` calls `signal.throwIfAborted()` between tool calls, and `agent.ts`
-threads one through the chat stream.
-
-Translating it to bare `task.cancel()` would be wrong in an important way: the
-`except CancelledError` branches need to *write to the database* (a shut-down run is
-recorded as `queued`, not `failed`), and a write issued inside a cancelled task is
-itself cancelled. So cancellation here is cooperative — callers poll
-`raise_if_cancelled()` at the same points the TypeScript does — and the task is only
-force-cancelled as a last resort, with the status write wrapped in
-`asyncio.shield()`.
-"""
-
 from __future__ import annotations
 
 import asyncio
@@ -71,8 +54,7 @@ class Cancellation:
     async def sleep(self, seconds: float) -> bool:
         """Sleep, waking early if cancelled. Returns True if it was cancelled.
 
-        Replaces the `setTimeout` raced against an `abort` listener that the worker
-        loop and the SSE heartbeats use.
+        Used by the worker loop and the SSE heartbeats.
         """
         try:
             await asyncio.wait_for(self._event.wait(), timeout=seconds)

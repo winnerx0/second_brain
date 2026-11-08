@@ -1,5 +1,3 @@
-"""Connection catalogue and seeding — the non-HTTP half of `src/app.ts`'s connections code."""
-
 from __future__ import annotations
 
 from sqlalchemy import select
@@ -36,9 +34,8 @@ REMOVED_CONNECTIONS = frozenset({"linkedin"})
 async def seed_connections() -> None:
     """Insert any missing built-in connections.
 
-    Ported from the module-level `await seedConnections()` in `src/app.ts`; it runs in
-    the FastAPI lifespan instead of at import time so the app stays importable without
-    a reachable database. The warn-and-continue fallback is kept: a missing table must
+    Runs in the FastAPI lifespan instead of at import time so the app stays importable
+    without a reachable database. The warn-and-continue fallback is kept: a missing table must
     not stop the process from starting.
     """
     try:

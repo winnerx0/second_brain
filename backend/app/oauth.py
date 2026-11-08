@@ -288,8 +288,8 @@ async def handle_callback(code: str, state: str) -> dict[str, str]:
 async def get_valid_token(connection_name: str) -> str | None:
     """The stored access token, refreshed if it expires within a minute.
 
-    On refresh failure the stale token is returned rather than `None`, matching the
-    TypeScript: a provider hiccup should not look like a disconnected integration.
+    On refresh failure the stale token is returned rather than `None`, so
+    that a provider hiccup should not look like a disconnected integration.
     """
     async with session_scope() as session:
         row = (

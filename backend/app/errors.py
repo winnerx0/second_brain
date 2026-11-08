@@ -1,16 +1,3 @@
-"""Typed errors replacing Hono's message-regex status mapping.
-
-`src/workflows/routes.ts` derived the status code by matching the error *message*:
-
-    /not found/i      -> 404
-    /conflict|active run/i -> 409
-    otherwise         -> 400
-
-Carrying that forward as regexes would mean a reworded message silently changes an
-HTTP status, so the ported code raises these instead. The response body stays
-`{"error": "<message>"}`, which is what `web/`'s `workflowApi()` reads.
-"""
-
 from __future__ import annotations
 
 

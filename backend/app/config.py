@@ -1,15 +1,3 @@
-"""Environment configuration.
-
-Port of `src/config.ts`, which parsed a zod schema against `process.env` at import
-time. Vars that the TypeScript code read via bare `process.env` (rather than through
-the zod schema) are folded in here too, so there is a single source of truth.
-
-Dropped relative to `src/config.ts`: `KIVIA_API_KEY` and `OLUSO_API_KEY` (the JS-only
-observability SDKs are replaced by OpenTelemetry), and `OPENROUTER_API_KEY` /
-`OPENROUTER_BASE_URL` / `GEMINI_API_KEY` (their LangChain providers were never
-imported by live code).
-"""
-
 from __future__ import annotations
 
 import os
@@ -51,8 +39,6 @@ class Settings(BaseSettings):
     APP_URL: str = "http://localhost:3001"
 
     # ─── Feature flags ───────────────────────────────────────────────────────
-    # `src/workflows/engine.ts` and `worker.ts` compare against the string 'false',
-    # so anything other than a falsy value leaves these enabled.
     SCHEDULER_ENABLED: bool = True
     WORKFLOW_LEARNING_ENABLED: bool = True
     AGENT_DEBUG_TOOL_PAYLOADS: bool = False
@@ -69,8 +55,6 @@ class Settings(BaseSettings):
     AGENT_SKILLS_DIRS: str | None = None
 
     # ─── OAuth app credentials ───────────────────────────────────────────────
-    # `src/oauth.ts` looks these up dynamically by the env-var name recorded in each
-    # OAUTH_CONFIGS entry; `oauth_credential()` below preserves that indirection.
     GITHUB_OAUTH_CLIENT_ID: str | None = None
     GITHUB_OAUTH_CLIENT_SECRET: str | None = None
     GOOGLE_OAUTH_CLIENT_ID: str | None = None
@@ -89,7 +73,7 @@ class Settings(BaseSettings):
     @field_validator("USER_TIMEZONE")
     @classmethod
     def _valid_iana_timezone(cls, value: str) -> str:
-        """Mirrors the `Intl.DateTimeFormat` refine in `src/config.ts`."""
+        """Reject anything that is not a valid IANA timezone."""
         try:
             ZoneInfo(value)
         except (ZoneInfoNotFoundError, ValueError) as exc:
@@ -102,12 +86,11 @@ class Settings(BaseSettings):
 
     @property
     def app_url(self) -> str:
-        """`getAppUrl()` in `src/oauth.ts` — trailing slash stripped."""
+        """`APP_URL` with the trailing slash stripped."""
         return self.APP_URL.rstrip("/")
 
     @property
     def redirect_uri(self) -> str:
-        """`getRedirectUri()` in `src/oauth.ts`."""
         return f"{self.OAUTH_REDIRECT_BASE_URL.rstrip('/')}/oauth/callback"
 
     def oauth_credential(self, env_name: str) -> str | None:
