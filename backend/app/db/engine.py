@@ -1,29 +1,6 @@
-"""Async engine and session factory — port of `src/db/client.ts`.
-
-`src/db/client.ts` stripped `sslmode=` out of `DATABASE_URL` and translated it into
-node-postgres' `ssl: {rejectUnauthorized: true}`, because node-postgres cannot parse
-libpq connection parameters. psycopg 3 is libpq-based and accepts `sslmode` directly,
-so that workaround is deleted rather than ported — the URL is passed through as-is
-apart from the driver prefix.
-
-The session factory replaces Drizzle's `db`; `sql_transaction()` and `fetch_all()`
-replace the raw `pool.query` / `sqlTransaction` call sites in `src/workflows/`.
-
-No psycopg `vector` type adapter is registered. ORM access goes through
-`pgvector.sqlalchemy.Vector`, which converts values itself, and the raw similarity
-queries bind the embedding as a JSON string with an explicit cast — the same thing
-`src/memory/context.ts` and `src/tools/memory.ts` already do, except that the
-Postgres `::` cast shorthand collides with SQLAlchemy's `:param` syntax inside
-`text()`, so the functional form is required:
-
-    ORDER BY vector <=> CAST(:embedding AS vector)
-
-`embedding_param()` below produces the bound string.
-"""
-
 from __future__ import annotations
 
-from collections.abc import AsyncIterator, Sequence
+from collections.abc import AsyncGenerator, Sequence
 from contextlib import asynccontextmanager
 from typing import Any
 
@@ -93,22 +70,22 @@ async def dispose_engine() -> None:
 
 
 @asynccontextmanager
-async def session_scope() -> AsyncIterator[AsyncSession]:
-    """Commit-on-success session, the Drizzle `db` equivalent for ORM call sites."""
+async def session_scope() -> AsyncGenerator[AsyncSession]:
+    """Commit-on-success ORM session."""
     async with get_sessionmaker()() as session:
         async with session.begin():
             yield session
 
 
 @asynccontextmanager
-async def sql_transaction() -> AsyncIterator[AsyncConnection]:
-    """BEGIN/COMMIT around raw SQL — replaces `sqlTransaction` in `workflows/service.ts`."""
+async def sql_transaction() -> AsyncGenerator[AsyncConnection]:
+    """BEGIN/COMMIT around raw SQL."""
     async with get_engine().begin() as conn:
         yield conn
 
 
 async def fetch_all(query: str, params: dict[str, Any] | None = None) -> Sequence[Row[Any]]:
-    """One-shot raw query — replaces a bare `pool.query(...)`."""
+    """One-shot raw query."""
     async with get_engine().connect() as conn:
         result = await conn.execute(text(query), params or {})
         return result.fetchall()
@@ -124,7 +101,6 @@ async def execute(query: str, params: dict[str, Any] | None = None) -> int:
 def embedding_param(embedding: Sequence[float]) -> str:
     """Render an embedding for a `:param::vector` bind.
 
-    Mirrors ``JSON.stringify(embedding)`` in the TypeScript, which is also what
-    Postgres' `vector` input parser accepts.
+    A JSON array, which is what Postgres' `vector` input parser accepts.
     """
     return "[" + ",".join(repr(float(value)) for value in embedding) + "]"

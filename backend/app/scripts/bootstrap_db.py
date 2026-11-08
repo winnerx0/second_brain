@@ -1,18 +1,3 @@
-"""Bring a database up to the current schema, whatever state it starts in.
-
-This replaces `bun run db:migrate` (drizzle-kit), which went away with
-`package.json`. Three cases have to be handled, because the schema predates Alembic:
-
-1. **Already under Alembic** (`alembic_version` exists) — just `upgrade head`.
-2. **Existing Drizzle-created schema, not yet adopted** — `stamp` the baseline, then
-   `upgrade head`. Nothing is re-created, so live data is untouched.
-3. **Empty database** — replay `drizzle/*.sql` to build the pre-migration schema,
-   then stamp and upgrade. Those files are the only record of that DDL;
-   `alembic/versions/0001_baseline_drizzle_schema.py` is deliberately a no-op.
-
-Run with `python -m app.scripts.bootstrap_db`.
-"""
-
 from __future__ import annotations
 
 import sys
@@ -47,11 +32,11 @@ def _inspect(url: str) -> tuple[bool, bool]:
     return has_version, has_schema
 
 
-def _replay_drizzle(url: str) -> None:
+def _replay_baseline_sql(url: str) -> None:
     files = migration_files()
     if not files:
         raise RuntimeError(
-            "No drizzle/*.sql files found; cannot build the schema for an empty database."
+            "No sql/*.sql files found; cannot build the schema for an empty database."
         )
     with psycopg.connect(url, autocommit=True) as conn:
         for path in files:
@@ -76,8 +61,8 @@ def main() -> int:
     if has_schema:
         logger.info("[bootstrap] adopting existing schema; stamping baseline")
     else:
-        logger.info("[bootstrap] empty database; replaying pre-Alembic SQL")
-        _replay_drizzle(url)
+        logger.info("[bootstrap] empty database; replaying baseline SQL")
+        _replay_baseline_sql(url)
 
     command.stamp(config, "head")
     command.upgrade(config, "head")

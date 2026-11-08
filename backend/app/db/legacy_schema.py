@@ -1,29 +1,15 @@
-"""Replay the pre-migration Drizzle SQL into a database.
-
-The production schema was built by `backend/drizzle/*.sql`, so those files are the
-authoritative record of what `app/db/models.py` must match. Two things use this:
-
-* `tests/test_schema_parity.py`, which builds a throwaway database here and asserts
-  Alembic finds no difference against the models;
-* the port of `src/workflows/integration.test.ts`, which did the same thing in
-  TypeScript to prove migrations preserve existing workflows.
-
-Drizzle separates statements within a file using a `--> statement-breakpoint`
-comment, which is not valid SQL on its own and has to be split out.
-"""
-
 from __future__ import annotations
 
 from pathlib import Path
 
 STATEMENT_BREAKPOINT = "--> statement-breakpoint"
 
-DRIZZLE_DIR = Path(__file__).resolve().parents[2] / "drizzle"
+SQL_DIR = Path(__file__).resolve().parents[2] / "sql"
 
 
 def migration_files(up_to: str | None = None) -> list[Path]:
-    """Drizzle migration files in apply order, optionally stopping at a prefix."""
-    files = sorted(p for p in DRIZZLE_DIR.glob("[0-9][0-9][0-9][0-9]_*.sql"))
+    """Baseline schema files in apply order, optionally stopping at a prefix."""
+    files = sorted(p for p in SQL_DIR.glob("[0-9][0-9][0-9][0-9]_*.sql"))
     if up_to is not None:
         files = [p for p in files if p.name[:4] <= up_to]
     return files

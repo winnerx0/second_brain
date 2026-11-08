@@ -40,8 +40,7 @@ def _configure(connection: Any) -> None:
         # Chat'::text, 0.2) in ways that generate permanent false positives. Default
         # correctness is covered instead by inserting rows in the integration tests.
         compare_server_default=False,
-        # Keeps Drizzle's own `drizzle.__drizzle_migrations` bookkeeping table, which
-        # lives in a separate schema, invisible to autogenerate.
+        # Other schemas (e.g. legacy bookkeeping tables) stay invisible to autogenerate.
         include_schemas=False,
     )
 

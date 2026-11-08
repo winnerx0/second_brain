@@ -1,25 +1,3 @@
-"""SQLAlchemy models — port of `src/db/schema.ts`.
-
-These models describe a database that already exists, created by the Drizzle
-migrations in `backend/drizzle/0000` .. `0006`. They must reproduce that schema
-exactly, down to constraint and index *names*, so `alembic revision --autogenerate`
-reports no difference. Where `schema.ts` and the migrations disagree, the
-migrations win — they are what actually ran.
-
-Two fidelity hazards worth stating up front:
-
-* `timestamp` vs `timestamp with time zone` is mixed. Everything created by
-  migrations 0000-0005 is naive (`DateTime()`); the scheduling columns added by
-  0006 are timezone-aware (`DateTime(timezone=True)`). Getting one wrong silently
-  shifts workflow schedules.
-* `graph_edges.from_node_id` / `to_node_id` and `chat_history.session_id` have no
-  foreign keys in the real database. Do not add them.
-
-Not modelled: `linkedin_drafts` (created by 0003, never dropped, already absent from
-`schema.ts`). It is filtered out in `alembic/env.py` instead of being modelled, so
-autogenerate neither drops it nor re-creates it.
-"""
-
 from __future__ import annotations
 
 import datetime as dt
@@ -44,7 +22,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 EMBEDDING_DIMENSIONS = 1536
 
-#: Native Postgres enums created by `drizzle/0000`. `create_type=False` keeps Alembic
+#: Native Postgres enums created by `sql/0000`. `create_type=False` keeps Alembic
 #: and `create_all()` from trying to re-issue `CREATE TYPE`.
 memory_classification = ENUM(
     "identity",
@@ -138,9 +116,8 @@ class ChatHistory(Base):
     """One message per row.
 
     `session_id` is deliberately un-constrained: NULL means the default, session-less
-    conversation, and `src/agent.ts` selects on `IS NULL` for it. `content` holds a
-    JSON string whose shape depends on `role`, which is one of 'human' | 'ai' | 'tool'
-    (the comment in `schema.ts` saying "user"/"assistant" is stale).
+    conversation, and the agent selects on `IS NULL` for it. `content` holds a
+    JSON string whose shape depends on `role`, which is one of 'human' | 'ai' | 'tool'.
     """
 
     __tablename__ = "chat_history"
@@ -219,8 +196,7 @@ class Connection(Base):
     """A third-party integration and its credentials.
 
     `access_token` doubles as the API-key column for providers that use key auth
-    rather than OAuth (ClickUp). Tokens are stored in plaintext, as in the
-    TypeScript implementation.
+    rather than OAuth (ClickUp). Tokens are stored in plaintext, for now.
     """
 
     __tablename__ = "connections"
