@@ -1,15 +1,3 @@
-"""Project-local skills — port of `src/tools/skills.ts`.
-
-A skill is a `<dir>/<skill-name>/SKILL.md` file with frontmatter carrying `name`,
-`description` and an optional `type`. Workflow skills are advertised to the agent as
-a catalog it can `read_skill` from; personality and context skills are injected into
-the system prompt directly.
-
-The frontmatter parser is intentionally lax — a line-wise regex that strips one layer
-of surrounding quotes. PyYAML would accept and reject a different set of files, so it
-is deliberately not used here.
-"""
-
 from __future__ import annotations
 
 import asyncio

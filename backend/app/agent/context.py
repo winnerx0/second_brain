@@ -1,16 +1,3 @@
-"""Ambient per-request context for the agent — port of `src/subagents/utils.ts`'s
-`AsyncLocalStorage`.
-
-`contextvars.ContextVar` is the direct analogue: a value set before an `await` chain
-is visible to everything below it, and `asyncio.create_task` copies the current
-context into the new task, which is what `AsyncLocalStorage.run()` gives you across
-promise chains.
-
-The one behavioural difference worth knowing: a `set()` inside a child task does not
-propagate back to the parent. That is fine here, because both stores are written once
-at the boundary and only read inward.
-"""
-
 from __future__ import annotations
 
 import json

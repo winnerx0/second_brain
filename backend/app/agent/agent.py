@@ -1,14 +1,3 @@
-"""The main agent — port of `src/agent.ts`.
-
-Two entry points: `run_briefing()` for the daily cron, and `handle_message()` for
-chat, which optionally streams events to a sink.
-
-Chat history is stored as JSON-encoded rows in `chat_history` with roles
-`human | ai | tool` (the comment in `schema.ts` saying "user"/"assistant" is stale).
-Rows written by the TypeScript predate this port and must still load, so the
-reconstruction below is deliberately literal.
-"""
-
 from __future__ import annotations
 
 import asyncio
@@ -43,18 +32,13 @@ from app.tools.skills import build_skills_system_prompt
 
 logger = get_logger("agent")
 
-#: `recursionLimit: 25` on the briefing invoke in `src/agent.ts`.
+#: Recursion limit for the briefing invoke.
 BRIEFING_RECURSION_LIMIT = 25
-#: `limit(40)` on the chat-history lookup.
+#: Maximum rows loaded by the chat-history lookup.
 HISTORY_LIMIT = 40
 
 EventSink = Callable[[dict[str, Any]], Awaitable[None] | None]
 
-#: Strong references to fire-and-forget tasks.
-#:
-#: JS `void promise` keeps the promise alive; an un-referenced `asyncio.Task` can be
-#: garbage-collected mid-flight, silently dropping the work. Every background task
-#: started here is held until it completes.
 _background: set[asyncio.Task[Any]] = set()
 
 
@@ -69,7 +53,7 @@ def spawn_background(coro: Any, *, name: str) -> asyncio.Task[Any]:
 def get_agent() -> Any:
     """The main agent graph.
 
-    `resilient_middleware()` replaces the per-tool `resilientTool` wrapper: a thrown
+    `resilient_middleware()` wraps every tool: a thrown
     tool error becomes a message for the model instead of halting the graph.
     """
     return create_agent(
@@ -311,7 +295,7 @@ async def handle_message(
 
     if reply.strip():
         # Self-learning runs in the background so it never adds chat latency.
-        # NOT YET PORTED: app/memory/learn.py (consolidateConversation). Until it
+        # NOT YET IMPLEMENTED: app/memory/learn.py (conversation consolidation). Until it
         # lands, chat works but the memory graph stops growing on its own.
         pass
 

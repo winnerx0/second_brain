@@ -1,13 +1,3 @@
-"""Telegram delivery — port of `src/delivery/telegram.ts`.
-
-Two behaviours matter and are preserved exactly:
-
-* Telegram's legacy Markdown parser is strict and rejects text the agent happily
-  produces. A 400 is retried once as plain text rather than surfaced as a failure.
-* Messages are split at 4096 characters on paragraph, then line, boundaries, so a
-  long briefing is not truncated.
-"""
-
 from __future__ import annotations
 
 from app.config import get_settings

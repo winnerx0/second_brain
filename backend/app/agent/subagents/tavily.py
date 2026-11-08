@@ -1,9 +1,3 @@
-"""Web-search specialist — port of `src/subagents/tavily.ts`.
-
-Note the tool the main agent sees is named `web_search`, not `tavily`; the provider
-name is an implementation detail of the specialist.
-"""
-
 from __future__ import annotations
 
 from functools import lru_cache

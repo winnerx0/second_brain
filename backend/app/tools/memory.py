@@ -1,18 +1,3 @@
-"""Memory tools and the embedding client — port of `src/tools/memory.ts`.
-
-Memory facts live in `graph_nodes` with `kind = 'memory'`; every query here is scoped
-by that predicate so entity nodes (person, project, …) are never treated as memories.
-
-Two details that look like bugs but are deliberate, and are preserved:
-
-* `set_memory_key` embeds the **key**, not the value. Recall is therefore
-  key-similarity search, which is why keys are required to be descriptive and
-  dot-separated.
-* `recall_memories` returns a **dict** on success and a **string** on failure. The
-  agent prompt and `app/workflows/policy.py`'s `/^(error|failed)/i` check both rely on
-  the failure case being a string.
-"""
-
 from __future__ import annotations
 
 import datetime as dt
@@ -67,13 +52,13 @@ LIFELONG_CLASSIFICATIONS = frozenset({"identity", "relationships", "behavior"})
 RECALL_SIMILARITY_THRESHOLD = 0.6
 RECALL_LIMIT = 8
 
-#: Key-prefix heuristics, ported verbatim from `inferClassificationFromKey`.
+#: Key-prefix heuristics for classifying a memory key.
 #:
 #: Note the `\b` after each alternation: it means only the *singular* prefix matches.
 #: 'preference.coffee' classifies as preferences, but 'preferences.coffee' does not —
 #: the trailing 's' is a word character, so the boundary fails and the key falls
-#: through to 'unclassified'. The same applies to 'relationships.'. This is confirmed
-#: behaviour of the TypeScript, not a porting mistake, and `set_memory_key`'s own
+#: through to 'unclassified'. The same applies to 'relationships.'. This is long-standing
+#: behaviour and `set_memory_key`'s own
 #: description suggests 'preferences.coffee' as an example key. Preserved because
 #: changing it would silently reclassify and re-tier existing memories; see
 #: tests/test_memory_tools.py.

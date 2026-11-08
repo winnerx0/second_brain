@@ -1,13 +1,3 @@
-"""Knowledge-graph tools — port of `src/tools/knowledge-graph.ts`.
-
-Entity nodes share the `graph_nodes` table with memory nodes, distinguished by
-`kind`. The memory-specific columns (`key`, `value`, `classification`, `tier`,
-`vector`) stay NULL for entities.
-
-Every tool returns a JSON *string* on success and a plain `Error: ...` string on
-failure, matching the TypeScript — the agent reads both as text.
-"""
-
 from __future__ import annotations
 
 import datetime as dt
@@ -63,8 +53,7 @@ async def ensure_node(
     """Find-or-create a node keyed by (kind, normalized name).
 
     On a hit, aliases are unioned (order-preserving, de-duplicated) and metadata is
-    shallow-merged with the incoming values winning — matching the object spread in
-    the TypeScript. `source` is only set on creation.
+    shallow-merged with the incoming values winning — (a plain dict merge). `source` is only set on creation.
     """
     normalized = normalize_name(name)
     existing = (
@@ -124,7 +113,7 @@ def _node_summary(node: GraphNode) -> dict[str, Any]:
 
 
 def _full_node(node: GraphNode) -> dict[str, Any]:
-    """Every column, as Drizzle's unprojected `select()` returned."""
+    """Every column of the node."""
     return {
         "id": node.id,
         "kind": node.kind,
@@ -393,8 +382,8 @@ async def get_related_graph_context(
 
             return dumps(
                 {
-                    # The TypeScript returned the whole root row here while
-                    # projecting the others; preserved.
+                    # The root is the whole row while the others are
+                    # projected; clients rely on that.
                     "root": _full_node(root) if root is not None else None,
                     "nodes": [_node_summary(node) for node in nodes],
                     "edges": [

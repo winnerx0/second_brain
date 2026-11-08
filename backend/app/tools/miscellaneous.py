@@ -1,5 +1,3 @@
-"""Miscellaneous tools — port of `src/tools/miscellaneous.ts`."""
-
 from __future__ import annotations
 
 import datetime as dt

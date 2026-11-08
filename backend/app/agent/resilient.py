@@ -1,25 +1,3 @@
-"""Uniform tool-failure handling — port of `src/tools/resilient.ts`.
-
-`src/agent.ts` wrapped every top-level tool with `resilientTool(t, {retries: 0})`.
-With `retries: 0` the retry loop runs exactly once, so the only behaviour that was
-ever live is the error path: a thrown exception becomes the string
-
-    Error: <tool name> failed: <message>
-
-returned to the model, rather than propagating and halting the graph. That is what
-`ToolErrorMiddleware` does natively, so the 20 tools are no longer re-wrapped
-individually — re-wrapping in LangChain rebuilds the tool's schema from the wrapper's
-signature, which is a needless risk.
-
-The transient-detection helpers are ported anyway: they are pure, they are the only
-part with interesting behaviour, and `app/workflows/policy.py` applies the same
-"does this result string look like a retryable failure?" judgement when deciding
-whether to retry a read once.
-
-Note `retries` is still accepted so the original semantics can be restored by
-composing `ToolRetryMiddleware` inside this one.
-"""
-
 from __future__ import annotations
 
 from langchain.agents.middleware import (
@@ -33,7 +11,7 @@ from app.logging import get_logger
 
 logger = get_logger("resilient")
 
-#: Substrings that mark a failure as worth retrying. Ported verbatim — the list is
+#: Substrings that mark a failure as worth retrying. The list is
 #: matched against lower-cased text, so entries must stay lower-case.
 TRANSIENT_HINTS: tuple[str, ...] = (
     "timeout",
@@ -105,7 +83,7 @@ def resilient_middleware(retries: int = 0) -> list[AgentMiddleware]:
         ToolErrorMiddleware(on_error, aon_error=aon_error),
     ]
     if retries > 0:
-        # `baseDelayMs * (attempt + 1)` in the TypeScript — linear, 400 ms step.
+        # Linear backoff, 400 ms step.
         stack.append(
             ToolRetryMiddleware(
                 max_retries=retries,

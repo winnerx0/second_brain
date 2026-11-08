@@ -1,10 +1,3 @@
-"""Tavily web search — port of `src/tools/tavily.ts`.
-
-Raw HTTP rather than `tavily-python`: the TypeScript hand-builds the request body and
-re-keys the response into camelCase, and an SDK would change both the request shape
-and the field names the agent sees.
-"""
-
 from __future__ import annotations
 
 from typing import Any, Literal
@@ -85,7 +78,7 @@ async def tavily_search(
             "include_usage": True,
             "include_favicon": True,
         }
-        # Omitted entirely when unset, as the TypeScript's conditional spreads did.
+        # Omitted entirely when unset, so the API applies its own defaults.
         if time_range:
             payload["time_range"] = time_range
         if include_domains:

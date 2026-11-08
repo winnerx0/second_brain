@@ -1,5 +1,3 @@
-"""Telegram tool — port of `src/tools/telegram.ts`."""
-
 from __future__ import annotations
 
 from langchain_core.tools import tool

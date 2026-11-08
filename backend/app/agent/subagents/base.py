@@ -1,10 +1,3 @@
-"""Shared machinery for the specialist subagents — port of `src/subagents/utils.ts`.
-
-Each specialist is its own `create_agent` graph exposed to the main agent as a single
-tool. Running one streams its inner tool activity up to the caller's event sink, so
-the UI shows `github:get_open_prs` rather than an opaque `github` call.
-"""
-
 from __future__ import annotations
 
 import json
@@ -21,7 +14,7 @@ from app.shared import get_model
 from app.workflows.context import current_execution
 from app.workflows.policy import workflow_policy
 
-#: Matches `recursionLimit: 30` on the subagent streams in `src/subagents/utils.ts`.
+#: Recursion limit for subagent streams.
 SUBAGENT_RECURSION_LIMIT = 30
 
 
@@ -64,7 +57,7 @@ async def run_subagent(agent: Any, messages: list[dict[str, Any]], subagent_name
     """
     execution = current_execution()
     if execution is not None:
-        # Inserted after the specialist's own system prompt, as in the TypeScript.
+        # Inserted after the specialist's own system prompt.
         messages = [
             *messages[:1],
             {"role": "system", "content": _authorization_notice(execution.step.get("permissions"))},

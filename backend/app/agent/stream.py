@@ -1,17 +1,3 @@
-"""Translating agent stream chunks into the SSE events `web/` renders.
-
-`src/agent.ts` consumed `agent.stream(..., {streamMode: 'updates'})` and took
-`Object.entries(chunk)[0]` — the single updated node per chunk. LangGraph's Python
-`astream(stream_mode="updates")` yields the same shape, `{node_name: {"messages":
-[...]}}`, so the translation is mechanical. It is isolated here because the chunk
-shape is the least stable thing in the port: it is the one place where a LangChain
-version difference would silently stop `web/` rendering tool activity, and keeping it
-pure makes it testable without a model.
-
-The event union mirrors `AgentStreamEvent` in `src/agent.ts`; `web/src/routes/index.tsx`
-switches on `type`.
-"""
-
 from __future__ import annotations
 
 from collections.abc import Iterator
@@ -27,7 +13,6 @@ class StreamTranslator:
 
     A `ToolMessage` does not always carry `name`, so the tool name is remembered from
     the `AIMessage.tool_calls` entry that requested it, keyed by `tool_call_id` —
-    exactly the `toolRunNames` map in `src/agent.ts`.
     """
 
     def __init__(self, *, debug_payloads: bool = False, tool_prefix: str = "") -> None:
@@ -43,8 +28,7 @@ class StreamTranslator:
     def chunk_messages(self, chunk: dict[str, Any]) -> list[BaseMessage]:
         """The messages from a chunk's single updated node.
 
-        `Object.entries(chunk)[0]` in the TypeScript: one node update per chunk, and
-        an empty chunk is skipped.
+        Expects one node update per chunk; an empty chunk is skipped.
         """
         if not chunk:
             return []
@@ -71,7 +55,7 @@ class StreamTranslator:
                         "input": safe_stringify(call.get("args")),
                     }
                 # Only plain string content becomes a delta; a content-block list is
-                # reasoning/tool-use scaffolding and was skipped in the TypeScript too.
+                # reasoning/tool-use scaffolding and is skipped.
                 if isinstance(message.content, str) and message.content:
                     yield {"type": "assistant_delta", "delta": message.content}
 
@@ -83,7 +67,7 @@ class StreamTranslator:
                 yield event
 
     def final_text(self) -> str:
-        """`getFinalText` — the last message's text, flattening content blocks."""
+        """The last message's text, flattening content blocks."""
         if not self.messages:
             return ""
         content = self.messages[-1].content

@@ -1,10 +1,3 @@
-"""System prompts — copied verbatim from `src/agent.ts`.
-
-These are the agent's behaviour. They are kept in their own module so a diff against
-the TypeScript is a plain text comparison, and so no code change can reword them by
-accident.
-"""
-
 from __future__ import annotations
 
 BRIEFING_SYSTEM_PROMPT = """You are Aira giving the user his morning briefing.

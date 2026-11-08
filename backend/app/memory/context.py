@@ -1,14 +1,3 @@
-"""Proactive recall — port of `src/memory/context.ts`.
-
-Before every chat turn the agent prepends the most relevant memories, plus their
-one-hop graph neighbours, to its system prompt. That is why the agent can answer
-from what it already knows without the model having to decide to call
-`recall_memories` first.
-
-Every failure path returns `''`: a chat turn must never break because recall
-stumbled.
-"""
-
 from __future__ import annotations
 
 from typing import Any
