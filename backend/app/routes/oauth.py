@@ -1,10 +1,3 @@
-"""The OAuth redirect endpoint — `src/app.ts:627-650`.
-
-Every branch ends in a 302 back to the web app, carrying either
-`?oauth_connected=<name>` or `?oauth_error=<reason>`, which is what
-`web/src/routes/connections.tsx` reads on return.
-"""
-
 from __future__ import annotations
 
 from urllib.parse import quote

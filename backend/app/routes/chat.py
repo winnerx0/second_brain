@@ -1,11 +1,3 @@
-"""Chat endpoints — `src/app.ts:668-838`.
-
-`POST /chat` serves two callers: the browser (a bare `{message}` or `{text}` body)
-and Telegram webhooks (a full update object). Telegram updates are recognised by
-`message` being an object, and are then checked against the configured chat id and
-de-duplicated by `update_id`.
-"""
-
 from __future__ import annotations
 
 import asyncio
@@ -25,12 +17,12 @@ from app.sse import COMMENT_HEARTBEAT, SSE_HEADERS, SSE_MEDIA_TYPE, event_frame
 router = APIRouter(tags=["chat"])
 logger = get_logger("chat")
 
-#: Heartbeat cadence for `/chat/stream`, matching the 5s `setInterval` it replaces.
+#: Heartbeat cadence for `/chat/stream`, every 5 seconds.
 HEARTBEAT_SECONDS = 5.0
 
 #: Seen Telegram `update_id`s.
 #:
-#: In-process, as in the TypeScript, and therefore lost on restart and not shared
+#: In-process, and therefore lost on restart and not shared
 #: between workers — one more reason the server runs with a single worker. Moving
 #: this to Postgres is a prerequisite for scaling out.
 _processed_update_ids: set[int] = set()
@@ -141,10 +133,8 @@ async def chat_stream(request: Request) -> Response:
     """Stream the turn as SSE.
 
     The agent runs as a task feeding a queue, and the generator races the queue
-    against the heartbeat interval — the TypeScript equivalent was a `setInterval`
-    running alongside the agent promise. Starlette cancels this generator when the
-    client disconnects, so the `finally` block is what replaces the `abort` listener
-    on the request signal.
+    against the heartbeat interval. Starlette cancels this generator when the
+    client disconnects, so the `finally` block is what cancels the agent run.
     """
     body = await _json_body(request)
     message = body.get("message") or body.get("text") or ""

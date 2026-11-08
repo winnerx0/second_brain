@@ -1,5 +1,3 @@
-"""Connection management — `src/app.ts:421-666`."""
-
 from __future__ import annotations
 
 import datetime as dt

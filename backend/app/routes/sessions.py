@@ -1,10 +1,3 @@
-"""Chat session endpoints — `src/app.ts:182-297`.
-
-Response field names are camelCase because the TypeScript selected whole Drizzle
-rows, and Drizzle maps columns to its own camelCase field names. `web/` reads
-`createdAt`/`updatedAt`/`sessionId` directly, so the casing is part of the contract.
-"""
-
 from __future__ import annotations
 
 from typing import Any
@@ -42,7 +35,7 @@ def _message_json(row: ChatHistory) -> dict[str, Any]:
 
 
 def _session_id(raw: str) -> int:
-    """Hono validated with `Number.isInteger(n) && n > 0`, returning 400 otherwise.
+    """Parse a positive-integer id, returning 400 otherwise.
 
     The path parameter is declared as `str` so this returns 400 rather than FastAPI's
     default 422 for a non-numeric segment.
@@ -95,7 +88,7 @@ async def delete_session(session_id: str) -> Response:
     try:
         async with session_scope() as session:
             # `chat_history.session_id` has no foreign key, so the rows are removed
-            # explicitly, exactly as `src/app.ts` did.
+            # explicitly.
             await session.execute(delete(ChatHistory).where(ChatHistory.session_id == value))
             await session.execute(delete(ChatSession).where(ChatSession.id == value))
         return JsonResponse({"success": True})

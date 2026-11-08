@@ -1,5 +1,3 @@
-"""`GET /health` — `src/app.ts:178`."""
-
 from __future__ import annotations
 
 from fastapi import APIRouter, Response

@@ -1,22 +1,3 @@
-"""Workflow endpoints — port of `src/workflows/routes.ts`.
-
-Two things about this router are load-bearing:
-
-**Route order.** FastAPI matches in declaration order, as Hono did. The literal
-segments (`/health`, `/plan`, `/runs/...`, `/proposals/...`, `/lessons/...`) must be
-declared before the `/{workflow_id}` catch-all, or `/workflows/health` would be
-parsed as a workflow id.
-
-**Status codes.** `src/workflows/routes.ts` derived the code from the error
-*message* (`/not found/i` → 404, `/conflict|active run/i` → 409, else 400). Carrying
-regexes forward would mean a reworded message silently changes an HTTP status, so the
-service raises typed errors instead and `app/main.py`'s handler maps them. The body
-stays `{"error": "<message>"}`, which is what `web/`'s `workflowApi()` reads.
-
-Responses are the raw snake_case rows plus the camelCase aliases the TypeScript
-added, because `web/src/lib/workflows.ts` reads both from these endpoints.
-"""
-
 from __future__ import annotations
 
 import asyncio
@@ -48,7 +29,7 @@ logger = get_logger("workflows")
 #: `LIMIT 30` on run history, and `LIMIT 100` per SSE poll.
 RUN_PAGE_SIZE = 30
 EVENT_PAGE_SIZE = 100
-#: The run-events stream polls once a second, as `streamSSE` did.
+#: The run-events stream polls once a second.
 EVENT_POLL_SECONDS = 1.0
 #: Postgres' int4 max, the default `before` cursor.
 INT4_MAX = 2_147_483_647
@@ -104,7 +85,7 @@ async def workflows_health() -> Response:
         {
             "workers": workers,
             "schedulerEnabled": get_settings().SCHEDULER_ENABLED,
-            # The TypeScript returned raw rows here, so each is {status, count}.
+            # Raw rows: each is {status, count}.
             "runs": [{"status": row.status, "count": row.count} for row in counts],
             "overdue": overdue,
         }
@@ -126,7 +107,7 @@ async def list_workflows() -> Response:
     """All workflows with their active definition and last run status.
 
     `last_status` stays snake_case while `activeRevision`/`nextRunAt`/`lastRunAt` are
-    camelCase — that mix is what `web/src/lib/workflows.ts` declares.
+    camelCase — that mix is what the web client declares.
     """
     rows = await fetch_all(
         "SELECT w.*, r.definition, "
@@ -249,8 +230,8 @@ async def run_events(run_id: str, request: Request) -> Response:
                 yield frame(dumps({"status": status}), event="done")
                 return
 
-            # A *named* heartbeat event, not a comment — Hono's streamSSE emitted
-            # this shape and a client may be listening for it.
+            # A *named* heartbeat event, not a comment — a client may be
+            # listening for it.
             yield frame("{}", event="heartbeat")
             await asyncio.sleep(EVENT_POLL_SECONDS)
 
@@ -320,7 +301,7 @@ async def patch_workflow(workflow_id: str, request: Request) -> Response:
     allowed = {"definition", "expectedRevision", "enabled"}
     unexpected = set(body) - allowed
     if unexpected:
-        # The TypeScript used a `.strict()` zod object here.
+        # Strict: unknown fields are rejected.
         raise BadRequestError(f"Unexpected field(s): {', '.join(sorted(unexpected))}")
 
     if body.get("definition") is not None:

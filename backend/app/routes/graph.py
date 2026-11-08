@@ -1,9 +1,3 @@
-"""Knowledge-graph read endpoint — `src/app.ts:883-937`.
-
-`POST /graph/maintenance` is deliberately absent until `app/memory/heal.py` is ported;
-it runs dedupe, LLM contradiction resolution, edge repair and re-embedding.
-"""
-
 from __future__ import annotations
 
 from typing import Any
@@ -25,7 +19,7 @@ async def get_graph(kind: str | None = None, status: str = "active") -> Response
     """Nodes plus the edges whose endpoints are both in the returned node set.
 
     `status=all` disables the status filter. The edge filtering happens in Python
-    rather than SQL, matching `src/app.ts` — it loads every edge and keeps those whose
+    rather than SQL — it loads every edge and keeps those whose
     endpoints survived the node filter.
     """
     try:

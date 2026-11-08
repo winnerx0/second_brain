@@ -1,12 +1,3 @@
-"""Memory endpoints — `src/app.ts:299-419`.
-
-Memories live in `graph_nodes` with `kind = 'memory'`; the standalone `memories` table
-is legacy (migration 0004 copied its rows across) and is not read here.
-
-`POST /memories/cleanup` is deliberately absent until `app/memory/cleanup.py` is
-ported, since it drives a three-model debate per row.
-"""
-
 from __future__ import annotations
 
 import datetime as dt
@@ -38,8 +29,8 @@ def _memory_id(raw: str) -> int:
 def _full_node_json(row: GraphNode) -> dict[str, Any]:
     """Every column, camelCased.
 
-    `PATCH /memories/:id` used Drizzle's `.returning()` with no projection, so its
-    response carried the whole row — including `vector` (1536 floats), `aliases`,
+    `PATCH /memories/:id` returns the unprojected row, so its
+    response carries the whole row — including `vector` (1536 floats), `aliases`,
     `metadata` and `normalizedName`. Trimming it would be a frontend-visible change,
     so it is preserved; revisit separately after the migration if the payload size
     matters.
