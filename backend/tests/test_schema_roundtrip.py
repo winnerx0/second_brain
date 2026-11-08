@@ -1,18 +1,3 @@
-"""Prove the models can *reproduce* the real schema, not just fail to differ from it.
-
-`tests/test_schema_parity.py` relies on Alembic's `compare_metadata`, which does not
-compare partial-index predicates: deleting the `WHERE status IN ('queued','running')`
-clause from `workflow_one_active` leaves that test green. That clause is what enforces
-"one active run per workflow", so losing it would let a workflow run twice
-concurrently — exactly the failure the index exists to prevent.
-
-This test closes the gap by building a second database from `Base.metadata` alone and
-diffing Postgres' own rendering of the indexes and constraints against the
-Drizzle-built schema. Both sides are rendered by Postgres, so predicates that are
-written differently but mean the same thing compare equal, while a missing or
-altered predicate shows up immediately.
-"""
-
 from __future__ import annotations
 
 import psycopg
@@ -105,11 +90,11 @@ def model_built_url() -> str:
 
 @requires_test_db
 def test_indexes_match(model_built_url: str) -> None:
-    drizzle_url = resolve_test_database_url()
-    assert drizzle_url is not None
-    rebuild_legacy_schema(drizzle_url)
+    legacy_url = resolve_test_database_url()
+    assert legacy_url is not None
+    rebuild_legacy_schema(legacy_url)
 
-    expected = _rows(drizzle_url, INDEX_QUERY)
+    expected = _rows(legacy_url, INDEX_QUERY)
     actual = _rows(model_built_url, INDEX_QUERY)
 
     missing = sorted(expected - actual)
@@ -124,11 +109,11 @@ def test_indexes_match(model_built_url: str) -> None:
 
 @requires_test_db
 def test_constraints_match(model_built_url: str) -> None:
-    drizzle_url = resolve_test_database_url()
-    assert drizzle_url is not None
-    rebuild_legacy_schema(drizzle_url)
+    legacy_url = resolve_test_database_url()
+    assert legacy_url is not None
+    rebuild_legacy_schema(legacy_url)
 
-    expected = _rows(drizzle_url, CONSTRAINT_QUERY)
+    expected = _rows(legacy_url, CONSTRAINT_QUERY)
     actual = _rows(model_built_url, CONSTRAINT_QUERY)
 
     missing = sorted(expected - actual)

@@ -1,10 +1,3 @@
-"""Tests for the memory tools.
-
-The classification table and the key heuristics decide a memory's importance and
-tier, so a drift here silently re-ranks what the agent recalls. Every expectation
-below was checked against the original TypeScript regexes.
-"""
-
 from __future__ import annotations
 
 from typing import Any
@@ -36,8 +29,8 @@ from tests.conftest import requires_test_db
         ("correction.1", "corrections"),
         ("knowledge.rust", "knowledge"),
         ("random.thing", "unclassified"),
-        # The \b-after-alternation quirk: plural prefixes do NOT match. Verified
-        # against the TypeScript; preserved deliberately.
+        # The \b-after-alternation quirk: plural prefixes do NOT match. Preserved
+        # deliberately.
         ("preferences.coffee", "unclassified"),
         ("relationships.wife", "unclassified"),
     ],

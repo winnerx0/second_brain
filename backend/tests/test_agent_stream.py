@@ -1,14 +1,3 @@
-"""Guards the riskiest assumption in the migration.
-
-`web/src/routes/index.tsx` renders the chat transcript from the SSE event stream, so
-if LangChain Python's `astream(stream_mode="updates")` chunk shape differs from the
-JS `stream({streamMode:'updates'})` shape that `src/agent.ts` consumed, tool activity
-silently stops appearing in the UI with no error anywhere.
-
-The first test pins the real shape by running an actual `create_agent` graph; the rest
-cover the translator's branches without needing a model.
-"""
-
 from __future__ import annotations
 
 from typing import Any
@@ -61,7 +50,7 @@ async def test_real_agent_stream_produces_expected_event_sequence() -> None:
     async for chunk in agent.astream(
         {"messages": [HumanMessage("any PRs?")]}, stream_mode="updates"
     ):
-        # The contract src/agent.ts relied on: one updated node per chunk, whose
+        # The contract the translator relies on: one updated node per chunk, whose
         # value carries a `messages` list.
         assert len(chunk) == 1, chunk
         node_update = next(iter(chunk.values()))
@@ -70,7 +59,7 @@ async def test_real_agent_stream_produces_expected_event_sequence() -> None:
 
     assert [e["type"] for e in events] == ["tool_start", "tool_end", "assistant_delta"]
     assert events[0]["tool"] == "get_open_prs"
-    assert events[0]["input"] == '{"owner":"winnerx0"}', "compact JSON, as JSON.stringify"
+    assert events[0]["input"] == '{"owner":"winnerx0"}', "compact JSON"
     assert events[1]["tool"] == "get_open_prs"
     assert events[1]["output"] == "PR #1: fix things"
     assert events[2]["delta"] == "You have one open PR."
@@ -132,7 +121,7 @@ def test_output_is_omitted_unless_debug_payloads() -> None:
 
 
 def test_subagent_prefix_is_applied() -> None:
-    """Subagents report inner tools as '<subagent>:<tool>' (src/subagents/utils.ts)."""
+    """Subagents report inner tools as '<subagent>:<tool>'."""
     translator = StreamTranslator(tool_prefix="github:")
     events = list(
         translator.translate(
@@ -159,7 +148,7 @@ def test_subagent_prefix_is_applied() -> None:
 
 
 def test_block_content_is_not_emitted_as_a_delta() -> None:
-    """Only plain string content becomes a delta, matching the TypeScript check."""
+    """Only plain string content becomes a delta, only."""
     translator = StreamTranslator()
     events = list(
         translator.translate(
@@ -167,7 +156,7 @@ def test_block_content_is_not_emitted_as_a_delta() -> None:
         )
     )
     assert events == []
-    # ...but final_text still flattens blocks, as getFinalText did.
+    # ...but final_text still flattens blocks, regardless.
     assert translator.final_text() == "hello"
 
 

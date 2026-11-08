@@ -1,5 +1,3 @@
-"""Tests for the knowledge-graph tools, exercised against a real Postgres."""
-
 from __future__ import annotations
 
 import json

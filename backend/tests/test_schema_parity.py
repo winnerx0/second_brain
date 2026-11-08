@@ -1,11 +1,3 @@
-"""Prove `app/db/models.py` matches the schema Drizzle actually created.
-
-This is the gate for the whole migration: every raw-SQL query ported from
-`src/workflows/` assumes the live column types, and an Alembic autogenerate run
-against a drifted model set would emit destructive DDL. A clean result is an empty
-diff list.
-"""
-
 from __future__ import annotations
 
 from typing import Any
@@ -41,7 +33,7 @@ def _diff(sync_connection: Any) -> list[Any]:
 
 
 @requires_test_db
-async def test_models_match_drizzle_schema(drizzle_engine: AsyncEngine) -> None:
-    async with drizzle_engine.connect() as conn:
+async def test_models_match_baseline_schema(legacy_engine: AsyncEngine) -> None:
+    async with legacy_engine.connect() as conn:
         diffs = await conn.run_sync(_diff)
     assert diffs == [], "\n".join(repr(d) for d in diffs)

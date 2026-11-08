@@ -1,5 +1,3 @@
-"""Contract tests for the memory and graph endpoints."""
-
 from __future__ import annotations
 
 import httpx
@@ -72,7 +70,7 @@ async def test_patch_memory_returns_the_whole_row(
     assert response.status_code == 200
     memory = response.json()["memory"]
     assert memory["value"] == "Winner X", "value is trimmed"
-    # Drizzle's bare `.returning()` sent the full row; keep that shape.
+    # The PATCH response carries the full row; keep that shape.
     for field in ("normalizedName", "aliases", "metadata", "vector", "recallCount", "status"):
         assert field in memory, field
     assert len(memory["vector"]) == 1536

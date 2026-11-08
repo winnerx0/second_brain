@@ -1,10 +1,3 @@
-"""Records which of the TypeScript agent's tools are wired, and which are not.
-
-`src/agent.ts` exposed 21 tools. This test fails if a wired tool disappears, and its
-`KNOWN_MISSING` list is the live checklist for the rest of the port — removing a name
-from it without wiring the tool breaks the test.
-"""
-
 from __future__ import annotations
 
 from app.agent.registry import (
@@ -16,24 +9,14 @@ from app.agent.registry import (
 
 #: Still to port. Shrink this as each module lands; it must reach [] before cutover.
 KNOWN_MISSING = [
-    "anilist",
-    "calendar",
-    "clickup",
-    "docs",
-    "github",
-    "gmail",
-    "knowledge_graph",
     "list_workflows",
     "manage_workflow",
-    "notion",
     "schedule_workflow",
-    "spotify",
-    "twitter",
 ]
 
 
-def test_wired_tools_are_a_subset_of_the_typescript_surface() -> None:
-    """No tool may be invented that the TypeScript agent did not expose."""
+def test_wired_tools_are_a_subset_of_the_expected_surface() -> None:
+    """No tool may be invented outside the expected surface."""
     expected = {*EXPECTED_DIRECT_TOOLS, *EXPECTED_SPECIALISTS}
     wired = {tool.name for tool in main_agent_tools()}
     assert wired <= expected, f"unexpected tools wired: {sorted(wired - expected)}"
@@ -41,13 +24,23 @@ def test_wired_tools_are_a_subset_of_the_typescript_surface() -> None:
 
 def test_currently_wired_tools() -> None:
     assert sorted(tool.name for tool in main_agent_tools()) == [
+        "anilist",
+        "calendar",
+        "clickup",
         "delete_memory_key",
+        "docs",
         "get_current_datetime",
+        "github",
+        "gmail",
+        "knowledge_graph",
         "list_skills",
+        "notion",
         "read_skill",
         "recall_memories",
         "send_telegram_message",
         "set_memory_key",
+        "spotify",
+        "twitter",
         "web_search",
     ]
 

@@ -1,10 +1,3 @@
-"""Tests for the skills loader.
-
-The frontmatter parser is deliberately lax rather than a YAML parser, so its exact
-tolerances are part of the contract: a stricter parser would start rejecting skill
-files that work today.
-"""
-
 from __future__ import annotations
 
 import json

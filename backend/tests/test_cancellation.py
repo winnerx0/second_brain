@@ -1,10 +1,3 @@
-"""Tests for the AbortSignal stand-in.
-
-These matter because `engine.py` decides a run's terminal status from *which* signal
-fired — a shutdown re-queues the run, a timeout fails it — so reason propagation
-through a composed signal has to be right.
-"""
-
 from __future__ import annotations
 
 import asyncio

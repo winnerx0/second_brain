@@ -1,10 +1,3 @@
-"""Contract tests for `/health` and the session endpoints.
-
-The TypeScript backend had no HTTP tests at all. These pin the parts `web/` reads by
-name: the camelCase field set, the status codes, and the `Date.now()` millisecond
-timestamp.
-"""
-
 from __future__ import annotations
 
 import re
@@ -13,7 +6,7 @@ import httpx
 
 from tests.conftest import requires_test_db
 
-# `JSON.stringify(new Date(...))` — three fractional digits, always `Z`.
+# JavaScript `Date` ISO format — three fractional digits, always `Z`.
 JS_TIMESTAMP = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$")
 
 
@@ -62,7 +55,7 @@ async def test_sessions_crud_and_field_names(api_client: httpx.AsyncClient) -> N
 
 @requires_test_db
 async def test_invalid_session_id_is_400_not_422(api_client: httpx.AsyncClient) -> None:
-    """Hono's `Number.isInteger(n) && n > 0` check produced a 400.
+    """A non-positive-integer id must produce a 400.
 
     A FastAPI `int` path parameter would return 422 with a different body, which
     `web/`'s error handling does not expect.

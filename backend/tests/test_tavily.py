@@ -1,9 +1,3 @@
-"""Tests for the Tavily tool and the web-search specialist.
-
-The request body and the camelCase re-keying of the response are both part of what
-the agent sees, so both are pinned.
-"""
-
 from __future__ import annotations
 
 import json
@@ -83,7 +77,7 @@ async def test_default_request_body(tavily_api: list[dict]) -> None:
 
 
 async def test_optional_filters_are_omitted_when_unset(tavily_api: list[dict]) -> None:
-    """The TypeScript used conditional spreads; absent keys must stay absent."""
+    """Absent keys must stay absent from the request body."""
     await tavily_search.ainvoke({"query": "q", "time_range": "week", "include_domains": ["a.com"]})
     body = tavily_api[0]
     assert body["time_range"] == "week"

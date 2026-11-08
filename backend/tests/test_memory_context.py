@@ -1,10 +1,3 @@
-"""Tests for proactive recall.
-
-The output of `build_recall_context` goes straight into the agent's system prompt, so
-its exact shape is load-bearing: the header tells the model not to mention the block,
-and the arrow notation is how relationships are conveyed.
-"""
-
 from __future__ import annotations
 
 from typing import Any

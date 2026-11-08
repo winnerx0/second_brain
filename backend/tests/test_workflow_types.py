@@ -1,13 +1,3 @@
-"""Port of `src/workflows/types.test.ts`, plus cases the TypeScript did not cover.
-
-The scheduling assertions carry the literal ISO strings from the original test. They
-are the proof that `croniter` agrees with `cron-parser`, including across both US
-daylight-saving transitions — a disagreement would silently reschedule every cron
-workflow, and because `workflow_occurrence` is unique on
-`(workflow_id, scheduled_for)`, a shifted instant would also let a duplicate
-occurrence be enqueued.
-"""
-
 from __future__ import annotations
 
 import datetime as dt

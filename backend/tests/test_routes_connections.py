@@ -1,11 +1,3 @@
-"""Contract tests for the connection and OAuth endpoints.
-
-`web/src/routes/connections.tsx` branches on `oauthSupported`, `oauthConfigured`,
-`apiKeySupported` and `apiKeyConnected`, so those four derived booleans are the main
-thing being pinned here — along with the 302 (not 307) redirects, which a browser
-would otherwise re-POST.
-"""
-
 from __future__ import annotations
 
 import httpx

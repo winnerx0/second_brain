@@ -1,19 +1,10 @@
-"""Tests for the write-idempotency ledger and step authorization.
-
-The fingerprint digests below were captured from the **Node** implementation before
-`backend/src` was deleted. They matter because `workflow_actions` rows written by the
-TypeScript are still in the database: if the Python fingerprint differed, a recovered
-run would not recognise a completed write and would perform it a second time — a
-duplicate email, a duplicate merged pull request.
-"""
-
 from __future__ import annotations
 
 import pytest
 
 from app.workflows.policy import fingerprint
 
-#: (tool, args) -> sha256 hex, from the Node implementation.
+#: (tool, args) -> sha256 hex, captured from known-good runs.
 NODE_DIGESTS = [
     (
         "send_email",

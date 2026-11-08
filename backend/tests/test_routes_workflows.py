@@ -1,11 +1,3 @@
-"""Contract tests for the `/workflows` endpoints.
-
-`web/src/lib/workflows.ts` declares a deliberately mixed contract — `activeRevision`
-and `nextRunAt` in camelCase alongside `last_status`, `ran_at`, `scheduled_for` and
-`steps[].step_id` in snake_case — because the TypeScript spread raw Postgres rows and
-then added three aliases. Those key sets are the main thing pinned here.
-"""
-
 from __future__ import annotations
 
 from typing import Any
@@ -100,7 +92,7 @@ async def test_invalid_definition_is_400(api_client: httpx.AsyncClient) -> None:
 
 @requires_test_db
 async def test_unported_specialist_is_rejected_clearly(api_client: httpx.AsyncClient) -> None:
-    """A step naming a specialist whose tools are not ported must not be saved."""
+    """A step naming a specialist whose tools are not available must not be saved."""
     definition = {
         **DEFINITION,
         "steps": [{**DEFINITION["steps"][0], "specialist": "github"}],

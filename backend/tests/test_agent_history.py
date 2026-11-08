@@ -1,11 +1,3 @@
-"""Tests for chat-history reconstruction.
-
-`chat_history` rows written by the TypeScript predate this port and must still load.
-A provider rejects a tool result that does not answer a tool call, so the
-orphan-dropping is what keeps a conversation usable after a turn was interrupted
-mid-tool-call.
-"""
-
 from __future__ import annotations
 
 import json
@@ -59,7 +51,7 @@ def test_tool_message_after_a_plain_ai_message_is_dropped() -> None:
 def test_consecutive_tool_messages_after_one_call_keep_the_first_only() -> None:
     """Each kept ToolMessage becomes the new 'previous', so only the first survives.
 
-    This mirrors the TypeScript exactly: it checks `history[history.length - 1]`,
+    It checks the last history entry,
     which is a ToolMessage by the time the second one is examined.
     """
     messages = reconstruct_history(

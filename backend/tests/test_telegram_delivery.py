@@ -1,5 +1,3 @@
-"""Tests for Telegram message splitting and the Markdown-failure retry."""
-
 from __future__ import annotations
 
 import httpx

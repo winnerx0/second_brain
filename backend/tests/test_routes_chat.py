@@ -1,9 +1,3 @@
-"""Tests for the chat endpoints, including the SSE frame bytes.
-
-`web/src/routes/index.tsx` parses `/chat/stream` by hand from the response body, so
-the literal frame bytes are the contract — not just the event names.
-"""
-
 from __future__ import annotations
 
 from typing import Any

@@ -1,9 +1,3 @@
-"""Tests for the scheduler and claim logic.
-
-These exercise the Postgres coordination primitives directly, because they are what
-prevent duplicate runs and duplicate external writes — not application logic.
-"""
-
 from __future__ import annotations
 
 import datetime as dt

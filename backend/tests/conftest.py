@@ -1,11 +1,3 @@
-"""Shared test fixtures.
-
-`src/workflows/integration.test.ts` guarded itself against ever touching a real
-database: it required an explicit `WORKFLOW_TEST_DATABASE_URL`, asserted the host was
-localhost and the database was named `workflow_test`, and never fell back to
-`DATABASE_URL`. Those guard rails are reproduced here.
-"""
-
 from __future__ import annotations
 
 import os
@@ -77,7 +69,7 @@ def _stub_required_env(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def rebuild_legacy_schema(url: str, up_to: str | None = None) -> None:
-    """Recreate `public` from the Drizzle SQL. Only ever run against a guarded URL."""
+    """Recreate `public` from the baseline SQL. Only ever run against a guarded URL."""
     with psycopg.connect(url, autocommit=True) as conn:
         with conn.cursor() as cur:
             cur.execute("DROP SCHEMA public CASCADE; CREATE SCHEMA public;")
@@ -88,8 +80,8 @@ def rebuild_legacy_schema(url: str, up_to: str | None = None) -> None:
 
 
 @pytest_asyncio.fixture
-async def drizzle_engine() -> AsyncIterator[AsyncEngine]:
-    """An engine over a database built from the frozen Drizzle migrations."""
+async def legacy_engine() -> AsyncIterator[AsyncEngine]:
+    """An engine over a database built from the frozen baseline SQL."""
     url = resolve_test_database_url()
     assert url is not None
     rebuild_legacy_schema(url)
