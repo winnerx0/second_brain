@@ -1,12 +1,3 @@
-"""Workflow definitions, scheduling and permission scope — port of
-`src/workflows/types.ts`.
-
-This module is pure: no database, no network. It decides when a workflow runs and
-what a step is allowed to do, so it is the most security-relevant part of the engine
-and is tested exhaustively (`tests/test_workflow_types.py`, ported from
-`src/workflows/types.test.ts`).
-"""
-
 from __future__ import annotations
 
 import datetime as dt
@@ -54,7 +45,7 @@ Specialist = Literal[
 
 TriggerKind = Literal["manual", "once", "cron"]
 
-#: A constraint value: string, number or boolean, as the zod union allowed.
+#: A constraint value: string, number or boolean, mirroring the JSON the web client sends.
 ConstraintValue = str | int | float | bool
 
 STEP_ID_PATTERN = r"^[a-z][a-z0-9_-]{0,63}$"
@@ -105,15 +96,14 @@ def _valid_timezone(name: str) -> ZoneInfo:
     try:
         return ZoneInfo(name)
     except (ZoneInfoNotFoundError, ValueError, KeyError) as exc:
-        # `new Intl.DateTimeFormat('en', {timeZone})` threw for an unknown zone.
-        raise BadRequestError(f"Invalid timezone: {name}") from exc
+                raise BadRequestError(f"Invalid timezone: {name}") from exc
 
 
 def validate_definition(value: Any) -> Definition:
     """Parse and fully validate a definition, or raise `BadRequestError`.
 
-    Checks run in the same order as the TypeScript so the first failure reported for
-    a given input is unchanged: schema, timezone, cron, one-time instant, duplicate
+    Checks run in a fixed order so the first failure reported for
+    a given input is stable: schema, timezone, cron, one-time instant, duplicate
     step ids, then dependency cycles.
     """
     try:
@@ -221,7 +211,7 @@ def latest_occurrence(trigger: Trigger, now: dt.datetime | None = None) -> dt.da
         return instant if instant.tzinfo else instant.replace(tzinfo=dt.UTC)
 
     zone = _valid_timezone(trigger.timezone)
-    # The +1ms matches the TypeScript, and makes an occurrence landing exactly on
+    # The +1ms makes an occurrence landing exactly on
     # `now` count as past rather than future.
     local = (moment + dt.timedelta(milliseconds=1)).astimezone(zone)
     previous = croniter(trigger.cron or "", local).get_prev(dt.datetime)

@@ -1,16 +1,3 @@
-"""The ambient workflow-execution context.
-
-Shared between `app/agent/subagents/base.py` (which injects an authorization notice
-into a subagent's prompt while a workflow step is running) and
-`app/workflows/policy.py` (which enforces permissions and the write ledger). It lives
-in its own module so the subagents do not import the workflow engine.
-
-`AsyncLocalStorage` in `src/workflows/policy.ts`; a `ContextVar` here. The dataclass
-is mutable on purpose — the TypeScript does `ctx.toolCalls++` and
-`ctx.failures.push(...)`, and `executeStep` reads both afterwards to decide whether
-the step really succeeded.
-"""
-
 from __future__ import annotations
 
 from collections.abc import Iterator

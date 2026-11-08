@@ -1,14 +1,3 @@
-"""The embedded workflow worker — port of `src/workflows/worker.ts`.
-
-Runs in the same process as the HTTP server, as `src/index.ts` did. That is why
-`/workflows/health` reports `workers` from a heartbeat table and why compose sets
-`stop_grace_period: 17m`: the container lifecycle *is* the worker lifecycle.
-
-It follows that the server runs with a single uvicorn worker. Two would mean two
-poll loops (so the global four-run cap would become eight), plus two copies of the
-in-memory OAuth pending-state map and the Telegram de-duplication set.
-"""
-
 from __future__ import annotations
 
 import asyncio

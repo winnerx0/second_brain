@@ -1,10 +1,3 @@
-"""Pre-flight connection checks — port of `src/workflows/connections.ts`.
-
-Reported on the workflow detail page so a workflow that cannot possibly succeed says
-so before it is run, rather than failing mid-execution. Advisory only: several
-specialists work from a configured credential instead of an OAuth connection.
-"""
-
 from __future__ import annotations
 
 from sqlalchemy import select

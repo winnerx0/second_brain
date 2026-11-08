@@ -1,20 +1,3 @@
-"""Per-tool-call authorization and the write-idempotency ledger.
-
-Port of `src/workflows/policy.ts`. This middleware wraps every tool call a
-specialist makes while a workflow step is executing, and is the only thing standing
-between a lost worker lease and a duplicated real-world side effect — a second email,
-a second merged pull request.
-
-Outside a workflow run (ordinary chat) it is a pass-through.
-
-Four jobs, in order:
-  1. refuse a call the step is not authorized to make;
-  2. refuse to continue if the run has been cancelled or the lease has moved on;
-  3. for writes, claim a ledger row before acting, and replay a previously completed
-     write from its recorded result instead of repeating it;
-  4. retry a *read* once on a transient failure; never blind-retry a write.
-"""
-
 from __future__ import annotations
 
 import hashlib
@@ -47,11 +30,10 @@ def fingerprint(tool: str, args: dict[str, Any]) -> str:
     Content arguments are excluded, so re-sending the same message to the same
     recipient is recognised as the same write while a different recipient is not.
 
-    The digest must match the TypeScript's byte-for-byte or every ledger row written
-    before this migration becomes unmatchable, and a recovered run would re-send.
-    Specifically: `JSON.stringify` emits no whitespace, and `Object.entries` yields
-    two-element arrays rather than objects. Pinned against digests captured from the
-    Node implementation in `tests/test_workflow_policy.py`.
+    The digest must stay stable or every ledger row already written becomes
+    unmatchable, and a recovered run would re-send. Specifically: the JSON has no
+    whitespace, and targets are two-element arrays rather than objects. Pinned by
+    the known digests in `tests/test_workflow_policy.py`.
     """
     targets = sorted(
         ([key, value] for key, value in args.items() if is_target(key)),

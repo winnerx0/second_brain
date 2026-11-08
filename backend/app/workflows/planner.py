@@ -1,13 +1,3 @@
-"""Natural-language workflow planning — port of `src/workflows/planner.ts`.
-
-Turns "every weekday at 8am, summarize my PRs and send it to Telegram" into a
-validated definition, or into clarification questions. It never executes anything.
-
-The system prompt is copied verbatim; it is the whole behaviour of the feature, and
-in particular it is what stops the model inventing a schedule, a recipient or a
-capability instead of asking.
-"""
-
 from __future__ import annotations
 
 import datetime as dt

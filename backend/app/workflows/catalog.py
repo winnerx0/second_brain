@@ -1,16 +1,3 @@
-"""Specialist capability catalog — port of `src/workflows/catalog.ts`.
-
-The catalog is handed to the planner so it writes permissions using real tool names
-and argument schemas, and `validate_capabilities` then refuses a definition that
-names a tool the specialist does not have.
-
-PORTING STATUS: only the specialists whose tool modules are ported appear in
-`TOOL_GROUPS`. `validate_capabilities` raises a clear error for a step naming an
-unported specialist rather than silently accepting it — the TypeScript would have
-thrown a TypeError on the missing lookup, and silently passing would let a workflow
-be saved that can never run.
-"""
-
 from __future__ import annotations
 
 from typing import Any
@@ -18,18 +5,36 @@ from typing import Any
 from langchain_core.tools import BaseTool
 
 from app.errors import BadRequestError
+from app.tools.anilist import anilist_tools
+from app.tools.calendar import calendar_tools
+from app.tools.clickup import clickup_tools
+from app.tools.github import github_tools
+from app.tools.gmail import gmail_tools
+from app.tools.google_docs import google_doc_tools
 from app.tools.knowledge_graph import knowledge_graph_tools
+from app.tools.notion import notion_tools
+from app.tools.spotify import spotify_tools
 from app.tools.tavily import tavily_tools
+from app.tools.twitter import twitter_tools
 from app.workflows.types import Definition, is_read_tool
 
 #: specialist -> its tools. Add an entry as each provider module lands.
 TOOL_GROUPS: dict[str, list[BaseTool]] = {
+    "github": list(github_tools),
+    "calendar": list(calendar_tools),
+    "gmail": list(gmail_tools),
+    "docs": list(google_doc_tools),
+    "anilist": list(anilist_tools),
     "knowledge_graph": list(knowledge_graph_tools),
+    "notion": list(notion_tools),
+    "clickup": list(clickup_tools),
+    "spotify": list(spotify_tools),
+    "twitter": list(twitter_tools),
     "web_search": list(tavily_tools),
 }
 
-#: Specialists `src/workflows/catalog.ts` had tool groups for. Any of these missing
-#: from TOOL_GROUPS is simply not ported yet.
+#: Specialists expected to have tool groups. Any of these missing
+#: from TOOL_GROUPS is simply not available yet.
 EXPECTED_TOOL_GROUPS = (
     "github",
     "gmail",
@@ -55,7 +60,7 @@ def unported_specialists() -> list[str]:
 
 
 def _parameters(tool: BaseTool) -> Any:
-    """The tool's argument JSON Schema, or the TypeScript's fallback string."""
+    """The tool's argument JSON Schema, or a fallback string."""
     try:
         return tool.tool_call_schema.model_json_schema()
     except Exception:
@@ -93,7 +98,7 @@ def validate_capabilities(definition: Definition) -> None:
             if group is None:
                 raise BadRequestError(
                     f"The {step.specialist} specialist is not available in this "
-                    "build yet; its tools have not been ported."
+                    "build yet; its tools are not available."
                 )
             names = [tool.name for tool in group]
 

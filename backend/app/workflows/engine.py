@@ -1,28 +1,3 @@
-"""Workflow scheduler and executor — port of `src/workflows/engine.ts`.
-
-Coordination is done entirely in Postgres, so several backend replicas can run
-workers without talking to each other:
-
-* `SELECT ... FOR UPDATE SKIP LOCKED` hands each due workflow to exactly one worker;
-* `pg_advisory_xact_lock(81723501)` serialises claiming, so the global concurrency
-  cap is honoured across processes;
-* the partial unique index `workflow_one_active` makes "one live run per workflow" a
-  database guarantee rather than application logic;
-* `ON CONFLICT DO NOTHING` on `workflow_occurrence` makes enqueueing an occurrence
-  idempotent.
-
-None of that is reimplemented in Python. The SQL is ported as-is.
-
-Cancellation differs from the TypeScript in one respect worth stating. There,
-`AbortSignal` propagated into `fetch` and unwound a hung HTTP call. Python has no
-equivalent, so this module combines two mechanisms: a cooperative `Cancellation`
-checked at the same points the TypeScript checked `throwIfAborted()`, and an
-`asyncio.timeout` that puts a hard bound on the whole run so a hung model call cannot
-hold a lease forever. Status writes on the failure path are shielded, because a write
-issued inside a cancelled task is itself cancelled — which would strand the run as
-`running` with a dead lease.
-"""
-
 from __future__ import annotations
 
 import asyncio

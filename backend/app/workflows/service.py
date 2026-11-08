@@ -1,15 +1,3 @@
-"""Workflow persistence — port of `src/workflows/service.ts`.
-
-Every mutation runs in a transaction that takes `SELECT ... FOR UPDATE` on the
-workflow row first, which is what serialises concurrent edits, enqueues and
-pause/resume against each other.
-
-Revision model: editing a workflow writes a new `workflow_revisions` row and bumps
-`workflows.active_revision`. A run freezes the revision it started with, so an edit
-mid-flight cannot change what an in-progress run does. Queued *scheduled* runs from
-the old revision are cancelled; an explicit manual run is not.
-"""
-
 from __future__ import annotations
 
 import datetime as dt
@@ -65,7 +53,7 @@ async def get_workflow(workflow_id: int) -> dict[str, Any]:
     """A workflow plus its active definition, schedule preview and connection issues.
 
     The response carries the raw snake_case row *and* three camelCase aliases,
-    because `web/src/lib/workflows.ts` reads both conventions from this endpoint.
+    because the web client reads both conventions from this endpoint.
     """
     async with sql_transaction() as conn:
         row = (

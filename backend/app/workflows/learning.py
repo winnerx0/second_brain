@@ -1,20 +1,3 @@
-"""Run reflection — port of `src/workflows/learning.ts`.
-
-After a run finishes, one unlearned run at a time is reflected on: verified step
-statuses, errors and any explicit user feedback become short lessons, and optionally
-a *proposal* for an improved definition.
-
-Two deliberate constraints:
-
-* a proposal is never activated — it is reviewed through `/workflows/proposals/...`;
-* `SELECT ... FOR UPDATE SKIP LOCKED` inside the transaction serialises the claim, so
-  several workers never reflect on the same run.
-
-The model call happens inside the open transaction, as in the TypeScript. That holds
-a row lock for up to its 60-second timeout, which is accepted: the alternative is a
-claim that can be lost between selecting and writing.
-"""
-
 from __future__ import annotations
 
 import asyncio
