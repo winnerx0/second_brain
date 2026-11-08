@@ -9,3 +9,11 @@ dist/
 /web/.vite
 /web/.output
 .vercel
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/

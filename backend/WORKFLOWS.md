@@ -1,23 +1,29 @@
 # Scheduled workflows
 
+> **Status on this branch:** the engine, worker, scheduler and learning loop are
+> ported and running. Nine specialists (github, gmail, calendar, docs, notion,
+> clickup, spotify, twitter, anilist) do not have their tool modules ported yet,
+> so a step naming one is refused at save time rather than failing at run time.
+> `synthesis`, `telegram` and `web_search` work.
+
 Create an automation in chat, Telegram, or the Workflows dashboard: “Every weekday at 8am, summarize my GitHub PRs and calendar, then send it to Telegram.” Clear requests activate immediately; unresolved schedules, destinations, or connections produce clarification questions. The timezone is always visible and defaults to `USER_TIMEZONE` (`Africa/Lagos`).
 
 ## Run locally
 
-From `backend/`, install dependencies and run `bun run db:migrate`, then start `bun run dev` and `bun run worker` in separate terminals. Start the frontend with `bun --cwd ../web run dev`. Backend port: 3005. Frontend port: 3001. Existing text-only workflows are retained; use “Edit instructions” to convert them before execution.
+From `backend/`, install dependencies with `uv sync`, bring the database up to date with `uv run python -m app.scripts.bootstrap_db`, then start `uv run uvicorn app.main:app --port 3005 --reload`. The backend process serves the API and runs the workflow scheduler, executor, and learning loop together. Start the frontend with `bun --cwd ../web run dev`. Backend port: 3005. Frontend port: 3001. Existing text-only workflows are retained; use “Edit instructions” to convert them before execution.
 
-`docker compose up -d --build` starts the backend and a separate worker. The backend applies migrations before starting; the worker waits for backend health. The database remains the externally configured Postgres instance. No live deployment or production migration is performed by the source-code change itself.
+`docker compose up -d --build` starts the backend process, which handles HTTP and workflows together. The backend applies migrations before starting. The database remains the externally configured Postgres instance. No live deployment or production migration is performed by the source-code change itself.
 
 The backend is bound to `127.0.0.1:3005` on the host. Configure your existing external proxy to forward to it, terminate HTTPS, enforce access control for this single-user application, disable SSE buffering, and support WebSocket upgrades. Set `APP_URL`, `OAUTH_REDIRECT_BASE_URL`, `PUBLIC_API_URL`, and frontend `VITE_API_BASE_URL` to the appropriate public URLs. Nginx and Certbot are no longer included. Existing certificate/data volumes are not deleted.
 
 ## Execution rules
 
 - Manual, one-time, and five-field recurring cron triggers are supported. Schedules retain their IANA timezone; instants are stored as UTC.
-- The worker polls every 15 seconds. Postgres row locks, unique occurrence keys and a partial unique active-run index coordinate multiple workers.
+- The embedded worker polls every 15 seconds. Postgres row locks, unique occurrence keys and a partial unique active-run index coordinate workers across multiple backend replicas.
 - Four runs may execute globally, with one active run per workflow and up to four ready specialist steps per run. Overdue occurrences coalesce to the latest occurrence, including while the previous run is still active.
 - Each run freezes its revision. Editing changes future runs and cancels queued scheduled runs from older revisions. Pausing cancels queued scheduled runs, but does not cancel an active run or prevent explicit manual runs.
 - Runs time out after 15 minutes. Cancellation prevents subsequent actions; an already-issued external request cannot be undone.
-- A 90-second expired lease recovers safe work from persisted step checkpoints. Unknown write outcomes become `needs_attention`; the worker does not automatically repeat them. This is not an exactly-once guarantee for external services.
+- A 90-second expired lease recovers safe work from persisted step checkpoints. Unknown write outcomes become `needs_attention`; the worker does not automatically repeat them. This is not an exactly-once guarantee for external services. During shutdown, the backend stops polling, aborts active work, waits for it to settle, and removes its worker heartbeat.
 - Writes are constrained by tool name and exact target arguments. One logical write per tool/target per step is replayed from its recorded result after recovery; use separate steps for intentional repeated writes to the same target. Unknown dynamic write targets require clarification. Read operations may retry a transient failure once; specialist agents are never blindly retried as a whole.
 - `SCHEDULER_ENABLED=false` stops scheduling new occurrences; queued/manual runs still execute. `WORKFLOW_LEARNING_ENABLED=false` disables background run reflection.
 
@@ -53,6 +59,6 @@ All paths below are under `/workflows`:
 
 ## Validation
 
-Run `bun test src/workflows/types.test.ts`, `bun run typecheck`, and `bun run build` in `backend/`; run `bun run typecheck` and `bun run build` in `web/`. Build the worker with `bun build --target=bun --outfile=dist/worker.js src/workflows/worker.ts`.
+Run `uv run pytest`, `uv run ruff check`, and `uv run mypy app` in `backend/`; run `bun run typecheck` and `bun run build` in `web/`.
 
-Integration tests require a disposable local Postgres database named `workflow_test` with pgvector. They intentionally recreate only that database's public schema. Pass its URL explicitly as `WORKFLOW_TEST_DATABASE_URL` when running `bun test src/workflows`; they never fall back to the application's `DATABASE_URL`. Tests exercise migration preservation, duplicate claims, catch-up, revision conflicts, cancellation, uncertain writes, run persistence and proposal acceptance.
+Integration tests require a disposable local Postgres database named `workflow_test` with pgvector. They intentionally recreate only that database's public schema. Pass its URL explicitly as `WORKFLOW_TEST_DATABASE_URL` when running `uv run pytest`; they never fall back to the application's `DATABASE_URL`. Tests exercise migration preservation, duplicate claims, catch-up, revision conflicts, cancellation, uncertain writes, run persistence and proposal acceptance.
